@@ -7,9 +7,6 @@ function dataSourceId_(source) {
       '';
   }
 
-  if (source === DATA_SOURCES.ASSIGNMENTS) {
-    return props.getProperty(APP.PROPERTY_ASSIGNMENTS_DB_ID) || '';
-  }
 
   throw new Error('Fuente de datos no reconocida: ' + source);
 }
