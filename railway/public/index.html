@@ -565,10 +565,10 @@ function parseOrderTextBulk(text,fileName){
   let cama=orderClean(pick(["tipo cama","cama"],100));if(badBed(cama))cama="";
   const tipoCirugia=pick(["tipo cirugía","tipo cirugia"],120);
   let procedencia=pick(["procedencia","origen paciente"],160);
-  if(!procedencia){
+  if(!/(AMBULATORI|HOSPITAL|INTERN)/i.test(procedencia)){
     const pm=t.match(/PROCEDENCIA\s*[:#]?\s*(AMBULATORI[AO]|HOSPITALIZAD[AO]|HOSPITALARI[AO]|INTERN[AO])/i);if(pm)procedencia=pm[1];
   }
-  if(!procedencia){
+  if(!/(AMBULATORI|HOSPITAL|INTERN)/i.test(procedencia)){
     const top=lines.find(x=>/^(AMBULATORI[AO]|HOSPITALIZAD[AO]|HOSPITALARI[AO])\b/i.test(x));if(top)procedencia=top;
   }
   const tipoAtencion=normalizeCareType(tipoCirugia,procedencia,cama);
