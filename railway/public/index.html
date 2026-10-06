@@ -241,7 +241,7 @@ header .logo{
   <div class="ops-flow-title">Recuperación postanestésica</div>
   <div class="panel table-wrap recovery-panel"><table><thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Procedimiento</th><th>Especialidad</th><th>Especialista</th><th>QNO</th><th>Ingreso</th><th>Acciones</th></tr></thead><tbody id="recoveryBody"></tbody></table></div>
 </section>
-<section class="view" id="view-programacion"><div class="hero"><div><span class="kicker">PROGRAMACIÓN</span><h2>Programación quirúrgica</h2><p>Consulta, nuevo paciente y cargue masivo.</p></div><div><button class="btn" id="newPatient">Nuevo paciente</button> <button class="btn soft" id="bulkOpen">Carga masiva</button></div></div><div class="toolbar"><input id="pq" placeholder="Buscar paciente, documento, procedimiento o especialista"><select id="pst"><option value="">Todos los estados</option><option>PROGRAMADO</option><option>PREPARACIÓN</option><option>QUIRÓFANO</option><option>RECUPERACIÓN</option><option>ALTA</option><option>HOSPITALIZACIÓN</option><option>CANCELADO</option></select><select id="pqn"><option value="">Todos los QNO</option></select><button class="btn soft" id="refreshProg">Actualizar</button></div><div class="panel table-wrap"><table><thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Procedimiento</th><th>Especialidad</th><th>Especialista</th><th>QNO</th><th>Estado</th><th>Tipo</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody id="progBody"></tbody></table></div></section>
+<section class="view" id="view-programacion"><div class="hero"><div><span class="kicker">PROGRAMACIÓN</span><h2>Programación quirúrgica</h2><p>Gestión de pacientes programados.</p></div><div><button class="btn" id="newPatient">Nuevo paciente</button> <button class="btn soft" id="bulkOpen">Carga masiva</button></div></div><div class="toolbar"><input id="pq" placeholder="Buscar paciente, documento, procedimiento o especialista"><select id="pst"><option value="">Todos los estados</option><option>PROGRAMADO</option><option>PREPARACIÓN</option><option>QUIRÓFANO</option><option>RECUPERACIÓN</option><option>ALTA</option><option>HOSPITALIZACIÓN</option><option>CANCELADO</option></select><select id="pqn"><option value="">Todos los QNO</option></select><button class="btn soft" id="refreshProg">Actualizar</button></div><div class="panel table-wrap"><table><thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Procedimiento</th><th>Especialidad</th><th>Especialista</th><th>QNO</th><th>Estado</th><th>Tipo</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody id="progBody"></tbody></table></div></section>
 <section class="view" id="view-profilaxis">
   <div class="hero"><div><span class="kicker">PROFILAXIS</span><h2>Profilaxis antibiótica</h2><p>Consulta del protocolo institucional y seguimiento de la profilaxis administrada.</p></div></div>
   <div class="panel" style="margin-bottom:10px">
@@ -416,7 +416,7 @@ async function parsePdfBulk(file){
   for(let n=1;n<=pdf.numPages;n++){
     const p=await pdf.getPage(n),tc=await p.getTextContent();
     const text=tc.items.map(x=>String(x.str||"").trim()).filter(Boolean).join(" ").replace(/\s+/g," ");
-    const qm=[...text.matchAll(/QUIR[ÓO]FANO\s*([123])/gi)];
+    const qm=[...text.matchAll(/QUIR[ÓO]FANO\s*(\d{1,2})/gi)];
     if(qm.length)qno="QNO "+qm[qm.length-1][1];
     const chunks=text.split(/(?=\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b)/g);
     chunks.forEach(ch=>{
@@ -427,7 +427,7 @@ async function parsePdfBulk(file){
       const fecha=yy+"-"+String(dm[2]).padStart(2,"0")+"-"+String(dm[1]).padStart(2,"0");
       const documento=(ch.match(/\b\d{6,12}\b/)||[])[0]||"";
       const cups=(ch.match(/\b\d{5,6}\b/)||[])[0]||"";
-      const cleaned=ch.replace(dm[0]," ").replace(tm[0]," ").replace(documento," ").replace(cups," ").replace(/QUIR[ÓO]FANO\s*[123]/ig," ").replace(/\s+/g," ").trim();
+      const cleaned=ch.replace(dm[0]," ").replace(tm[0]," ").replace(documento," ").replace(cups," ").replace(/QUIR[ÓO]FANO\s*\d{1,2}/ig," ").replace(/\s+/g," ").trim();
       rows.push({fecha,hora:tm[0],documento,paciente:"",edad:"",sexo:"",cups,procedimiento:cleaned,especialidad:"",especialista:"",qno,tipoAtencion:"",cama:"",observaciones:"Fuente PDF · revisar datos extraídos"});
     });
   }
@@ -481,33 +481,66 @@ async function parseAnyBulkFile(file){
 async function api(url,opt){opt=opt||{};const r=await fetch(url,Object.assign({credentials:"same-origin"},opt,{headers:Object.assign({"content-type":"application/json"},opt.headers||{})}));const d=await r.json();if(!r.ok)throw new Error(d.error||"Error");return d}
 function metric(n,v){return '<div class="metric"><span>'+esc(n)+'</span><b>'+esc(v)+'</b></div>'}
 function cls(s){s=String(s||"").toUpperCase();if(s==="PREPARACIÓN")return"preparacion";if(s==="QUIRÓFANO")return"quirofano";if(s==="RECUPERACIÓN")return"recuperacion";if(["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(s))return"final";return""}
-function qnoNorm(v){const s=String(v||"").toUpperCase();const m=s.match(/[123]/);return m?"QNO "+m[0]:""}
+function qnoNorm(v){return String(v||"").trim().toUpperCase()}
+function populateQnoSelectors(){
+  const qnos=state.config?.qnos||[];
+  const prog=$("pqn"),patient=$("fQno"),download=$("dlType");
+  if(prog){const prev=prog.value;prog.innerHTML='<option value="">Todos los QNO</option>'+qnos.map(q=>'<option value="'+esc(q)+'">'+esc(q)+'</option>').join("");if(qnos.includes(prev))prog.value=prev}
+  if(patient){const prev=patient.value;patient.innerHTML='<option value=""></option>'+qnos.map(q=>'<option value="'+esc(q)+'">'+esc(q)+'</option>').join("");if(qnos.includes(prev))patient.value=prev}
+  if(download){
+    const prev=download.value;
+    [...download.querySelectorAll('option[data-dynamic-qno="1"]')].forEach(x=>x.remove());
+    const before=[...download.options].find(x=>x.value==="TIEMPOS_QNO");
+    qnos.forEach(q=>{const o=document.createElement("option");o.value=q;o.textContent=q;o.dataset.dynamicQno="1";download.insertBefore(o,before||null)});
+    if([...download.options].some(x=>x.value===prev))download.value=prev;
+  }
+}
+function flowDestinations(stateName){return Array.isArray(state.config?.flow?.[stateName])?state.config.flow[stateName]:[]}
+function flowButton(p,dest){
+  if(p.estado==="QUIRÓFANO"&&["RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"].includes(dest)){
+    const label=dest==="RECUPERACIÓN"?"Recuperación":dest==="ALTA"?"Alta directa":"Hospitalización";
+    return '<button class="btn '+(dest==="RECUPERACIÓN"||dest==="ALTA"?"green ":"")+'sm" onclick="openIntraop(\''+p.id+'\',\''+dest+'\')">'+label+'</button>';
+  }
+  if(p.estado==="PROGRAMADO"&&dest==="QUIRÓFANO")return '<button class="btn sm" onclick="directQno(\''+p.id+'\')">Directo QNO</button>';
+  const label=dest==="PREPARACIÓN"?"Preparación":dest==="QUIRÓFANO"?"Ingresar QNO":dest==="PROGRAMADO"?"Volver a programado":dest;
+  return '<button class="btn '+(dest==="PREPARACIÓN"?"amber ":"")+'sm" onclick="moveCase(\''+p.id+'\',\''+dest+'\')">'+esc(label)+'</button>';
+}
+function operationActions(p){
+  if(!hasUiPermission("OPERACION_GESTIONAR"))return "";
+  let a=flowDestinations(p.estado).map(d=>flowButton(p,d)).join("");
+  if(["PROGRAMADO","PREPARACIÓN","QUIRÓFANO"].includes(p.estado))a+='<button class="btn red sm" onclick="openCancel(\''+p.id+'\')">Cancelar</button>';
+  return a;
+}
 function currentChief(required=true){
   const v=String($("turnChief")?.value||"").trim();
   if(required&&!v){alert("Debe registrar el Jefe de turno antes de mover pacientes.");$("turnChief")?.focus();return "";}
   return v;
 }
 function pcard(p){
-  let a="";
-  if(p.estado==="PROGRAMADO")a='<button class="btn amber sm" onclick="moveCase(\''+p.id+'\',\'PREPARACIÓN\')">Preparación</button><button class="btn sm" onclick="directQno(\''+p.id+'\')">Directo QNO</button><button class="btn red sm" onclick="openCancel(\''+p.id+'\')">Cancelar</button>';
-  if(p.estado==="PREPARACIÓN")a='<button class="btn sm" onclick="moveCase(\''+p.id+'\',\'QUIRÓFANO\')">Ingresar QNO</button><button class="btn soft sm" onclick="moveCase(\''+p.id+'\',\'PROGRAMADO\')">Volver</button><button class="btn red sm" onclick="openCancel(\''+p.id+'\')">Cancelar</button>';
-  if(p.estado==="QUIRÓFANO")a='<button class="btn green sm" onclick="openIntraop(\''+p.id+'\',\'RECUPERACIÓN\')">Recuperación</button><button class="btn green sm" onclick="openIntraop(\''+p.id+'\',\'ALTA\')">Alta directa</button><button class="btn sm" onclick="openIntraop(\''+p.id+'\',\'HOSPITALIZACIÓN\')">Hospitalización</button><button class="btn soft sm" onclick="moveCase(\''+p.id+'\',\'PREPARACIÓN\')">Volver</button><button class="btn red sm" onclick="openCancel(\''+p.id+'\')">Cancelar</button>';
-  const qsel=['','QNO 1','QNO 2','QNO 3'].map(q=>'<option value="'+q+'" '+(qnoNorm(p.qno)===q?'selected':'')+'>'+esc(q||"Sin QNO")+'</option>').join('');
-  return '<article class="patient '+cls(p.estado)+'"><div class="ptop"><div><div class="pname">'+esc(p.paciente)+'</div><div class="pdoc">'+esc(p.documento)+'</div></div><div class="ptime">'+esc(p.hora||'--:--')+'</div></div><div class="proc">'+esc(p.procedimiento)+'</div><div class="chips"><span class="chip">'+esc(p.especialidad||'—')+'</span><span class="chip">'+esc(p.estado)+'</span></div><div class="actions"><select onchange="changeQno(\''+p.id+'\',this.value)">'+qsel+'</select>'+a+'</div></article>';
+  const manage=hasUiPermission("OPERACION_GESTIONAR"),qnos=state.config?.qnos||[];
+  const qsel=[''].concat(qnos).map(q=>'<option value="'+esc(q)+'" '+(qnoNorm(p.qno)===q?'selected':'')+'>'+esc(q||"Sin QNO")+'</option>').join('');
+  return '<article class="patient '+cls(p.estado)+'"><div class="ptop"><div><div class="pname">'+esc(p.paciente)+'</div><div class="pdoc">'+esc(p.documento)+'</div></div><div class="ptime">'+esc(p.hora||'--:--')+'</div></div><div class="proc">'+esc(p.procedimiento)+'</div><div class="chips"><span class="chip">'+esc(p.especialidad||'—')+'</span><span class="chip">'+esc(p.estado)+'</span></div><div class="actions"><select '+(manage?'':'disabled')+' onchange="changeQno(\''+p.id+'\',this.value)">'+qsel+'</select>'+operationActions(p)+'</div></article>';
 }
 function renderLane(id,rows){$(id).innerHTML=rows.length?rows.map(pcard).join(""):'<div class="empty">Sin pacientes</div>';}
 function renderOp(d){
-  state.patients=d.rows||[];const m=d.metrics;
+  state.patients=d.rows||[];if(d.config)state.config=d.config;populateQnoSelectors();const m=d.metrics;
   $("opMetrics").innerHTML=metric("Total",m.total)+metric("Programados",m.programado)+metric("Preparación",m.preparacion)+metric("En QNO",m.quirofano)+metric("Recuperación",m.recuperacion)+metric("Finalizados",m.finalizados);
   const prog=state.patients.filter(p=>p.estado==="PROGRAMADO"),prep=state.patients.filter(p=>p.estado==="PREPARACIÓN");
-  const q1=state.patients.filter(p=>p.estado==="QUIRÓFANO"&&qnoNorm(p.qno)==="QNO 1"),q2=state.patients.filter(p=>p.estado==="QUIRÓFANO"&&qnoNorm(p.qno)==="QNO 2"),q3=state.patients.filter(p=>p.estado==="QUIRÓFANO"&&qnoNorm(p.qno)==="QNO 3");
-  renderLane("lane-programado",prog);renderLane("lane-preparacion",prep);renderLane("lane-qno1",q1);renderLane("lane-qno2",q2);renderLane("lane-qno3",q3);
-  $("count-programado").textContent=prog.length;$("count-preparacion").textContent=prep.length;$("count-qno1").textContent=q1.length;$("count-qno2").textContent=q2.length;$("count-qno3").textContent=q3.length;
-  const rec=state.patients.filter(p=>p.estado==="RECUPERACIÓN");
-  $("recoveryBody").innerHTML=rec.length?rec.map(p=>'<tr><td>'+esc(p.hora)+'</td><td><b>'+esc(p.paciente)+'</b></td><td>'+esc(p.documento)+'</td><td>'+esc(p.procedimiento)+'</td><td>'+esc(p.especialidad)+'</td><td>'+esc(p.especialista)+'</td><td>'+esc(qnoNorm(p.qno)||"—")+'</td><td>'+esc(p.actualizado||"—")+'</td><td><button class="btn green sm" onclick="finishCase(\''+p.id+'\',\'ALTA\')">Alta</button> <button class="btn sm" onclick="finishCase(\''+p.id+'\',\'HOSPITALIZACIÓN\')">Hospitalizar</button></td></tr>').join(""):'<tr><td colspan="9">Sin pacientes en recuperación</td></tr>';
+  renderLane("lane-programado",prog);renderLane("lane-preparacion",prep);
+  $("count-programado").textContent=prog.length;$("count-preparacion").textContent=prep.length;
+  const qnos=state.config?.qnos||[];
+  $("qnoGrid").innerHTML=qnos.map((q,i)=>'<div class="lane"><div class="lane-head">'+esc(q)+' <span class="count" id="count-qno-'+i+'">0</span></div><div id="lane-qno-'+i+'"></div></div>').join("")||'<div class="empty">No hay QNO habilitados.</div>';
+  qnos.forEach((q,i)=>{const rows=state.patients.filter(p=>p.estado==="QUIRÓFANO"&&qnoNorm(p.qno)===q);renderLane("lane-qno-"+i,rows);const c=$("count-qno-"+i);if(c)c.textContent=rows.length});
+  const rec=state.patients.filter(p=>p.estado==="RECUPERACIÓN"),allowed=flowDestinations("RECUPERACIÓN"),manage=hasUiPermission("OPERACION_GESTIONAR");
+  $("recoveryBody").innerHTML=rec.length?rec.map(p=>{let a="";if(manage&&allowed.includes("ALTA"))a+='<button class="btn green sm" onclick="finishCase(\''+p.id+'\',\'ALTA\')">Alta</button> ';if(manage&&allowed.includes("HOSPITALIZACIÓN"))a+='<button class="btn sm" onclick="finishCase(\''+p.id+'\',\'HOSPITALIZACIÓN\')">Hospitalizar</button>';return '<tr><td>'+esc(p.hora)+'</td><td><b>'+esc(p.paciente)+'</b></td><td>'+esc(p.documento)+'</td><td>'+esc(p.procedimiento)+'</td><td>'+esc(p.especialidad)+'</td><td>'+esc(p.especialista)+'</td><td>'+esc(qnoNorm(p.qno)||"—")+'</td><td>'+esc(p.actualizado||"—")+'</td><td>'+(a||"—")+'</td></tr>'}).join(""):'<tr><td colspan="9">Sin pacientes en recuperación</td></tr>';
 }
 async function loadPatients(){const d=await api("/api/board?date="+encodeURIComponent($("date").value));renderOp(d);renderProgram()}
-function renderProgram(){const q=$("pq").value.toLowerCase(),st=$("pst").value,qn=$("pqn").value;const rows=state.patients.filter(p=>(!st||p.estado===st)&&(!qn||qnoNorm(p.qno)===qn)&&(!q||[p.paciente,p.documento,p.procedimiento,p.especialista].some(v=>String(v||"").toLowerCase().includes(q))));$("progBody").innerHTML=rows.map(p=>'<tr><td>'+esc(p.hora)+'</td><td>'+esc(p.paciente)+'</td><td>'+esc(p.documento)+'</td><td>'+esc(p.procedimiento)+'</td><td>'+esc(p.especialidad)+'</td><td>'+esc(p.especialista)+'</td><td>'+esc(p.qno)+'</td><td>'+esc(p.estado)+'</td><td>'+esc(p.tipoAtencion)+'</td><td>'+esc(p.observaciones)+'</td><td><button class="btn soft sm" onclick="editPatient(\''+p.id+'\')">Editar</button> <button class="btn red sm" onclick="openCancel(\''+p.id+'\')">Cancelar</button></td></tr>').join("")||'<tr><td colspan="11">Sin registros</td></tr>'}
+function renderProgram(){
+  const q=$("pq").value.toLowerCase(),st=$("pst").value,qn=$("pqn").value;
+  const rows=state.patients.filter(p=>(!st||p.estado===st)&&(!qn||qnoNorm(p.qno)===qn)&&(!q||[p.paciente,p.documento,p.procedimiento,p.especialista].some(v=>String(v||"").toLowerCase().includes(q))));
+  const canEdit=hasUiPermission("PROGRAMACION_EDITAR"),canCancel=hasUiPermission("OPERACION_GESTIONAR");
+  $("progBody").innerHTML=rows.map(p=>{let a="";if(canEdit)a+='<button class="btn soft sm" onclick="editPatient(\''+p.id+'\')">Editar</button> ';if(canCancel&&!["CANCELADO","ALTA","HOSPITALIZACIÓN"].includes(p.estado))a+='<button class="btn red sm" onclick="openCancel(\''+p.id+'\')">Cancelar</button>';return '<tr><td>'+esc(p.hora)+'</td><td>'+esc(p.paciente)+'</td><td>'+esc(p.documento)+'</td><td>'+esc(p.procedimiento)+'</td><td>'+esc(p.especialidad)+'</td><td>'+esc(p.especialista)+'</td><td>'+esc(p.qno)+'</td><td>'+esc(p.estado)+'</td><td>'+esc(p.tipoAtencion)+'</td><td>'+esc(p.observaciones)+'</td><td>'+(a||"—")+'</td></tr>'}).join("")||'<tr><td colspan="11">Sin registros</td></tr>';
+}
 function editPatient(id){
   const p=state.patients.find(x=>x.id===id);if(!p)return;state.editPatientId=id;$("patientTitle").textContent="Editar paciente";$("fFecha").value=p.fecha||$("date").value;$("fHora").value=String(p.hora||"").slice(0,5);$("fDoc").value=p.documento||"";$("fPaciente").value=p.paciente||"";$("fEdad").value=p.edad||"";$("fSexo").value=p.sexo||"";$("fCups").value=p.cups||"";$("fProc").value=p.procedimiento||"";$("fEsp").value=p.especialidad||"";$("fMed").value=p.especialista||"";$("fQno").value=qnoNorm(p.qno)||"";$("fTipo").value=p.tipoAtencion||"";$("fCama").value=p.cama||"";$("fUvr").value=p.uvr||"";$("fTiempo").value=p.tiempoQx||"";$("fRecursos").value=p.recursos||"";$("fObs").value=p.observaciones||"";state.patientFiles=[];$("patientFiles").value="";$("patientFilesStatus").textContent="Puede adjuntar archivos adicionales al actualizar el paciente.";openModal("patientModal");
 }
@@ -743,9 +776,14 @@ async function importBulk(){try{const batchId=$("bulkFile").dataset.batchId||("B
 function hasUiPermission(p){const perms=state.session?.permissions||[];return perms.includes("*")||perms.includes(p)}
 function applyAccessUi(){
   const viewPerm={operativo:"OPERACION_VER",programacion:"PROGRAMACION_VER",profilaxis:"PROFILAXIS_PREQX",postop:"CUIDADOS_POSTOP",acompanantes:"OPERACION_VER",coordinacion:"COORDINACION_VER"};
-  document.querySelectorAll(".nav button[data-view]").forEach(b=>{const p=viewPerm[b.dataset.view];b.classList.toggle("hidden",Boolean(p)&&!hasUiPermission(p))});
-  const coordPerm={resumen:"COORDINACION_VER",kpi:"INDICADORES_VER",mci:"INDICADORES_VER",seguridad:"REINTERVENCIONES_REVISAR",descargas:"DESCARGAS",usuarios:"USUARIOS_GESTIONAR"};
+  document.querySelectorAll(".nav button[data-view]").forEach(b=>{
+    if(b.dataset.view==="configuracion"){b.classList.toggle("hidden",String(state.session?.role||"").toUpperCase()!=="SUPERADMIN");return}
+    const p=viewPerm[b.dataset.view];b.classList.toggle("hidden",Boolean(p)&&!hasUiPermission(p));
+  });
+  const coordPerm={resumen:"COORDINACION_VER",kpi:"INDICADORES_VER",mci:"INDICADORES_VER",seguridad:"REINTERVENCIONES_REVISAR",descargas:"DESCARGAS"};
   document.querySelectorAll("[data-coord]").forEach(b=>{const p=coordPerm[b.dataset.coord];b.classList.toggle("hidden",Boolean(p)&&!hasUiPermission(p))});
+  if($("newPatient"))$("newPatient").classList.toggle("hidden",!hasUiPermission("PROGRAMACION_EDITAR"));
+  if($("bulkOpen"))$("bulkOpen").classList.toggle("hidden",!hasUiPermission("CARGUE_MASIVO"));
 }
 const PERMISSION_LABELS={
 "OPERACION_VER":["Ver operación","Consultar tablero operativo y flujo quirúrgico."],
@@ -789,8 +827,37 @@ async function saveRole(){
   const payload={id,nombre:$("roleName").value,descripcion:$("roleDescription").value,estado:$("roleState").value,permisos};
   try{if(editing)await api("/api/roles/update",{method:"POST",body:JSON.stringify(payload)});else await api("/api/roles",{method:"POST",body:JSON.stringify(payload)});closeModal("roleModal");await Promise.all([loadRolesAdmin(),loadUsersAdmin()])}catch(e){alert(e.message)}
 }
+function isSuperAdmin(){return String(state.session?.role||"").toUpperCase()==="SUPERADMIN"}
+function renderQnoConfig(){
+  const box=$("configQnoList");if(!box)return;
+  box.innerHTML=(state.config?.qnos||[]).map(q=>'<span class="config-qno-chip">'+esc(q)+'<button type="button" title="Retirar" onclick="removeConfigQno(\''+String(q).replace(/'/g,"\\'")+'\')">×</button></span>').join("")||'<span class="empty">Sin QNO configurados.</span>';
+}
+function addConfigQno(){
+  const input=$("newQnoName"),q=String(input.value||"").trim().toUpperCase();if(!q)return;
+  if((state.config.qnos||[]).includes(q)){alert("Ese QNO ya existe.");return}
+  state.config.qnos.push(q);input.value="";renderQnoConfig();
+}
+function removeConfigQno(q){
+  if((state.config.qnos||[]).length<=1){alert("Debe quedar al menos un QNO habilitado.");return}
+  const inUse=state.patients.some(p=>qnoNorm(p.qno)===q&&!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(p.estado));
+  if(inUse&&!confirm(q+" tiene pacientes activos en la fecha seleccionada. ¿Desea retirarlo de la configuración futura?"))return;
+  state.config.qnos=state.config.qnos.filter(x=>x!==q);renderQnoConfig();
+}
+function renderFlowEditor(){
+  const box=$("flowEditor");if(!box)return;const sources=["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN"],states=state.config?.states||[];
+  box.innerHTML=sources.map(from=>'<div class="flow-row"><div class="flow-source">'+esc(from)+'</div><div class="flow-targets">'+states.filter(to=>to!==from).map(to=>'<label><input type="checkbox" data-flow-from="'+esc(from)+'" value="'+esc(to)+'" '+(flowDestinations(from).includes(to)?"checked":"")+'>'+esc(to)+'</label>').join("")+'</div></div>').join("");
+}
+async function loadConfiguration(){
+  if(!isSuperAdmin()){alert("Configuración es exclusiva de SUPERADMIN.");return}
+  const d=await api("/api/config-operativa");state.config=d;populateQnoSelectors();renderQnoConfig();renderFlowEditor();
+}
+async function saveOperationalConfig(){
+  if(!isSuperAdmin())return;
+  const flow={};["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN"].forEach(from=>{flow[from]=[...document.querySelectorAll('[data-flow-from="'+from+'"]:checked')].map(x=>x.value)});
+  try{const d=await api("/api/config-operativa",{method:"POST",body:JSON.stringify({qnos:state.config.qnos,flow})});state.config=d;renderQnoConfig();renderFlowEditor();populateQnoSelectors();alert("Configuración operativa actualizada.");if(state.view==="operativo"||state.view==="programacion")await loadPatients()}catch(e){alert(e.message)}
+}
 function isAdminUi(){return hasUiPermission("USUARIOS_GESTIONAR")}
-function updateAdminUi(){applyAccessUi();const b=$("usersTabBtn");if(b)b.classList.toggle("hidden",!isAdminUi())}
+function updateAdminUi(){applyAccessUi()}
 async function loadUsersAdmin(){
   if(!hasUiPermission("USUARIOS_GESTIONAR")){alert("No tiene permiso USUARIOS_GESTIONAR.");return;}
   const [u,r]=await Promise.all([api("/api/users"),api("/api/roles")]);state.users=u.rows||[];state.roles=r.rows||[];
@@ -803,9 +870,10 @@ async function saveUser(){const id=$("uId").value;try{if(id){await api("/api/use
 function openResetPin(id){const u=state.users.find(x=>x.id===id);if(!u)return;$("rpUserId").value=id;$("rpUserName").value=u.usuario+" · "+u.nombre;$("rpPin").value="";$("rpForce").checked=true;openModal("resetPinModal")}
 async function saveResetPin(){try{await api("/api/users/reset-pin",{method:"POST",body:JSON.stringify({id:$("rpUserId").value,pin:$("rpPin").value,forceChange:$("rpForce").checked})});closeModal("resetPinModal");alert("PIN actualizado.");await loadUsersAdmin()}catch(e){alert(e.message)}}
 async function saveOwnPin(){const a=$("cpNew").value,b=$("cpConfirm").value;if(a!==b){alert("La confirmación del nuevo PIN no coincide.");return}try{await api("/api/change-pin",{method:"POST",body:JSON.stringify({currentPin:$("cpCurrent").value,newPin:a})});closeModal("changePinModal");$("cpCurrent").value=$("cpNew").value=$("cpConfirm").value="";alert("PIN actualizado correctamente. Inicie sesión nuevamente.");await api("/api/logout",{method:"POST"}).catch(()=>{});location.reload()}catch(e){alert(e.message)}}
-async function showView(v){state.view=v;document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.id==="view-"+v));document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.view===v));if(v==="operativo"||v==="programacion")await loadPatients();if(v==="profilaxis")await loadProfilaxis();if(v==="postop")await loadPostop();if(v==="acompanantes")await loadCompanionAdmin();if(v==="coordinacion"){await loadCoord();updateAdminUi();}}
+async function showView(v){state.view=v;document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.id==="view-"+v));document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.view===v));if(v==="operativo"||v==="programacion")await loadPatients();if(v==="profilaxis")await loadProfilaxis();if(v==="postop")await loadPostop();if(v==="acompanantes")await loadCompanionAdmin();if(v==="coordinacion"){await loadCoord();updateAdminUi();}if(v==="configuracion"){if(!isSuperAdmin()){alert("Configuración es exclusiva de SUPERADMIN.");return}await loadConfiguration();}}
 async function login(){try{const d=await api("/api/login",{method:"POST",body:JSON.stringify({user:$("lu").value,pin:$("lp").value})});state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";updateAdminUi();$("login").classList.add("hidden");const first=document.querySelector(".nav button[data-view]:not(.hidden)");await showView(first?.dataset.view||"operativo")}catch(e){$("le").textContent=e.message}}
-document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closeModal(b.dataset.close)));document.querySelectorAll("[data-coord]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-coord]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".coord-panel").forEach(x=>x.classList.toggle("active",x.id==="coord-"+b.dataset.coord));if(b.dataset.coord==="kpi")await loadKpi();if(b.dataset.coord==="mci")await loadMci();if(b.dataset.coord==="seguridad")await loadSecurity();if(b.dataset.coord==="usuarios")await loadUsersAdmin()}));
-$("lb").addEventListener("click",login);$("newRoleBtn")?.addEventListener("click",openNewRole);$("saveRoleBtn")?.addEventListener("click",saveRole);$("changePinBtn")?.addEventListener("click",()=>openModal("changePinModal"));$("saveOwnPinBtn")?.addEventListener("click",saveOwnPin);$("newUserBtn")?.addEventListener("click",openNewUser);$("saveUserBtn")?.addEventListener("click",saveUser);$("saveResetPinBtn")?.addEventListener("click",saveResetPin);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",async()=>{try{await api("/api/logout",{method:"POST"})}catch{}location.reload()});$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackBtn").addEventListener("click",track);$("copyTrackingPortalBtn")?.addEventListener("click",copyTrackingPortal);$("openTrackingPortalBtn")?.addEventListener("click",openTrackingPortal);$("printTrackingQrBtn")?.addEventListener("click",()=>printTrackingQr().catch(e=>alert(e.message)));$("downloadCompanionCardsBtn")?.addEventListener("click",()=>downloadCompanionCards().catch(e=>alert(e.message)));$("companionLogin").addEventListener("click",()=>{$("login").classList.add("hidden");showView("acompanantes")});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>alert(x.message))});$("patientFiles").addEventListener("change",e=>{state.patientFiles=Array.from(e.target.files||[]);$("patientFilesStatus").textContent=state.patientFiles.length?state.patientFiles.length+" archivo(s) seleccionados. Se guardarán al crear el paciente.":"Sin archivos seleccionados.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);$("confirmCancel")?.addEventListener("click",submitCancel);$("confirmIntraop")?.addEventListener("click",submitIntraop);$("profSearchBtn")?.addEventListener("click",searchProfilaxisCatalog);$("profSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchProfilaxisCatalog()});document.querySelectorAll("[data-prof]").forEach(b=>b.addEventListener("click",()=>chooseProf(b.dataset.prof)));document.querySelectorAll("[data-clasif]").forEach(b=>b.addEventListener("click",()=>chooseClasif(b.dataset.clasif)));["ioAnestIni","ioAnestFin","ioQxIni","ioQxFin","ioProfHora"].forEach(id=>$(id)?.addEventListener("input",updateIntraopCalc));
-(async()=>{$("date").value=new Date().toLocaleDateString("en-CA",{timeZone:"America/Bogota"});if(new URLSearchParams(location.search).get("follow")==="1"){$("login").classList.add("hidden");await showView("acompanantes");return;}try{const d=await api("/api/me");state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";updateAdminUi();$("login").classList.add("hidden");await showView("operativo")}catch{}})();
+document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closeModal(b.dataset.close)));document.querySelectorAll("[data-coord]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-coord]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".coord-panel").forEach(x=>x.classList.toggle("active",x.id==="coord-"+b.dataset.coord));if(b.dataset.coord==="kpi")await loadKpi();if(b.dataset.coord==="mci")await loadMci();if(b.dataset.coord==="seguridad")await loadSecurity();}));document.querySelectorAll("[data-config]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-config]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".config-panel").forEach(x=>x.classList.toggle("active",x.id==="config-"+b.dataset.config));if(b.dataset.config==="usuarios")await loadUsersAdmin();if(b.dataset.config==="roles")await loadRolesAdmin();if(b.dataset.config==="operacion")await loadConfiguration()}));
+
+$("lb").addEventListener("click",login);$("addQnoBtn")?.addEventListener("click",addConfigQno);$("newQnoName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addConfigQno()});$("saveOperationalConfigBtn")?.addEventListener("click",saveOperationalConfig);$("newRoleBtn")?.addEventListener("click",openNewRole);$("saveRoleBtn")?.addEventListener("click",saveRole);$("changePinBtn")?.addEventListener("click",()=>openModal("changePinModal"));$("saveOwnPinBtn")?.addEventListener("click",saveOwnPin);$("newUserBtn")?.addEventListener("click",openNewUser);$("saveUserBtn")?.addEventListener("click",saveUser);$("saveResetPinBtn")?.addEventListener("click",saveResetPin);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",async()=>{try{await api("/api/logout",{method:"POST"})}catch{}location.reload()});$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackBtn").addEventListener("click",track);$("copyTrackingPortalBtn")?.addEventListener("click",copyTrackingPortal);$("openTrackingPortalBtn")?.addEventListener("click",openTrackingPortal);$("printTrackingQrBtn")?.addEventListener("click",()=>printTrackingQr().catch(e=>alert(e.message)));$("downloadCompanionCardsBtn")?.addEventListener("click",()=>downloadCompanionCards().catch(e=>alert(e.message)));$("companionLogin").addEventListener("click",()=>{$("login").classList.add("hidden");showView("acompanantes")});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>alert(x.message))});$("patientFiles").addEventListener("change",e=>{state.patientFiles=Array.from(e.target.files||[]);$("patientFilesStatus").textContent=state.patientFiles.length?state.patientFiles.length+" archivo(s) seleccionados. Se guardarán al crear el paciente.":"Sin archivos seleccionados.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);$("confirmCancel")?.addEventListener("click",submitCancel);$("confirmIntraop")?.addEventListener("click",submitIntraop);$("profSearchBtn")?.addEventListener("click",searchProfilaxisCatalog);$("profSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchProfilaxisCatalog()});document.querySelectorAll("[data-prof]").forEach(b=>b.addEventListener("click",()=>chooseProf(b.dataset.prof)));document.querySelectorAll("[data-clasif]").forEach(b=>b.addEventListener("click",()=>chooseClasif(b.dataset.clasif)));["ioAnestIni","ioAnestFin","ioQxIni","ioQxFin","ioProfHora"].forEach(id=>$(id)?.addEventListener("input",updateIntraopCalc));
+(async()=>{$("date").value=new Date().toLocaleDateString("en-CA",{timeZone:"America/Bogota"});if(new URLSearchParams(location.search).get("follow")==="1"){$("login").classList.add("hidden");await showView("acompanantes");return;}try{const d=await api("/api/me");state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";updateAdminUi();$("login").classList.add("hidden");const first=document.querySelector(".nav button[data-view]:not(.hidden)");await showView(first?.dataset.view||"operativo")}catch{}})();
 </script></body></html>
