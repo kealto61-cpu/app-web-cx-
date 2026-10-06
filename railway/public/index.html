@@ -1090,7 +1090,7 @@ async function openEditRole(id){
 async function saveRole(){
   const editing=$("roleEditingId").value,id=(editing||$("roleId").value).trim().toUpperCase(),permisos=[...document.querySelectorAll("[data-role-permission]:checked")].map(x=>x.dataset.rolePermission);
   const payload={id,nombre:$("roleName").value,descripcion:$("roleDescription").value,estado:$("roleState").value,permisos};
-  try{if(editing)await api("/api/roles/update",{method:"POST",body:JSON.stringify(payload)});else await api("/api/roles",{method:"POST",body:JSON.stringify(payload)});closeModal("roleModal");await Promise.all([loadRolesAdmin(),loadUsersAdmin()])}catch(e){alert(e.message)}
+  try{if(editing)await api("/api/roles/update",{method:"POST",body:JSON.stringify(payload)});else await api("/api/roles",{method:"POST",body:JSON.stringify(payload)});closeModal("roleModal");await loadRolesAdmin();const rr=await api("/api/roles");state.roles=rr.rows||[];}catch(e){alert(e.message)}
 }
 function isSuperAdmin(){return String(state.session?.role||"").toUpperCase()==="SUPERADMIN"}
 function renderQnoConfig(){
@@ -1126,7 +1126,7 @@ function updateAdminUi(){applyAccessUi()}
 async function loadUsersAdmin(){
   if(!hasUiPermission("USUARIOS_GESTIONAR")){alert("No tiene permiso USUARIOS_GESTIONAR.");return;}
   const [u,r]=await Promise.all([api("/api/users"),api("/api/roles")]);state.users=u.rows||[];state.roles=r.rows||[];
-  const roleMap=Object.fromEntries(state.roles.map(r=>[r.id,r.nombre]));const body=$("usersBody");body.innerHTML=state.users.map(x=>'<tr><td><b>'+esc(x.usuario)+'</b></td><td>'+esc(x.nombre)+'</td><td>'+esc((roleMap[x.rol]||x.rol)+(roleMap[x.rol]?" ("+x.rol+")":""))+'</td><td>'+esc(x.estado)+'</td><td>'+esc(x.ultimoIngreso||"—")+'</td><td>'+(x.cambioPin?"Sí":"No")+'</td><td><button class="btn soft sm" onclick="openEditUser(\''+x.id+'\')">Editar</button> <button class="btn sm" onclick="openResetPin(\''+x.id+'\')">Reiniciar PIN</button></td></tr>').join("")||'<tr><td colspan="7">Sin usuarios</td></tr>';await loadRolesAdmin();
+  const roleMap=Object.fromEntries(state.roles.map(r=>[r.id,r.nombre]));const body=$("usersBody");body.innerHTML=state.users.map(x=>'<tr><td><b>'+esc(x.usuario)+'</b></td><td>'+esc(x.nombre)+'</td><td>'+esc((roleMap[x.rol]||x.rol)+(roleMap[x.rol]?" ("+x.rol+")":""))+'</td><td>'+esc(x.estado)+'</td><td>'+esc(x.ultimoIngreso||"—")+'</td><td>'+(x.cambioPin?"Sí":"No")+'</td><td><button class="btn soft sm" onclick="openEditUser(\''+x.id+'\')">Editar</button> <button class="btn sm" onclick="openResetPin(\''+x.id+'\')">Reiniciar PIN</button></td></tr>').join("")||'<tr><td colspan="7">Sin usuarios</td></tr>';
 }
 function fillRoleSelect(sel,value){sel.innerHTML=state.roles.map(r=>'<option value="'+esc(r.id)+'">'+esc(roleOptionLabel(r))+'</option>').join("");if(value)sel.value=value}
 async function openNewUser(){if(!state.roles.length)await loadUsersAdmin();$("uId").value="";$("userModalTitle").textContent="Nuevo usuario";$("uUsername").disabled=false;$("uUsername").value="";$("uName").value="";fillRoleSelect($("uRole"),"");$("uState").value="ACTIVO";$("uPin").value="";$("uPin").closest(".field").classList.remove("hidden");$("uForceChange").checked=true;openModal("userModal")}
