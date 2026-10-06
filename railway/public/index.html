@@ -72,6 +72,25 @@ main{max-width:1750px;margin:auto;padding:14px 16px 30px}.view{display:none}.vie
 
 #bulkModal .modal-card{width:min(98vw,1500px);max-width:1500px}
 #bulkModal .preview{width:100%}
+
+.companion-public-mode{background:linear-gradient(145deg,#F4F9FD,#E9F3FA);min-height:100vh}
+.companion-public-mode header,.companion-public-mode #login{display:none!important}
+.companion-public-mode main{max-width:100%;padding:0;min-height:100vh;display:grid;place-items:center}
+.companion-public-mode main>.view{display:none!important}
+.companion-public-mode #view-acompanantes{display:block!important;width:min(520px,94vw)}
+.companion-public-mode #companionInternalHero,.companion-public-mode #companionAdmin{display:none!important}
+.public-companion-card{background:#fff;border:1px solid #D8E7F2;border-radius:20px;padding:28px 26px;box-shadow:0 24px 70px rgba(7,59,111,.13);text-align:center}
+.public-companion-logo{width:190px;height:60px;background:var(--ama-logo) center/contain no-repeat;margin:0 auto 18px}
+.public-companion-card h2{margin:0;color:#073B6F;font-size:22px}
+.public-companion-card p{color:#688298;font-size:12px;line-height:1.55;margin:8px auto 20px;max-width:390px}
+.public-companion-card .trackrow{max-width:390px;margin:auto}
+.public-companion-card .trackrow input{height:46px;font-size:17px;text-align:center;letter-spacing:.08em}
+.companion-notice-tag{display:block;margin-top:12px;padding:11px 13px;border-radius:10px;background:#EAF5FC;border:1px solid #CDE5F5;color:#0A4F91;font-size:12px;font-weight:850;line-height:1.45}
+.companion-final-notice{margin-top:15px;padding:18px;border-radius:13px;background:#E9F7EF;border:1px solid #C8E9D6;color:#17693E;font-size:15px;font-weight:900;line-height:1.5}
+.companion-message-table textarea{min-width:320px;min-height:64px}
+.companion-message-table select{min-width:150px}
+.companion-message-table input[type="text"]{min-width:170px}
+.notify-badge{background:#EAF3FA!important;color:#0A4F91!important}
 </style>
 
 <style>
@@ -272,14 +291,14 @@ header .logo{
 </section>
 <section class="view" id="view-postop"><div class="hero"><div><span class="kicker">CUIDADOS POP</span><h2>Cuidados postoperatorios</h2><p>Sin PASP: solo información POP inmediata de BD PROGRAMACIÓN.</p></div></div><div class="metrics" id="popMetrics"></div><div class="cards" id="popCards"></div></section>
 <section class="view" id="view-acompanantes">
-  <div class="hero"><div><span class="kicker">ACOMPAÑANTES</span><h2>Seguimiento del paciente</h2><p>Portal público por código temporal y herramientas internas para generar las fichas entregables.</p></div></div>
+  <div class="hero" id="companionInternalHero"><div><span class="kicker">ACOMPAÑANTES</span><h2>Seguimiento del paciente</h2><p>Herramientas internas para generar fichas y administrar el acceso temporal de acompañantes.</p></div></div>
 
   <div id="companionAdmin" class="hidden">
     <div class="panel tracking-portal-card">
       <div class="tracking-qr-box" id="trackingQrBox"></div>
       <div class="tracking-copy">
         <h3>QR general de seguimiento</h3>
-        <p>Este mismo QR puede imprimirse en admisiones, sala de espera o cirugía. El acompañante lo escanea y posteriormente ingresa el código temporal entregado por el personal.</p>
+        <p>El acompañante escanea este QR e ingresa únicamente el código temporal entregado por el servicio.</p>
         <div class="tracking-url" id="trackingPortalUrl">—</div>
         <div class="tracking-actions">
           <button class="btn soft" id="copyTrackingPortalBtn">Copiar enlace</button>
@@ -289,19 +308,19 @@ header .logo{
         </div>
       </div>
     </div>
-
     <div class="panel companion-admin table-wrap">
       <table style="min-width:850px">
-        <thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Código temporal</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Código temporal</th><th>Estado</th><th>Último aviso</th><th>Acciones</th></tr></thead>
         <tbody id="trackingBody"></tbody>
       </table>
     </div>
   </div>
 
-  <div class="panel trackbox">
-    <h3 style="margin-top:0;color:var(--navy)">Consulta para acompañantes</h3>
-    <p style="font-size:11px;color:var(--muted);line-height:1.45">Ingrese el código temporal entregado por el servicio. Esta consulta no muestra diagnóstico, procedimiento, especialista ni información clínica adicional.</p>
-    <div class="trackrow"><input id="trackCode" placeholder="Código temporal de seguimiento"><button class="btn" id="trackBtn">Consultar</button></div>
+  <div class="public-companion-card" id="companionPublicPortal">
+    <div class="public-companion-logo" aria-label="Clínica AMA"></div>
+    <h2>Seguimiento quirúrgico</h2>
+    <p>Ingrese el código temporal entregado por el servicio para consultar el estado de su familiar.</p>
+    <div class="trackrow"><input id="trackCode" inputmode="numeric" maxlength="5" placeholder="Token de 5 dígitos"><button class="btn" id="trackBtn">Consultar</button></div>
     <div id="trackResult"></div>
   </div>
 </section>
@@ -319,7 +338,7 @@ header .logo{
   <div class="subnav" id="configSubnav">
     <button class="active" data-config="operacion">Operación y flujos</button>
     <button data-config="usuarios">Usuarios</button>
-    <button data-config="roles">Roles y permisos</button>
+    <button data-config="roles">Roles y permisos</button><button data-config="acompanantes">Acompañantes</button>
   </div>
 
   <div class="config-panel active" id="config-operacion">
@@ -350,6 +369,21 @@ header .logo{
       <div class="panel table-wrap"><table style="min-width:900px"><thead><tr><th>Código</th><th>Nombre</th><th>Descripción</th><th>Permisos</th><th>Estado</th><th>Sistema</th><th>Acciones</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
     </div>
   </div>
+  <div class="config-panel" id="config-acompanantes">
+    <div class="hero" style="margin-bottom:10px">
+      <div><span class="kicker">ACOMPAÑANTES</span><h2>Mensajes y disparadores</h2><p>Configure el texto, el momento de envío y si cada aviso se genera automáticamente o de forma manual.</p></div>
+      <button class="btn" id="addCompanionMessageBtn">Nuevo mensaje</button>
+    </div>
+    <div class="notice">Los mensajes de <b>ALTA</b> y <b>HOSPITALIZACIÓN</b> son finales y se envían automáticamente. Puede editar su texto. Use <b>{{CAMA_FRASE}}</b> para incluir la cama cuando esté disponible.</div>
+    <div class="panel table-wrap">
+      <table class="companion-message-table" style="min-width:1050px">
+        <thead><tr><th>Código</th><th>Nombre</th><th>Momento de envío</th><th>Mensaje</th><th>Automático</th><th>Activo</th><th>Acción</th></tr></thead>
+        <tbody id="companionMessagesConfigBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions"><button class="btn" id="saveCompanionMessagesBtn">Guardar mensajes</button></div>
+  </div>
+
 </section>
 
 </main>
@@ -389,6 +423,14 @@ header .logo{
   <div class="field" style="margin-top:9px"><label>Observación intraoperatoria</label><textarea id="ioObs"></textarea></div>
   <div class="modal-actions"><button class="btn soft" data-close="intraopModal">Volver</button><button class="btn green" id="confirmIntraop">Validar y continuar</button></div>
 </div></div>
+<div class="modal" id="companionNotifyModal"><div class="modal-card" style="max-width:620px">
+  <div class="modal-head"><div><span class="kicker">ACOMPAÑANTE</span><h3>Notificar acompañante</h3></div><button class="btn soft sm" data-close="companionNotifyModal">Cerrar</button></div>
+  <input id="notifyCaseId" type="hidden">
+  <div class="field"><label>Paciente</label><input id="notifyPatient" disabled></div>
+  <div class="field"><label>Mensaje configurado</label><select id="notifyMessageSelect"></select></div>
+  <div class="notice" id="notifyPreview" style="margin-top:8px"></div>
+  <div class="modal-actions"><button class="btn soft" data-close="companionNotifyModal">Cancelar</button><button class="btn" id="sendCompanionNotifyBtn">Enviar aviso</button></div>
+</div></div>
 <div class="modal" id="changePinModal"><div class="modal-card" style="max-width:520px"><div class="modal-head"><div><span class="kicker">SEGURIDAD</span><h3>Cambiar PIN</h3></div><button class="btn soft sm" data-close="changePinModal">Cerrar</button></div><div class="field"><label>PIN actual</label><input id="cpCurrent" type="password" inputmode="numeric" maxlength="8"></div><div class="field"><label>Nuevo PIN</label><input id="cpNew" type="password" inputmode="numeric" maxlength="8"></div><div class="field"><label>Confirmar nuevo PIN</label><input id="cpConfirm" type="password" inputmode="numeric" maxlength="8"></div><div class="notice">Use 6–8 dígitos. No se permiten secuencias simples ni números repetidos.</div><div class="modal-actions"><button class="btn soft" data-close="changePinModal">Cancelar</button><button class="btn" id="saveOwnPinBtn">Cambiar PIN</button></div></div></div>
 <div class="modal" id="userModal"><div class="modal-card" style="max-width:700px"><div class="modal-head"><div><span class="kicker">USUARIOS</span><h3 id="userModalTitle">Nuevo usuario</h3></div><button class="btn soft sm" data-close="userModal">Cerrar</button></div><input id="uId" type="hidden"><div class="formgrid"><div class="field"><label>Usuario *</label><input id="uUsername"></div><div class="field span2"><label>Nombre completo *</label><input id="uName"></div><div class="field"><label>Rol *</label><select id="uRole"></select></div><div class="field"><label>Estado</label><select id="uState"><option>ACTIVO</option><option>INACTIVO</option></select></div><div class="field"><label>PIN inicial</label><input id="uPin" type="password" inputmode="numeric" maxlength="8"></div><div class="field span2"><label><input id="uForceChange" type="checkbox" style="width:auto;height:auto;margin-right:6px"> Exigir cambio de PIN en próximo ingreso</label></div></div><div class="modal-actions"><button class="btn soft" data-close="userModal">Cancelar</button><button class="btn" id="saveUserBtn">Guardar usuario</button></div></div></div>
 <div class="modal" id="resetPinModal"><div class="modal-card" style="max-width:520px"><div class="modal-head"><div><span class="kicker">USUARIOS</span><h3>Reiniciar PIN</h3></div><button class="btn soft sm" data-close="resetPinModal">Cerrar</button></div><input id="rpUserId" type="hidden"><div class="field"><label>Usuario</label><input id="rpUserName" disabled></div><div class="field"><label>Nuevo PIN</label><input id="rpPin" type="password" inputmode="numeric" maxlength="8"></div><div class="field"><label><input id="rpForce" type="checkbox" checked style="width:auto;height:auto;margin-right:6px"> Exigir cambio de PIN al próximo ingreso</label></div><div class="modal-actions"><button class="btn soft" data-close="resetPinModal">Cancelar</button><button class="btn" id="saveResetPinBtn">Guardar nuevo PIN</button></div></div></div>
@@ -401,7 +443,7 @@ header .logo{
 <div class="field span2"><label>Recursos / alertas</label><textarea id="fRecursos"></textarea></div><div class="field span2"><label>Observaciones</label><textarea id="fObs"></textarea></div><div class="field span4"><label>Archivos / soportes del paciente</label><input id="patientFiles" type="file" multiple><div class="notice" id="patientFilesStatus" style="margin:6px 0 0">Puede adjuntar cualquier tipo de archivo. Los archivos se asocian al caso y no se ejecutan dentro de la aplicación.</div></div></div><div class="modal-actions"><button class="btn soft" data-close="patientModal">Cancelar</button><button class="btn" id="savePatient">Guardar paciente</button></div></div></div>
 <div class="modal" id="bulkModal"><div class="modal-card"><div class="modal-head"><div><span class="kicker">CARGA MASIVA</span><h3>Importar programación</h3></div><button class="btn soft sm" data-close="bulkModal">Cerrar</button></div><div class="field"><label>Archivos de programación / soportes</label><input id="bulkFile" type="file" multiple></div><div class="notice" id="bulkStatus">Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.</div><div class="bulk-quality" id="bulkQuality"></div><div class="preview bulk-preview-wrap" id="bulkPreview"></div><div class="modal-actions"><button class="btn soft" data-close="bulkModal">Cancelar</button><button class="btn" id="bulkImport" disabled>Importar filas</button></div></div></div>
 <script>
-const $=id=>document.getElementById(id);const state={view:"operativo",patients:[],session:null,bulk:[],bulkFiles:[],patientFiles:[],trackingRows:[],editPatientId:null,users:[],roles:[],config:{qnos:["QNO 1","QNO 2","QNO 3"],flow:{},states:["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"]},rolesAdmin:[],rolePermissionCatalog:[]};
+const $=id=>document.getElementById(id);const state={view:"operativo",patients:[],session:null,bulk:[],bulkFiles:[],patientFiles:[],trackingRows:[],editPatientId:null,users:[],roles:[],config:{qnos:["QNO 1","QNO 2","QNO 3"],flow:{},states:["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"]},rolesAdmin:[],rolePermissionCatalog:[],companionMessages:[]};
 function esc(v){const d=document.createElement("div");d.textContent=String(v==null?"":v);return d.innerHTML}
 function fileExt(name){const p=String(name||"").toLowerCase().split(".");return p.length>1?p.pop():""}
 async function uploadAttachment(file,caseId,context,metadata){
@@ -711,6 +753,7 @@ function operationActions(p){
   if(!hasUiPermission("OPERACION_GESTIONAR"))return "";
   let a=flowDestinations(p.estado).map(d=>flowButton(p,d)).join("");
   if(["PROGRAMADO","PREPARACIÓN","QUIRÓFANO"].includes(p.estado))a+='<button class="btn red sm" onclick="openCancel(\''+p.id+'\')">Cancelar</button>';
+  a+='<button class="btn soft sm notify-badge" onclick="openCompanionNotify(\''+p.id+'\')">Notificar acompañante</button>';
   return a;
 }
 function currentChief(required=true){
@@ -734,7 +777,7 @@ function renderOp(d){
   $("qnoGrid").innerHTML=qnos.map((q,i)=>'<div class="lane"><div class="lane-head">'+esc(q)+' <span class="count" id="count-qno-'+i+'">0</span></div><div id="lane-qno-'+i+'"></div></div>').join("")||'<div class="empty">No hay QNO habilitados.</div>';
   qnos.forEach((q,i)=>{const rows=state.patients.filter(p=>p.estado==="QUIRÓFANO"&&qnoNorm(p.qno)===q);renderLane("lane-qno-"+i,rows);const c=$("count-qno-"+i);if(c)c.textContent=rows.length});
   const rec=state.patients.filter(p=>p.estado==="RECUPERACIÓN"),allowed=flowDestinations("RECUPERACIÓN"),manage=hasUiPermission("OPERACION_GESTIONAR");
-  $("recoveryBody").innerHTML=rec.length?rec.map(p=>{let a="";if(manage&&allowed.includes("ALTA"))a+='<button class="btn green sm" onclick="finishCase(\''+p.id+'\',\'ALTA\')">Alta</button> ';if(manage&&allowed.includes("HOSPITALIZACIÓN"))a+='<button class="btn sm" onclick="finishCase(\''+p.id+'\',\'HOSPITALIZACIÓN\')">Hospitalizar</button>';return '<tr><td>'+esc(p.hora)+'</td><td><b>'+esc(p.paciente)+'</b></td><td>'+esc(p.documento)+'</td><td>'+esc(p.procedimiento)+'</td><td>'+esc(p.especialidad)+'</td><td>'+esc(p.especialista)+'</td><td>'+esc(qnoNorm(p.qno)||"—")+'</td><td>'+esc(p.actualizado||"—")+'</td><td>'+(a||"—")+'</td></tr>'}).join(""):'<tr><td colspan="9">Sin pacientes en recuperación</td></tr>';
+  $("recoveryBody").innerHTML=rec.length?rec.map(p=>{let a="";if(manage&&allowed.includes("ALTA"))a+='<button class="btn green sm" onclick="finishCase(\''+p.id+'\',\'ALTA\')">Alta</button> ';if(manage&&allowed.includes("HOSPITALIZACIÓN"))a+='<button class="btn sm" onclick="finishCase(\''+p.id+'\',\'HOSPITALIZACIÓN\')">Hospitalizar</button> ';if(manage)a+='<button class="btn soft sm notify-badge" onclick="openCompanionNotify(\''+p.id+'\')">Notificar</button>';return '<tr><td>'+esc(p.hora)+'</td><td><b>'+esc(p.paciente)+'</b></td><td>'+esc(p.documento)+'</td><td>'+esc(p.procedimiento)+'</td><td>'+esc(p.especialidad)+'</td><td>'+esc(p.especialista)+'</td><td>'+esc(qnoNorm(p.qno)||"—")+'</td><td>'+esc(p.actualizado||"—")+'</td><td>'+(a||"—")+'</td></tr>'}).join(""):'<tr><td colspan="9">Sin pacientes en recuperación</td></tr>';
 }
 async function loadPatients(){const d=await api("/api/board?date="+encodeURIComponent($("date").value));renderOp(d);renderProgram()}
 function renderProgram(){
@@ -810,7 +853,21 @@ async function searchProfilaxisCatalog(){
   }catch(e){$("profCatalog").innerHTML='<div class="notice">'+esc(e.message)+'</div>'}
 }
 async function loadPostop(){const d=await api("/api/postop?date="+encodeURIComponent($("date").value));const m=d.metrics;$("popMetrics").innerHTML=metric("Casos POP",m.total)+metric("Alta",m.alta)+metric("Hospitalización",m.hospitalizacion)+metric("Recuperación",m.recuperacion)+metric("Con seguimiento",m.conSeguimiento)+metric("Pendientes",m.pendientes);$("popCards").innerHTML=d.rows.map(p=>'<div class="care"><h3>'+esc(p.paciente)+'</h3><p>'+esc(p.procedimiento)+'</p><div><b>Estado / destino</b>'+esc(p.estado)+' · '+esc(p.destino||"—")+'</div><div><b>Salida recuperación</b>'+esc(p.salida||"—")+'</div><div><b>Observación</b>'+esc(p.observacion||"—")+'</div><div><b>Código seguimiento</b>'+esc(p.codigo||"Pendiente")+'</div></div>').join("")||'<div class="empty">Sin casos POP</div>'}
-async function track(){const c=$("trackCode").value.trim();if(!c)return;$("trackResult").innerHTML="Consultando...";try{const d=await api("/api/tracking?code="+encodeURIComponent(c));$("trackResult").innerHTML='<div class="statusbox"><b>'+esc(d.estadoPublico)+'</b><br><small>Última actualización: '+esc(d.actualizado||"—")+'</small></div>'}catch(e){$("trackResult").innerHTML='<div class="notice">'+esc(e.message)+'</div>'}}
+async function track(){
+  const c=$("trackCode").value.replace(/\D/g,"").slice(0,5);$("trackCode").value=c;
+  if(!/^\d{5}$/.test(c)){$("trackResult").innerHTML='<div class="notice">Ingrese un token válido de 5 dígitos.</div>';return}
+  $("trackResult").innerHTML="Consultando...";
+  try{
+    const d=await api("/api/tracking?code="+encodeURIComponent(c));
+    if(d.terminal){
+      $("trackResult").innerHTML='<div class="companion-final-notice">'+esc(d.aviso||"El seguimiento ha finalizado.")+'</div>';
+      return;
+    }
+    let html='<div class="statusbox"><b>'+esc(d.estadoPublico||"Seguimiento activo")+'</b><br><small>Última actualización: '+esc(d.actualizado||"—")+'</small></div>';
+    if(d.aviso)html+='<span class="companion-notice-tag">'+esc(d.aviso)+'</span>';
+    $("trackResult").innerHTML=html;
+  }catch(e){$("trackResult").innerHTML='<div class="notice">'+esc(e.message)+'</div>'}
+}
 function trackingPortalUrl(){
   return location.origin+location.pathname.replace(/\/+$/,"")+"?follow=1";
 }
@@ -832,8 +889,8 @@ function renderTrackingTable(){
   const rows=state.trackingRows||[];
   body.innerHTML=rows.length?rows.map(p=>{
     const active=!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(p.estado);
-    return '<tr><td>'+esc(p.hora||"")+'</td><td><b>'+esc(p.paciente||"")+'</b><div class="tracking-token">'+esc(p.documento||"")+'</div></td><td>'+esc(p.codigo||"—")+'</td><td>'+(active?'<span class="tracking-code">'+esc(p.token||"—")+'</span>':'<span class="tracking-token">Inactivo</span>')+'</td><td>'+esc(p.estado||"")+'</td><td>'+(active?'<button class="btn soft sm" onclick="copyTrackingCode(\''+p.id+'\')">Copiar token</button>':'—')+'</td></tr>';
-  }).join(""):'<tr><td colspan="6">No hay códigos de seguimiento para la fecha seleccionada.</td></tr>';
+    return '<tr><td>'+esc(p.hora||"")+'</td><td><b>'+esc(p.paciente||"")+'</b><div class="tracking-token">'+esc(p.documento||"")+'</div></td><td>'+esc(p.codigo||"—")+'</td><td>'+(active?'<span class="tracking-code">'+esc(p.token||"—")+'</span>':'<span class="tracking-token">Inactivo</span>')+'</td><td>'+esc(p.estado||"")+'</td><td>'+esc(p.aviso||"—")+(p.avisoFecha?'<div class="tracking-token">'+esc(p.avisoFecha)+'</div>':'')+'</td><td>'+(active?'<button class="btn soft sm" onclick="copyTrackingCode(\''+p.id+'\')">Copiar token</button> <button class="btn soft sm notify-badge" onclick="openCompanionNotify(\''+p.id+'\')">Notificar</button>':'—')+'</td></tr>';
+  }).join(""):'<tr><td colspan="7">No hay códigos de seguimiento para la fecha seleccionada.</td></tr>';
 }
 async function copyTrackingCode(id){
   const p=(state.trackingRows||[]).find(x=>x.id===id),code=String(p?.token||"");
@@ -1121,6 +1178,61 @@ function renderFlowEditor(){
   const box=$("flowEditor");if(!box)return;const sources=["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN"],states=state.config?.states||[];
   box.innerHTML=sources.map(from=>'<div class="flow-row"><div class="flow-source">'+esc(from)+'</div><div class="flow-targets">'+states.filter(to=>to!==from).map(to=>'<label><input type="checkbox" data-flow-from="'+esc(from)+'" value="'+esc(to)+'" '+(flowDestinations(from).includes(to)?"checked":"")+'>'+esc(to)+'</label>').join("")+'</div></div>').join("");
 }
+async function loadCompanionMessages(){
+  const d=await api("/api/companion-messages");state.companionMessages=d.rows||[];return state.companionMessages;
+}
+function companionMessageLabel(m){return (m.name||m.id)+" · "+(m.trigger||"MANUAL")}
+async function openCompanionNotify(id){
+  const p=state.patients.find(x=>x.id===id)||(state.trackingRows||[]).find(x=>x.id===id);if(!p)return;
+  if(!state.companionMessages.length)await loadCompanionMessages();
+  const rows=state.companionMessages.filter(m=>m.enabled);
+  if(!rows.length){alert("No hay mensajes de acompañante activos.");return}
+  $("notifyCaseId").value=id;$("notifyPatient").value=p.paciente||"Paciente";
+  $("notifyMessageSelect").innerHTML=rows.map(m=>'<option value="'+esc(m.id)+'">'+esc(companionMessageLabel(m))+'</option>').join("");
+  const update=()=>{const m=rows.find(x=>x.id===$("notifyMessageSelect").value);$("notifyPreview").textContent=m?.text||""};
+  $("notifyMessageSelect").onchange=update;update();openModal("companionNotifyModal");
+}
+async function sendCompanionNotify(){
+  try{
+    await api("/api/companion/notify",{method:"POST",body:JSON.stringify({id:$("notifyCaseId").value,messageId:$("notifyMessageSelect").value})});
+    closeModal("companionNotifyModal");await loadPatients();if(state.view==="acompanantes")await loadCompanionAdmin();alert("Aviso enviado al portal del acompañante.");
+  }catch(e){alert(e.message)}
+}
+function companionTriggerOptions(value){
+  const opts=["MANUAL","PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"];
+  return opts.map(x=>'<option value="'+x+'" '+(x===value?'selected':'')+'>'+x+'</option>').join("");
+}
+function renderCompanionMessagesConfig(){
+  const body=$("companionMessagesConfigBody");if(!body)return;
+  body.innerHTML=state.companionMessages.map((m,i)=>{
+    const terminal=["ALTA","HOSPITALIZACIÓN"].includes(m.trigger);
+    return '<tr><td><input type="text" data-cm="'+i+'" data-key="id" value="'+esc(m.id)+'" '+(terminal?'disabled':'')+'></td>'+
+      '<td><input type="text" data-cm="'+i+'" data-key="name" value="'+esc(m.name||"")+'"></td>'+
+      '<td><select data-cm="'+i+'" data-key="trigger" '+(terminal?'disabled':'')+'>'+companionTriggerOptions(m.trigger)+'</select></td>'+
+      '<td><textarea data-cm="'+i+'" data-key="text">'+esc(m.text||"")+'</textarea></td>'+
+      '<td style="text-align:center"><input type="checkbox" data-cm="'+i+'" data-key="automatic" '+(m.automatic?'checked':'')+' '+(terminal?'disabled':'')+'></td>'+
+      '<td style="text-align:center"><input type="checkbox" data-cm="'+i+'" data-key="enabled" '+(m.enabled?'checked':'')+' '+(terminal?'disabled':'')+'></td>'+
+      '<td>'+(terminal?'<span class="chip">Final obligatorio</span>':'<button class="btn red sm" onclick="removeCompanionMessage('+i+')">Eliminar</button>')+'</td></tr>';
+  }).join("");
+  document.querySelectorAll("[data-cm]").forEach(el=>el.addEventListener("change",()=>syncCompanionMessageField(el)));
+  document.querySelectorAll("[data-cm] textarea,[data-cm][type=text]").forEach(el=>el.addEventListener("input",()=>syncCompanionMessageField(el)));
+}
+function syncCompanionMessageField(el){
+  const i=Number(el.dataset.cm),k=el.dataset.key;if(!state.companionMessages[i])return;
+  state.companionMessages[i][k]=el.type==="checkbox"?el.checked:el.value;
+}
+function addCompanionMessage(){
+  state.companionMessages.push({id:"MSG_"+String(Date.now()).slice(-6),name:"Nuevo mensaje",trigger:"MANUAL",text:"",automatic:false,enabled:true,terminal:false});
+  renderCompanionMessagesConfig();
+}
+function removeCompanionMessage(i){state.companionMessages.splice(i,1);renderCompanionMessagesConfig()}
+async function loadCompanionMessagesConfig(){await loadCompanionMessages();renderCompanionMessagesConfig()}
+async function saveCompanionMessages(){
+  try{
+    const d=await api("/api/companion-messages",{method:"POST",body:JSON.stringify({rows:state.companionMessages})});
+    state.companionMessages=d.rows||[];renderCompanionMessagesConfig();alert("Mensajes de acompañantes actualizados.");
+  }catch(e){alert(e.message)}
+}
 async function loadConfiguration(){
   if(!isSuperAdmin()){alert("Configuración es exclusiva de SUPERADMIN.");return}
   const d=await api("/api/config-operativa");state.config=d;populateQnoSelectors();renderQnoConfig();renderFlowEditor();
@@ -1146,8 +1258,8 @@ async function saveResetPin(){try{await api("/api/users/reset-pin",{method:"POST
 async function saveOwnPin(){const a=$("cpNew").value,b=$("cpConfirm").value;if(a!==b){alert("La confirmación del nuevo PIN no coincide.");return}try{await api("/api/change-pin",{method:"POST",body:JSON.stringify({currentPin:$("cpCurrent").value,newPin:a})});closeModal("changePinModal");$("cpCurrent").value=$("cpNew").value=$("cpConfirm").value="";alert("PIN actualizado correctamente. Inicie sesión nuevamente.");await api("/api/logout",{method:"POST"}).catch(()=>{});location.reload()}catch(e){alert(e.message)}}
 async function showView(v){state.view=v;document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.id==="view-"+v));document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.view===v));if(v==="operativo"||v==="programacion")await loadPatients();if(v==="profilaxis")await loadProfilaxis();if(v==="postop")await loadPostop();if(v==="acompanantes")await loadCompanionAdmin();if(v==="coordinacion"){await loadCoord();updateAdminUi();}if(v==="configuracion"){if(!isSuperAdmin()){alert("Configuración es exclusiva de SUPERADMIN.");return}await loadConfiguration();}}
 async function login(){try{const d=await api("/api/login",{method:"POST",body:JSON.stringify({user:$("lu").value,pin:$("lp").value})});state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";updateAdminUi();$("login").classList.add("hidden");const first=document.querySelector(".nav button[data-view]:not(.hidden)");await showView(first?.dataset.view||"operativo")}catch(e){$("le").textContent=e.message}}
-document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closeModal(b.dataset.close)));document.querySelectorAll("[data-coord]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-coord]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".coord-panel").forEach(x=>x.classList.toggle("active",x.id==="coord-"+b.dataset.coord));if(b.dataset.coord==="kpi")await loadKpi();if(b.dataset.coord==="mci")await loadMci();if(b.dataset.coord==="seguridad")await loadSecurity();}));document.querySelectorAll("[data-config]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-config]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".config-panel").forEach(x=>x.classList.toggle("active",x.id==="config-"+b.dataset.config));if(b.dataset.config==="usuarios")await loadUsersAdmin();if(b.dataset.config==="roles")await loadRolesAdmin();if(b.dataset.config==="operacion")await loadConfiguration()}));
+document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closeModal(b.dataset.close)));document.querySelectorAll("[data-coord]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-coord]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".coord-panel").forEach(x=>x.classList.toggle("active",x.id==="coord-"+b.dataset.coord));if(b.dataset.coord==="kpi")await loadKpi();if(b.dataset.coord==="mci")await loadMci();if(b.dataset.coord==="seguridad")await loadSecurity();}));document.querySelectorAll("[data-config]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-config]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".config-panel").forEach(x=>x.classList.toggle("active",x.id==="config-"+b.dataset.config));if(b.dataset.config==="usuarios")await loadUsersAdmin();if(b.dataset.config==="roles")await loadRolesAdmin();if(b.dataset.config==="operacion")await loadConfiguration();if(b.dataset.config==="acompanantes")await loadCompanionMessagesConfig()}));
 
-$("lb").addEventListener("click",login);$("addQnoBtn")?.addEventListener("click",addConfigQno);$("newQnoName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addConfigQno()});$("saveOperationalConfigBtn")?.addEventListener("click",saveOperationalConfig);$("newRoleBtn")?.addEventListener("click",openNewRole);$("saveRoleBtn")?.addEventListener("click",saveRole);$("changePinBtn")?.addEventListener("click",()=>openModal("changePinModal"));$("saveOwnPinBtn")?.addEventListener("click",saveOwnPin);$("newUserBtn")?.addEventListener("click",openNewUser);$("saveUserBtn")?.addEventListener("click",saveUser);$("saveResetPinBtn")?.addEventListener("click",saveResetPin);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",async()=>{try{await api("/api/logout",{method:"POST"})}catch{}location.reload()});$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackBtn").addEventListener("click",track);$("copyTrackingPortalBtn")?.addEventListener("click",copyTrackingPortal);$("openTrackingPortalBtn")?.addEventListener("click",openTrackingPortal);$("printTrackingQrBtn")?.addEventListener("click",()=>printTrackingQr().catch(e=>alert(e.message)));$("downloadCompanionCardsBtn")?.addEventListener("click",()=>downloadCompanionCards().catch(e=>alert(e.message)));$("companionLogin").addEventListener("click",()=>{$("login").classList.add("hidden");showView("acompanantes")});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>alert(x.message))});$("patientFiles").addEventListener("change",async e=>{state.patientFiles=Array.from(e.target.files||[]);if(!state.patientFiles.length){$("patientFilesStatus").textContent="Sin archivos seleccionados.";return}const pdf=state.patientFiles.find(f=>fileExt(f.name)==="pdf"||String(f.type||"").toLowerCase()==="application/pdf");if(pdf&&!state.editPatientId)await readPatientFileIntoForm(pdf);else $("patientFilesStatus").textContent=state.patientFiles.length+" archivo(s) seleccionados. Se guardarán con el paciente.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);$("confirmCancel")?.addEventListener("click",submitCancel);$("confirmIntraop")?.addEventListener("click",submitIntraop);$("profSearchBtn")?.addEventListener("click",searchProfilaxisCatalog);$("profSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchProfilaxisCatalog()});document.querySelectorAll("[data-prof]").forEach(b=>b.addEventListener("click",()=>chooseProf(b.dataset.prof)));document.querySelectorAll("[data-clasif]").forEach(b=>b.addEventListener("click",()=>chooseClasif(b.dataset.clasif)));["ioAnestIni","ioAnestFin","ioQxIni","ioQxFin","ioProfHora"].forEach(id=>$(id)?.addEventListener("input",updateIntraopCalc));
-(async()=>{$("date").value=new Date().toLocaleDateString("en-CA",{timeZone:"America/Bogota"});if(new URLSearchParams(location.search).get("follow")==="1"){$("login").classList.add("hidden");await showView("acompanantes");return;}try{const d=await api("/api/me");state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";updateAdminUi();$("login").classList.add("hidden");const first=document.querySelector(".nav button[data-view]:not(.hidden)");await showView(first?.dataset.view||"operativo")}catch{}})();
+$("lb").addEventListener("click",login);$("sendCompanionNotifyBtn")?.addEventListener("click",sendCompanionNotify);$("addCompanionMessageBtn")?.addEventListener("click",addCompanionMessage);$("saveCompanionMessagesBtn")?.addEventListener("click",saveCompanionMessages);$("addQnoBtn")?.addEventListener("click",addConfigQno);$("newQnoName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addConfigQno()});$("saveOperationalConfigBtn")?.addEventListener("click",saveOperationalConfig);$("newRoleBtn")?.addEventListener("click",openNewRole);$("saveRoleBtn")?.addEventListener("click",saveRole);$("changePinBtn")?.addEventListener("click",()=>openModal("changePinModal"));$("saveOwnPinBtn")?.addEventListener("click",saveOwnPin);$("newUserBtn")?.addEventListener("click",openNewUser);$("saveUserBtn")?.addEventListener("click",saveUser);$("saveResetPinBtn")?.addEventListener("click",saveResetPin);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",async()=>{try{await api("/api/logout",{method:"POST"})}catch{}location.reload()});$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackBtn").addEventListener("click",track);$("trackCode")?.addEventListener("keydown",e=>{if(e.key==="Enter")track()});$("copyTrackingPortalBtn")?.addEventListener("click",copyTrackingPortal);$("openTrackingPortalBtn")?.addEventListener("click",openTrackingPortal);$("printTrackingQrBtn")?.addEventListener("click",()=>printTrackingQr().catch(e=>alert(e.message)));$("downloadCompanionCardsBtn")?.addEventListener("click",()=>downloadCompanionCards().catch(e=>alert(e.message)));$("companionLogin").addEventListener("click",()=>{location.href=trackingPortalUrl()});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>alert(x.message))});$("patientFiles").addEventListener("change",async e=>{state.patientFiles=Array.from(e.target.files||[]);if(!state.patientFiles.length){$("patientFilesStatus").textContent="Sin archivos seleccionados.";return}const pdf=state.patientFiles.find(f=>fileExt(f.name)==="pdf"||String(f.type||"").toLowerCase()==="application/pdf");if(pdf&&!state.editPatientId)await readPatientFileIntoForm(pdf);else $("patientFilesStatus").textContent=state.patientFiles.length+" archivo(s) seleccionados. Se guardarán con el paciente.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);$("confirmCancel")?.addEventListener("click",submitCancel);$("confirmIntraop")?.addEventListener("click",submitIntraop);$("profSearchBtn")?.addEventListener("click",searchProfilaxisCatalog);$("profSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchProfilaxisCatalog()});document.querySelectorAll("[data-prof]").forEach(b=>b.addEventListener("click",()=>chooseProf(b.dataset.prof)));document.querySelectorAll("[data-clasif]").forEach(b=>b.addEventListener("click",()=>chooseClasif(b.dataset.clasif)));["ioAnestIni","ioAnestFin","ioQxIni","ioQxFin","ioProfHora"].forEach(id=>$(id)?.addEventListener("input",updateIntraopCalc));
+(async()=>{$("date").value=new Date().toLocaleDateString("en-CA",{timeZone:"America/Bogota"});if(new URLSearchParams(location.search).get("follow")==="1"){document.body.classList.add("companion-public-mode");$("login").classList.add("hidden");document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));$("view-acompanantes").classList.add("active");$("trackCode")?.focus();return;}try{const d=await api("/api/me");state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";updateAdminUi();$("login").classList.add("hidden");const first=document.querySelector(".nav button[data-view]:not(.hidden)");await showView(first?.dataset.view||"operativo")}catch{}})();
 </script></body></html>
