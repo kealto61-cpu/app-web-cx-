@@ -1,7 +1,7 @@
-function doGet() {
+function doGet(e) {
   return HtmlService
     .createHtmlOutputFromFile('Index')
-    .setTitle('Cirugía — Tablero Operativo')
+    .setTitle('Cirugía — Control de Pacientes Quirúrgicos')
     .addMetaTag(
       'viewport',
       'width=device-width, initial-scale=1, maximum-scale=1'
@@ -9,10 +9,9 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
-function apiBoot(dateIso) {
-  var board = apiGetBoard(dateIso || todayIso_());
-
-  return jsonSafe_({
+function apiBoot(token, dateIso) {
+  var session = apiSession(token || '');
+  var result = {
     app: {
       name: APP.NAME,
       version: APP.VERSION
@@ -27,8 +26,19 @@ function apiBoot(dateIso) {
         getSystemParameter_('MODELO DE ACCESO', '')
       )
     },
-    board: board
-  });
+    session: session,
+    board: null
+  };
+
+  if (session.valid) {
+    try {
+      result.board = boardApp_(token, dateIso || todayIso_());
+    } catch (error) {
+      result.boardError = error.message;
+    }
+  }
+
+  return jsonSafe_(result);
 }
 
 function apiHealth() {
