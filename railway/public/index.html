@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Control de Pacientes Quirúrgicos</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.4/qrcode.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 <style>
 :root{--navy:#0D024E;--navy2:#1A0965;--purple:#49358E;--soft:#F7F5FC;--line:#D9D2EB;--line2:#E8E4F0;--text:#241C3A;--muted:#716986;--green:#207A40;--amber:#B98517;--red:#B74444;--blue:#2D6CDF;--shadow:0 4px 14px rgba(13,2,78,.06)}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--soft);color:var(--text)}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
@@ -17,7 +17,14 @@ main{max-width:1750px;margin:auto;padding:14px 16px 30px}.view{display:none}.vie
 .toolbar{display:grid;grid-template-columns:minmax(230px,1.5fr) repeat(3,minmax(125px,.6fr));gap:7px;margin-bottom:10px}.toolbar input,.toolbar select,.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 9px;background:#fff;outline:none}.field textarea{min-height:72px;resize:vertical}.toolbar input,.toolbar select,.field input,.field select{height:36px}
 .panel{padding:11px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:9px;min-width:950px}th{background:#EEEAF7;color:var(--navy);padding:7px 6px;font-size:8px;position:sticky;top:0}td{padding:6px;border-bottom:1px solid var(--line2);line-height:1.25;overflow-wrap:anywhere}.subnav{display:flex;gap:5px;overflow:auto;margin-bottom:10px}.subnav button{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:8px;padding:7px 10px;font-size:8.5px;font-weight:850}.subnav button.active{background:var(--navy);color:#fff}.coord-panel{display:none}.coord-panel.active{display:block}.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}.care{padding:10px}.care h3{margin:0;color:var(--navy);font-size:11px}.care p{font-size:8.5px;color:var(--muted)}.care div{margin-top:5px;padding:6px;background:#FAF9FD;border-radius:7px;font-size:8.5px}.care div b{display:block;font-size:7px;color:var(--muted);text-transform:uppercase}
 .chartbars{display:flex;flex-direction:column;gap:5px}.barrow{display:grid;grid-template-columns:150px 1fr 45px;gap:7px;align-items:center;font-size:8px}.bar{height:10px;background:#ECE8F6;border-radius:999px;overflow:hidden}.bar>span{display:block;height:100%;background:var(--navy);border-radius:999px}.notice{padding:9px 11px;border:1px solid #D8D1EB;background:#F6F3FC;color:#554873;border-radius:9px;font-size:8.5px;margin-bottom:10px}
-.trackbox{max-width:650px;margin:auto}.trackrow{display:flex;gap:7px}.trackrow input{flex:1;border:1px solid var(--line);border-radius:8px;padding:9px}.statusbox{margin-top:10px;padding:10px;background:#FCFBFE;border:1px solid var(--line2);border-radius:9px}
+.trackbox{max-width:650px;margin:auto}
+.tracking-portal-card{display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:center;margin-bottom:12px}
+.tracking-qr-box{width:170px;height:170px;border:1px solid var(--line);border-radius:12px;background:#fff;display:grid;place-items:center;padding:10px}
+.tracking-qr-box canvas,.tracking-qr-box img{max-width:150px!important;max-height:150px!important}
+.tracking-copy h3{margin:0 0 5px;color:var(--navy);font-size:15px}.tracking-copy p{font-size:11px;color:var(--muted);line-height:1.45}.tracking-url{font-size:10px;padding:8px 9px;background:#F7F5FC;border:1px solid var(--line2);border-radius:8px;overflow-wrap:anywhere}.tracking-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.tracking-code{display:inline-block;font-size:16px;font-weight:900;letter-spacing:.12em;color:var(--navy);background:#F0EEF6;border-radius:8px;padding:6px 8px}
+.tracking-token{font-size:10px;color:var(--muted);margin-left:5px}.companion-admin{margin-top:12px}
+@media(max-width:680px){.tracking-portal-card{grid-template-columns:1fr}.tracking-qr-box{margin:auto}}.trackrow{display:flex;gap:7px}.trackrow input{flex:1;border:1px solid var(--line);border-radius:8px;padding:9px}.statusbox{margin-top:10px;padding:10px;background:#FCFBFE;border:1px solid var(--line2);border-radius:9px}
 .modal{position:fixed;inset:0;background:rgba(17,11,42,.52);display:none;align-items:center;justify-content:center;padding:15px;z-index:100}.modal.show{display:flex}.modal-card{width:min(860px,100%);max-height:92vh;overflow:auto;padding:15px}.modal-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}.modal-head h3{margin:0;color:var(--navy)}.formgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.field label{display:block;font-size:7.5px;font-weight:900;color:var(--muted);text-transform:uppercase;margin-bottom:3px}.span2{grid-column:span 2}.span4{grid-column:1/-1}.modal-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:12px}.preview{max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px}.preview table{min-width:1100px}.empty{padding:24px;text-align:center;color:var(--muted);font-size:9px;background:#fff;border:1px dashed #c9c2da;border-radius:10px}
 #login{position:fixed;inset:0;background:linear-gradient(145deg,#0D024E,#251479);display:grid;place-items:center;padding:16px;z-index:120}.loginbox{width:min(400px,100%);background:#fff;border-radius:16px;padding:20px}.loginbox h2{margin:0;color:var(--navy)}.loginbox p{font-size:9px;color:var(--muted)}.err{color:var(--red);font-size:8.5px;min-height:14px}
 @media(max-width:1200px){.op-grid{grid-template-columns:repeat(3,1fr)}.metrics{grid-template-columns:repeat(3,1fr)}}
@@ -196,7 +203,40 @@ header .logo{
 <section class="view" id="view-programacion"><div class="hero"><div><span class="kicker">PROGRAMACIÓN</span><h2>Programación quirúrgica</h2><p>Consulta, nuevo paciente y cargue masivo.</p></div><div><button class="btn" id="newPatient">Nuevo paciente</button> <button class="btn soft" id="bulkOpen">Carga masiva</button></div></div><div class="toolbar"><input id="pq" placeholder="Buscar paciente, documento, procedimiento o especialista"><select id="pst"><option value="">Todos los estados</option><option>PROGRAMADO</option><option>PREPARACIÓN</option><option>QUIRÓFANO</option><option>RECUPERACIÓN</option><option>ALTA</option><option>HOSPITALIZACIÓN</option><option>CANCELADO</option></select><select id="pqn"><option value="">Todos los QNO</option><option>QNO 1</option><option>QNO 2</option><option>QNO 3</option></select><button class="btn soft" id="refreshProg">Actualizar</button></div><div class="panel table-wrap"><table><thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Procedimiento</th><th>Especialidad</th><th>Especialista</th><th>QNO</th><th>Estado</th><th>Tipo</th><th>Observaciones</th></tr></thead><tbody id="progBody"></tbody></table></div></section>
 <section class="view" id="view-profilaxis"><div class="hero"><div><span class="kicker">PROFILAXIS</span><h2>Profilaxis prequirúrgica</h2><p>Registro disponible en la base quirúrgica.</p></div></div><div class="notice">El documento clínico que aportarás definirá las reglas de cumplimiento. Por ahora no se emiten decisiones automáticas.</div><div class="metrics" id="profMetrics"></div><div class="cards" id="profCards"></div></section>
 <section class="view" id="view-postop"><div class="hero"><div><span class="kicker">CUIDADOS POP</span><h2>Cuidados postoperatorios</h2><p>Sin PASP: solo información POP inmediata de BD PROGRAMACIÓN.</p></div></div><div class="metrics" id="popMetrics"></div><div class="cards" id="popCards"></div></section>
-<section class="view" id="view-acompanantes"><div class="hero"><div><span class="kicker">ACOMPAÑANTES</span><h2>Seguimiento por código</h2><p>Consulta pública restringida del estado del paciente.</p></div></div><div class="panel trackbox"><div class="trackrow"><input id="trackCode" placeholder="Código o token de seguimiento"><button class="btn" id="trackBtn">Consultar</button></div><div id="trackResult"></div></div></section>
+<section class="view" id="view-acompanantes">
+  <div class="hero"><div><span class="kicker">ACOMPAÑANTES</span><h2>Seguimiento del paciente</h2><p>Portal público por código temporal y herramientas internas para generar las fichas entregables.</p></div></div>
+
+  <div id="companionAdmin" class="hidden">
+    <div class="panel tracking-portal-card">
+      <div class="tracking-qr-box" id="trackingQrBox"></div>
+      <div class="tracking-copy">
+        <h3>QR general de seguimiento</h3>
+        <p>Este mismo QR puede imprimirse en admisiones, sala de espera o cirugía. El acompañante lo escanea y posteriormente ingresa el código temporal entregado por el personal.</p>
+        <div class="tracking-url" id="trackingPortalUrl">—</div>
+        <div class="tracking-actions">
+          <button class="btn soft" id="copyTrackingPortalBtn">Copiar enlace</button>
+          <button class="btn soft" id="openTrackingPortalBtn">Abrir portal</button>
+          <button class="btn soft" id="printTrackingQrBtn">Imprimir QR</button>
+          <button class="btn" id="downloadCompanionCardsBtn">Descargar fichas entregables</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel companion-admin table-wrap">
+      <table style="min-width:850px">
+        <thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Código temporal</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="trackingBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel trackbox">
+    <h3 style="margin-top:0;color:var(--navy)">Consulta para acompañantes</h3>
+    <p style="font-size:11px;color:var(--muted);line-height:1.45">Ingrese el código temporal entregado por el servicio. Esta consulta no muestra diagnóstico, procedimiento, especialista ni información clínica adicional.</p>
+    <div class="trackrow"><input id="trackCode" placeholder="Código temporal de seguimiento"><button class="btn" id="trackBtn">Consultar</button></div>
+    <div id="trackResult"></div>
+  </div>
+</section>
 <section class="view" id="view-coordinacion"><div class="hero"><div><span class="kicker">COORDINACIÓN</span><h2>Centro de Coordinación Quirúrgica</h2><p>Resumen, KPI, MCI, seguridad y descargas.</p></div></div><div class="subnav"><button class="active" data-coord="resumen">Resumen</button><button data-coord="kpi">KPI</button><button data-coord="mci">MCI</button><button data-coord="seguridad">Seguridad</button><button data-coord="descargas">Descargas</button></div>
 <div class="coord-panel active" id="coord-resumen"><div class="metrics" id="coordMetrics"></div><div class="panel table-wrap"><table style="min-width:600px"><thead><tr><th>Especialidad</th><th>Casos</th><th>Operados</th><th>Cancelados</th></tr></thead><tbody id="coordBody"></tbody></table></div></div>
 <div class="coord-panel" id="coord-kpi"><div class="toolbar"><select id="kpiPeriod"><option value="MES">Mes</option><option value="DIA">Día</option></select><select id="kpiView"><option value="general">General</option><option value="productividad">Productividad</option><option value="tiempos">Tiempos</option><option value="muertos">Tiempos muertos</option><option value="especialidades">Especialidades</option><option value="cancelaciones">Cancelaciones</option><option value="flujo">Flujo</option></select><button class="btn soft" id="kpiRefresh">Actualizar KPI</button><div></div></div><div class="metrics" id="kpiMetrics"></div><div class="panel"><div class="chartbars" id="kpiChart"></div></div><div class="panel table-wrap" style="margin-top:8px"><table style="min-width:760px"><thead id="kpiHead"></thead><tbody id="kpiBody"></tbody></table></div></div>
@@ -321,6 +361,97 @@ async function finishCase(id,destino){const obs=prompt("Observación de egreso /
 async function loadProfilaxis(){const d=await api("/api/profilaxis?date="+encodeURIComponent($("date").value));const m=d.metrics;$("profMetrics").innerHTML=metric("Casos",m.total)+metric("Registrada",m.registrada)+metric("No registrada",m.noRegistrada)+metric("Pendiente",m.pendiente)+metric("Con medicamento",m.conMedicamento)+metric("Con tiempo",m.conTiempo);$("profCards").innerHTML=d.rows.map(p=>'<div class="care"><h3>'+esc(p.paciente)+'</h3><p>'+esc(p.procedimiento)+'</p><div><b>Administrada</b>'+esc(p.administrada||"Pendiente")+'</div><div><b>Medicamento</b>'+esc(p.medicamento||"—")+'</div><div><b>Hora</b>'+esc(p.hora||"—")+'</div><div><b>Profilaxis → incisión</b>'+esc(p.minutos===""?"—":p.minutos+" min")+'</div><div><b>Clasificación</b>'+esc(p.clasificacion||"—")+'</div></div>').join("")||'<div class="empty">Sin registros</div>'}
 async function loadPostop(){const d=await api("/api/postop?date="+encodeURIComponent($("date").value));const m=d.metrics;$("popMetrics").innerHTML=metric("Casos POP",m.total)+metric("Alta",m.alta)+metric("Hospitalización",m.hospitalizacion)+metric("Recuperación",m.recuperacion)+metric("Con seguimiento",m.conSeguimiento)+metric("Pendientes",m.pendientes);$("popCards").innerHTML=d.rows.map(p=>'<div class="care"><h3>'+esc(p.paciente)+'</h3><p>'+esc(p.procedimiento)+'</p><div><b>Estado / destino</b>'+esc(p.estado)+' · '+esc(p.destino||"—")+'</div><div><b>Salida recuperación</b>'+esc(p.salida||"—")+'</div><div><b>Observación</b>'+esc(p.observacion||"—")+'</div><div><b>Código seguimiento</b>'+esc(p.codigo||"Pendiente")+'</div></div>').join("")||'<div class="empty">Sin casos POP</div>'}
 async function track(){const c=$("trackCode").value.trim();if(!c)return;$("trackResult").innerHTML="Consultando...";try{const d=await api("/api/tracking?code="+encodeURIComponent(c));$("trackResult").innerHTML='<div class="statusbox"><b>'+esc(d.estadoPublico)+'</b><br><small>'+esc(d.paciente)+' · '+esc(d.actualizado||"")+'</small></div>'}catch(e){$("trackResult").innerHTML='<div class="notice">'+esc(e.message)+'</div>'}}
+function trackingPortalUrl(){
+  return location.origin+location.pathname.replace(/\/+$/,"")+"?follow=1";
+}
+async function renderTrackingQr(){
+  const box=$("trackingQrBox"),url=trackingPortalUrl();
+  if($("trackingPortalUrl"))$("trackingPortalUrl").textContent=url;
+  if(!box)return;
+  box.innerHTML="";
+  try{
+    await QRCode.toCanvas(document.createElement("canvas"),url,{width:150,margin:1}).then(canvas=>box.appendChild(canvas));
+  }catch(e){
+    box.innerHTML='<div class="empty">No fue posible generar el QR.</div>';
+  }
+}
+function renderTrackingTable(){
+  const body=$("trackingBody");if(!body)return;
+  const rows=(state.patients||[]).filter(p=>p.codigo||p.token);
+  body.innerHTML=rows.length?rows.map(p=>{
+    const active=!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(p.estado);
+    return '<tr><td>'+esc(p.hora||"")+'</td><td><b>'+esc(p.paciente||"")+'</b></td><td>'+esc(p.documento||"")+'</td><td>'+(active?'<span class="tracking-code">'+esc(p.codigo||p.token||"—")+'</span>':'<span class="tracking-token">Inactivo</span>')+'</td><td>'+esc(p.estado||"")+'</td><td>'+(active?'<button class="btn soft sm" onclick="copyTrackingCode(\''+p.id+'\')">Copiar código</button>':'—')+'</td></tr>';
+  }).join(""):'<tr><td colspan="6">No hay códigos de seguimiento para la fecha seleccionada.</td></tr>';
+}
+async function copyTrackingCode(id){
+  const p=(state.patients||[]).find(x=>x.id===id),code=String(p?.codigo||p?.token||"");
+  if(!code)return;
+  try{await navigator.clipboard.writeText(code);alert("Código "+code+" copiado.");}
+  catch(e){prompt("Código temporal:",code);}
+}
+async function copyTrackingPortal(){
+  const url=trackingPortalUrl();
+  try{await navigator.clipboard.writeText(url);alert("Enlace copiado.");}
+  catch(e){prompt("Enlace de seguimiento:",url);}
+}
+function openTrackingPortal(){window.open(trackingPortalUrl(),"_blank","noopener");}
+async function printTrackingQr(){
+  const url=trackingPortalUrl();
+  const dataUrl=await QRCode.toDataURL(url,{width:500,margin:2});
+  const w=window.open("about:blank","_blank","noopener");
+  if(!w){alert("El navegador bloqueó la ventana de impresión.");return;}
+  const d=w.document;
+  d.title="QR Seguimiento Quirúrgico";
+  const st=d.createElement("style");
+  st.textContent="body{font-family:Arial,sans-serif;text-align:center;padding:35px;color:#17324a;margin:0}.box{max-width:620px;margin:auto}img{width:320px;height:320px}h1{color:#073b6f}p{line-height:1.5;font-size:18px}";
+  d.head.appendChild(st);
+  const box=d.createElement("div");box.className="box";
+  const h1=d.createElement("h1");h1.textContent="Clínica AMA";
+  const h2=d.createElement("h2");h2.textContent="Seguimiento del proceso quirúrgico";
+  const img=d.createElement("img");img.src=dataUrl;img.alt="QR seguimiento quirúrgico";
+  const p=d.createElement("p");p.textContent="Escanee el código QR e ingrese el código temporal entregado por el personal de cirugía.";
+  box.append(h1,h2,img,p);d.body.appendChild(box);
+  img.addEventListener("load",()=>setTimeout(()=>w.print(),120),{once:true});
+  if(img.complete)setTimeout(()=>w.print(),120);
+}
+async function downloadCompanionCards(){
+  if(!state.session){alert("Debe iniciar sesión para descargar las fichas.");return;}
+  const rows=(state.patients||[]).filter(p=>(p.codigo||p.token)&&!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(p.estado));
+  if(!rows.length){alert("No hay fichas activas para descargar.");return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+  const portal=trackingPortalUrl();
+  const qr=await QRCode.toDataURL(portal,{width:320,margin:1});
+  const cardW=92,cardH=64,gapX=6,gapY=5,startX=10,startY=12;
+  rows.forEach((p,i)=>{
+    if(i>0&&i%8===0)doc.addPage();
+    const pos=i%8,col=pos%2,row=Math.floor(pos/2);
+    const x=startX+col*(cardW+gapX),y=startY+row*(cardH+gapY);
+    doc.setDrawColor(13,2,78);doc.roundedRect(x,y,cardW,cardH,3,3);
+    doc.setFillColor(13,2,78);doc.roundedRect(x,y,cardW,11,3,3,"F");
+    doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text("CLÍNICA AMA · SEGUIMIENTO QUIRÚRGICO",x+4,y+7);
+    doc.addImage(qr,"PNG",x+4,y+16,29,29);
+    doc.setTextColor(13,2,78);doc.setFontSize(8);doc.text("Paciente:",x+38,y+19);
+    doc.setTextColor(30,30,40);doc.setFont("helvetica","normal");doc.text(String(p.paciente||"Paciente").slice(0,35),x+38,y+24,{maxWidth:49});
+    doc.setTextColor(13,2,78);doc.setFont("helvetica","bold");doc.setFontSize(8);doc.text("Código temporal",x+38,y+34);
+    doc.setFontSize(18);doc.text(String(p.codigo||p.token||"—"),x+38,y+43);
+    doc.setTextColor(80,80,90);doc.setFont("helvetica","normal");doc.setFontSize(7);
+    doc.text("1. Escanee el QR.",x+4,y+51);
+    doc.text("2. Ingrese el código temporal.",x+4,y+55);
+    doc.text("3. Consulte únicamente el estado del proceso.",x+4,y+59);
+  });
+  doc.save("Fichas_seguimiento_acompanantes_"+$("date").value+".pdf");
+}
+async function loadCompanionAdmin(){
+  const admin=$("companionAdmin");
+  if(!admin)return;
+  admin.classList.toggle("hidden",!state.session);
+  if(state.session){
+    if(!state.patients.length)await loadPatients();
+    await renderTrackingQr();
+    renderTrackingTable();
+  }
+}
 async function loadCoord(){const d=await api("/api/coord?date="+encodeURIComponent($("date").value));const m=d.metrics;$("coordMetrics").innerHTML=metric("Total",m.total)+metric("Operados",m.operados)+metric("Cancelados",m.cancelados)+metric("QNO",m.quirofano)+metric("Recuperación",m.recuperacion)+metric("Finalizados",m.finalizados);$("coordBody").innerHTML=d.specialties.map(x=>'<tr><td>'+esc(x.especialidad)+'</td><td>'+x.total+'</td><td>'+x.operados+'</td><td>'+x.cancelados+'</td></tr>').join("")}
 function bars(items){const max=Math.max(1,...items.map(x=>Number(x.value||0)));return items.map(x=>'<div class="barrow"><span>'+esc(x.label)+'</span><div class="bar"><span style="width:'+Math.round(Number(x.value||0)*100/max)+'%"></span></div><b>'+esc(x.value)+'</b></div>').join("")}
 async function loadKpi(){const d=await api("/api/kpi?date="+encodeURIComponent($("date").value)+"&period="+$("kpiPeriod").value);const s=d.summary;$("kpiMetrics").innerHTML=metric("Brutas",s.programadasBrutas)+metric("Canceladas",s.canceladas)+metric("Netas",s.programadasNetas)+metric("Ejecutadas",s.ejecutadas)+metric("Realización",s.tasaRealizacion+"%")+metric("Cancelación",s.tasaCancelacion+"%");const view=$("kpiView").value;let items=d.especialidades.map(x=>({label:x.especialidad,value:x.programadasNetas}));let head='<tr><th>Especialidad</th><th>Brutas</th><th>Canceladas</th><th>Netas</th><th>Ejecutadas</th><th>Realización</th><th>Prepa→QNO</th><th>QNO→Rec.</th><th>Tiempo muerto</th></tr>';let body=d.especialidades.map(x=>'<tr><td>'+esc(x.especialidad)+'</td><td>'+x.programadasBrutas+'</td><td>'+x.canceladas+'</td><td>'+x.programadasNetas+'</td><td>'+x.ejecutadas+'</td><td>'+x.tasaRealizacion+'%</td><td>'+x.tiempoPrepaQno+'</td><td>'+x.tiempoQnoRec+'</td><td>'+x.tiempoMuerto+'</td></tr>').join("");if(view==="flujo")items=d.flujo;if(view==="cancelaciones")items=d.cancelaciones.causas;if(view==="tiempos")items=d.qnos.map(x=>({label:x.qno,value:x.tiempoQnoRec}));if(view==="muertos")items=d.qnos.map(x=>({label:x.qno,value:x.tiempoMuerto}));$("kpiChart").innerHTML=bars(items);$("kpiHead").innerHTML=head;$("kpiBody").innerHTML=body}
@@ -355,9 +486,9 @@ async function parseBulk(files){
   // Los archivos se suben al confirmar el cargue; así no se almacenan selecciones canceladas.
 }
 async function importBulk(){try{const batchId=$("bulkFile").dataset.batchId||("BULK-"+Date.now());const files=Array.from(state.bulkFiles||[]);if(files.length)await uploadMany(files,batchId,"BULK_IMPORT",{date:$("date").value,rowsDetected:state.bulk.length});let d={inserted:0,skipped:0};if(state.bulk.length)d=await api("/api/bulk",{method:"POST",body:JSON.stringify({rows:state.bulk,batchId,sourceFiles:files.map(f=>({name:f.name,type:f.type,size:f.size}))})});alert("Archivos guardados: "+files.length+" · Importadas: "+d.inserted+" · Omitidas: "+d.skipped);closeModal("bulkModal");await loadPatients()}catch(e){alert(e.message)}}
-async function showView(v){state.view=v;document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.id==="view-"+v));document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.view===v));if(v==="operativo"||v==="programacion")await loadPatients();if(v==="profilaxis")await loadProfilaxis();if(v==="postop")await loadPostop();if(v==="coordinacion"){await loadCoord();}}
+async function showView(v){state.view=v;document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.id==="view-"+v));document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.view===v));if(v==="operativo"||v==="programacion")await loadPatients();if(v==="profilaxis")await loadProfilaxis();if(v==="postop")await loadPostop();if(v==="acompanantes")await loadCompanionAdmin();if(v==="coordinacion"){await loadCoord();}}
 async function login(){try{const d=await api("/api/login",{method:"POST",body:JSON.stringify({user:$("lu").value,pin:$("lp").value})});state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";$("login").classList.add("hidden");await showView("operativo")}catch(e){$("le").textContent=e.message}}
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closeModal(b.dataset.close)));document.querySelectorAll("[data-coord]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-coord]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".coord-panel").forEach(x=>x.classList.toggle("active",x.id==="coord-"+b.dataset.coord));if(b.dataset.coord==="kpi")await loadKpi();if(b.dataset.coord==="mci")await loadMci();if(b.dataset.coord==="seguridad")await loadSecurity()}));
-$("lb").addEventListener("click",login);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",async()=>{try{await api("/api/logout",{method:"POST"})}catch{}location.reload()});$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackBtn").addEventListener("click",track);$("companionLogin").addEventListener("click",()=>{$("login").classList.add("hidden");showView("acompanantes")});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>alert(x.message))});$("patientFiles").addEventListener("change",e=>{state.patientFiles=Array.from(e.target.files||[]);$("patientFilesStatus").textContent=state.patientFiles.length?state.patientFiles.length+" archivo(s) seleccionados. Se guardarán al crear el paciente.":"Sin archivos seleccionados.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);
-(async()=>{$("date").value=new Date().toLocaleDateString("en-CA",{timeZone:"America/Bogota"});try{const d=await api("/api/me");state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";$("login").classList.add("hidden");await showView("operativo")}catch{}})();
+$("lb").addEventListener("click",login);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",async()=>{try{await api("/api/logout",{method:"POST"})}catch{}location.reload()});$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackBtn").addEventListener("click",track);$("copyTrackingPortalBtn")?.addEventListener("click",copyTrackingPortal);$("openTrackingPortalBtn")?.addEventListener("click",openTrackingPortal);$("printTrackingQrBtn")?.addEventListener("click",()=>printTrackingQr().catch(e=>alert(e.message)));$("downloadCompanionCardsBtn")?.addEventListener("click",()=>downloadCompanionCards().catch(e=>alert(e.message)));$("companionLogin").addEventListener("click",()=>{$("login").classList.add("hidden");showView("acompanantes")});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>alert(x.message))});$("patientFiles").addEventListener("change",e=>{state.patientFiles=Array.from(e.target.files||[]);$("patientFilesStatus").textContent=state.patientFiles.length?state.patientFiles.length+" archivo(s) seleccionados. Se guardarán al crear el paciente.":"Sin archivos seleccionados.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);
+(async()=>{$("date").value=new Date().toLocaleDateString("en-CA",{timeZone:"America/Bogota"});if(new URLSearchParams(location.search).get("follow")==="1"){$("login").classList.add("hidden");await showView("acompanantes");return;}try{const d=await api("/api/me");state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";$("login").classList.add("hidden");await showView("operativo")}catch{}})();
 </script></body></html>
