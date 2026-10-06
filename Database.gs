@@ -204,6 +204,7 @@ function patchRow_(sheet, rowNumber, patch) {
   }
 
   var meta = getHeaderMap_(sheet);
+  var values = sheet.getRange(rowNumber, 1, 1, meta.headers.length).getValues()[0];
   var keys = Object.keys(patch || {});
 
   keys.forEach(function(headerName) {
@@ -214,10 +215,11 @@ function patchRow_(sheet, rowNumber, patch) {
         '" en "' + sheet.getName() + '".'
       );
     }
-    sheet.getRange(rowNumber, column).setValue(patch[headerName]);
+    values[column - 1] = patch[headerName];
   });
 
-  return true;
+  sheet.getRange(rowNumber, 1, 1, meta.headers.length).setValues([values]);
+  return rowToObject_(meta.headers, values);
 }
 
 function appendRecord_(sheetName, record, source) {
@@ -246,4 +248,38 @@ function getSystemParameter_(name, fallback) {
   }
 
   return fallback;
+}
+
+
+function upsertSystemParameter_(name, value) {
+  var sheet = getSheet_(SHEETS.CONFIGURACION, DATA_SOURCES.MAIN);
+  var hit = findRowByHeader_(
+    SHEETS.CONFIGURACION,
+    'PARÁMETRO',
+    name,
+    DATA_SOURCES.MAIN
+  );
+
+  if (hit) {
+    patchRow_(sheet, hit.rowNumber, {
+      'PARÁMETRO': normalizeText_(name).toUpperCase(),
+      'VALOR': typeof value === 'string' ? value : JSON.stringify(value)
+    });
+    return hit.rowNumber;
+  }
+
+  return appendRecord_(SHEETS.CONFIGURACION, {
+    'PARÁMETRO': normalizeText_(name).toUpperCase(),
+    'VALOR': typeof value === 'string' ? value : JSON.stringify(value)
+  }, DATA_SOURCES.MAIN);
+}
+
+function getJsonSystemParameter_(name, fallback) {
+  var raw = getSystemParameter_(name, '');
+  if (raw === '' || raw == null) return JSON.parse(JSON.stringify(fallback));
+  try {
+    return JSON.parse(String(raw));
+  } catch (error) {
+    return JSON.parse(JSON.stringify(fallback));
+  }
 }
