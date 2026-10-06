@@ -148,7 +148,41 @@ Bun.serve({port:PORT,async fetch(req){
  if(url.pathname==="/api/roles"&&req.method==="GET"){
    if(!isAdminSession(s))return json({error:"No autorizado."},403);
    const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(coalesce(payload->>'ESTADO','ACTIVO'))='ACTIVO' order by payload->>'NOMBRE'");
-   return json({rows:r.map(x=>({id:x.payload["ID ROL"]||"",nombre:x.payload["NOMBRE"]||"",descripcion:x.payload["DESCRIPCIÓN"]||""}))});
+   return json({rows:r.map(x=>{let perms=[];try{perms=JSON.parse(String(x.payload["PERMISOS JSON"]||"[]"))}catch{}return{id:x.payload["ID ROL"]||"",nombre:x.payload["NOMBRE"]||"",descripcion:x.payload["DESCRIPCIÓN"]||"",permisos:perms,estado:x.payload["ESTADO"]||"ACTIVO",sistema:String(x.payload["SISTEMA"]||"").toUpperCase()==="SI"}})});
+ }
+ if(url.pathname==="/api/roles-admin"&&req.method==="GET"){
+   if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede editar roles."},403);
+   const r=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' order by payload->>'ID ROL'");
+   const catalog=["OPERACION_VER","OPERACION_GESTIONAR","PROGRAMACION_VER","PROGRAMACION_EDITAR","CARGUE_MASIVO","COORDINACION_VER","INDICADORES_VER","DESCARGAS","REPORTES_PDF","USUARIOS_GESTIONAR","REINTERVENCIONES_REVISAR","REINTERVENCIONES_CERRAR","PROFILAXIS_PREQX","CUIDADOS_POSTOP","SINCRONIZAR"];
+   const rows=r.map(x=>{let permisos=[];try{permisos=JSON.parse(String(x.payload["PERMISOS JSON"]||"[]"))}catch{}return{rowNumber:x.row_number,id:x.payload["ID ROL"]||"",nombre:x.payload["NOMBRE"]||"",descripcion:x.payload["DESCRIPCIÓN"]||"",permisos,estado:x.payload["ESTADO"]||"ACTIVO",sistema:String(x.payload["SISTEMA"]||"").toUpperCase()==="SI"}});
+   return json({rows,catalog});
+ }
+ if(url.pathname==="/api/roles"&&req.method==="POST"){
+   if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede crear roles."},403);
+   const b=await body(req),id=String(b.id||"").trim().toUpperCase(),nombre=String(b.nombre||"").trim(),descripcion=String(b.descripcion||"").trim(),permisos=Array.isArray(b.permisos)?b.permisos.map(x=>String(x).trim()).filter(Boolean):[];
+   if(!/^[A-Z0-9_]{2,40}$/.test(id))return json({error:"El código del rol debe usar letras mayúsculas, números o guion bajo."},400);
+   if(!nombre)return json({error:"El nombre del rol es obligatorio."},400);
+   const dup=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'ID ROL')=$1 limit 1",[id]);if(dup.length)return json({error:"Ese código de rol ya existe."},409);
+   const rn=await nextRow("ROLES"),now=nowBog(),row={"ID ROL":id,"NOMBRE":nombre,"DESCRIPCIÓN":descripcion,"PERMISOS JSON":JSON.stringify(permisos),"ESTADO":"ACTIVO","SISTEMA":"NO","CREADO EN":now,"CREADO POR":s.user,"ACTUALIZADO EN":now,"ACTUALIZADO POR":s.user};
+   await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','ROLES',$1,$2::jsonb)",[rn,JSON.stringify(row)]);
+   await outbox("ROL",id,"CREAR",row);await audit(s,"CREAR ROL","USUARIOS",id,nombre);
+   return json({ok:true,id});
+ }
+ if(url.pathname==="/api/roles/update"&&req.method==="POST"){
+   if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede editar roles."},403);
+   const b=await body(req),id=String(b.id||"").trim().toUpperCase();
+   const hit=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'ID ROL')=$1 limit 1",[id]);if(!hit.length)return json({error:"Rol no encontrado."},404);
+   const row=Object.assign({},hit[0].payload),nombre=String(b.nombre??row["NOMBRE"]??"").trim(),descripcion=String(b.descripcion??row["DESCRIPCIÓN"]??"").trim(),estado=String(b.estado??row["ESTADO"]??"ACTIVO").trim().toUpperCase(),permisos=Array.isArray(b.permisos)?b.permisos.map(x=>String(x).trim()).filter(Boolean):[];
+   if(id==="SUPERADMIN"){
+     row["NOMBRE"]=nombre||"Superadministrador";row["DESCRIPCIÓN"]=descripcion;row["PERMISOS JSON"]=JSON.stringify(["*"]);row["ESTADO"]="ACTIVO";
+   }else{
+     if(!["ACTIVO","INACTIVO"].includes(estado))return json({error:"Estado inválido."},400);
+     row["NOMBRE"]=nombre;row["DESCRIPCIÓN"]=descripcion;row["PERMISOS JSON"]=JSON.stringify(permisos);row["ESTADO"]=estado;
+   }
+   row["ACTUALIZADO EN"]=nowBog();row["ACTUALIZADO POR"]=s.user;
+   await sql.unsafe("update source_sheets set payload=$1::jsonb,imported_at=now() where source_key='MAIN' and sheet_name='ROLES' and row_number=$2",[JSON.stringify(row),hit[0].row_number]);
+   await outbox("ROL",id,"EDITAR",row);await audit(s,"EDITAR ROL","USUARIOS",id,row["NOMBRE"]+" · "+row["ESTADO"]);
+   return json({ok:true});
  }
  if(url.pathname==="/api/users"&&req.method==="POST"){
    if(!isAdminSession(s))return json({error:"No autorizado."},403);
@@ -157,7 +191,7 @@ Bun.serve({port:PORT,async fetch(req){
    if(!nombre)return json({error:"El nombre es obligatorio."},400);
    if(!validPin(pin))return json({error:"El PIN debe tener 6–8 dígitos y no puede ser una secuencia simple o repetida."},400);
    const dup=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='USUARIOS' and lower(payload->>'USUARIO')=$1 limit 1",[usuario]);if(dup.length)return json({error:"Ese usuario ya existe."},409);
-   const role=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'NOMBRE')=$1 and upper(coalesce(payload->>'ESTADO','ACTIVO'))='ACTIVO' limit 1",[rol]);if(!role.length&&rol!=="SUPERADMIN")return json({error:"Rol no válido."},400);
+   const role=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'ID ROL')=$1 and upper(coalesce(payload->>'ESTADO','ACTIVO'))='ACTIVO' limit 1",[rol]);if(!role.length)return json({error:"Rol no válido."},400);
    const salt=randomUUID().replace(/-/g,""),id="USR-"+randomUUID().slice(0,8).toUpperCase(),rn=await nextRow("USUARIOS"),created=nowBog();
    const u={"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"HASH PIN":hashRailwayPin(pin,salt),"ESTADO":"ACTIVO","CREADO EN":created,"CREADO POR":s.user,"ÚLTIMO INGRESO":"","ACTUALIZADO EN":created,"CAMBIO PIN REQUERIDO":b.forceChange?"SI":"NO","SALT PIN":salt,"PIN ACTUALIZADO EN":created,"INTENTOS FALLIDOS":"0","BLOQUEADO HASTA":"","VERSIÓN SESIÓN":"1","ALGORITMO PIN":"RAILWAY_V1"};
    await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','USUARIOS',$1,$2::jsonb)",[rn,JSON.stringify(u)]);await outbox("USUARIO",id,"CREAR",{"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"ESTADO":"ACTIVO"});await audit(s,"CREAR USUARIO","USUARIOS",id,usuario+" · "+rol);
@@ -168,6 +202,7 @@ Bun.serve({port:PORT,async fetch(req){
    const b=await body(req),hit=await findUserById(b.id);if(!hit)return json({error:"Usuario no encontrado."},404);
    const u=Object.assign({},hit.payload),nombre=String(b.nombre??u["NOMBRE"]??"").trim(),rol=String(b.rol??u["ROL"]??"").trim().toUpperCase(),estado=String(b.estado??u["ESTADO"]??"ACTIVO").trim().toUpperCase();
    if(!["ACTIVO","INACTIVO"].includes(estado))return json({error:"Estado inválido."},400);
+   const roleOk=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'ID ROL')=$1 and upper(coalesce(payload->>'ESTADO','ACTIVO'))='ACTIVO' limit 1",[rol]);if(!roleOk.length)return json({error:"Rol no válido o inactivo."},400);
    u["NOMBRE"]=nombre;u["ROL"]=rol;u["ESTADO"]=estado;u["ACTUALIZADO EN"]=nowBog();
    await patchUserRow(hit.row_number,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"EDITAR",{"ID USUARIO":u["ID USUARIO"],"NOMBRE":nombre,"ROL":rol,"ESTADO":estado});await audit(s,"EDITAR USUARIO","USUARIOS",String(u["ID USUARIO"]||""),nombre+" · "+rol+" · "+estado);
    return json({ok:true});
