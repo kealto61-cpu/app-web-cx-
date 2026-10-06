@@ -217,13 +217,11 @@ Bun.serve({port:PORT,async fetch(req){
    await patchUserRow(hit.row_number,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"CAMBIO_PIN",{"ID USUARIO":u["ID USUARIO"],"USUARIO":u["USUARIO"],"ACTUALIZADO EN":u["ACTUALIZADO EN"]});await audit(s,"CAMBIO PIN","USUARIOS",String(u["ID USUARIO"]||""),"Cambio de PIN propio");
    return json({ok:true});
  }
- if(url.pathname==="/api/users"&&req.method==="GET"){
-   if(!hasPermission(permissions,"USUARIOS_GESTIONAR"))return permissionDenied("USUARIOS_GESTIONAR");
+ if(url.pathname==="/api/users"&&req.method==="GET"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
    const r=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='USUARIOS' order by lower(coalesce(payload->>'NOMBRE',payload->>'USUARIO',''))");
    return json({rows:r.map(x=>({id:x.payload["ID USUARIO"]||"",usuario:x.payload["USUARIO"]||"",nombre:x.payload["NOMBRE"]||"",rol:x.payload["ROL"]||"",estado:x.payload["ESTADO"]||"",ultimoIngreso:x.payload["ÚLTIMO INGRESO"]||"",cambioPin:String(x.payload["CAMBIO PIN REQUERIDO"]||"").toUpperCase()==="SI"||String(x.payload["CAMBIO PIN REQUERIDO"]||"").toUpperCase()==="SÍ"}))});
  }
- if(url.pathname==="/api/roles"&&req.method==="GET"){
-   if(!hasPermission(permissions,"USUARIOS_GESTIONAR"))return permissionDenied("USUARIOS_GESTIONAR");
+ if(url.pathname==="/api/roles"&&req.method==="GET"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
    const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(coalesce(payload->>'ESTADO','ACTIVO'))='ACTIVO' order by payload->>'NOMBRE'");
    return json({rows:r.map(x=>{let perms=[];try{perms=JSON.parse(String(x.payload["PERMISOS JSON"]||"[]"))}catch{}return{id:x.payload["ID ROL"]||"",nombre:x.payload["NOMBRE"]||"",descripcion:x.payload["DESCRIPCIÓN"]||"",permisos:perms,estado:x.payload["ESTADO"]||"ACTIVO",sistema:String(x.payload["SISTEMA"]||"").toUpperCase()==="SI"}})});
  }
@@ -261,8 +259,7 @@ Bun.serve({port:PORT,async fetch(req){
    await outbox("ROL",id,"EDITAR",row);await audit(s,"EDITAR ROL","USUARIOS",id,row["NOMBRE"]+" · "+row["ESTADO"]);
    return json({ok:true});
  }
- if(url.pathname==="/api/users"&&req.method==="POST"){
-   if(!hasPermission(permissions,"USUARIOS_GESTIONAR"))return permissionDenied("USUARIOS_GESTIONAR");
+ if(url.pathname==="/api/users"&&req.method==="POST"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
    const b=await body(req),usuario=String(b.usuario||"").trim().toLowerCase(),nombre=String(b.nombre||"").trim(),rol=String(b.rol||"").trim().toUpperCase(),pin=String(b.pin||"");
    if(!/^[a-z0-9._-]{3,40}$/.test(usuario))return json({error:"Usuario inválido. Use 3–40 caracteres: letras, números, punto, guion o guion bajo."},400);
    if(!nombre)return json({error:"El nombre es obligatorio."},400);
@@ -274,8 +271,7 @@ Bun.serve({port:PORT,async fetch(req){
    await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','USUARIOS',$1,$2::jsonb)",[rn,JSON.stringify(u)]);await outbox("USUARIO",id,"CREAR",{"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"ESTADO":"ACTIVO"});await audit(s,"CREAR USUARIO","USUARIOS",id,usuario+" · "+rol);
    return json({ok:true,id});
  }
- if(url.pathname==="/api/users/update"&&req.method==="POST"){
-   if(!hasPermission(permissions,"USUARIOS_GESTIONAR"))return permissionDenied("USUARIOS_GESTIONAR");
+ if(url.pathname==="/api/users/update"&&req.method==="POST"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
    const b=await body(req),hit=await findUserById(b.id);if(!hit)return json({error:"Usuario no encontrado."},404);
    const u=Object.assign({},hit.payload),nombre=String(b.nombre??u["NOMBRE"]??"").trim(),rol=String(b.rol??u["ROL"]??"").trim().toUpperCase(),estado=String(b.estado??u["ESTADO"]??"ACTIVO").trim().toUpperCase();
    if(!["ACTIVO","INACTIVO"].includes(estado))return json({error:"Estado inválido."},400);
@@ -284,8 +280,7 @@ Bun.serve({port:PORT,async fetch(req){
    await patchUserRow(hit.row_number,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"EDITAR",{"ID USUARIO":u["ID USUARIO"],"NOMBRE":nombre,"ROL":rol,"ESTADO":estado});await audit(s,"EDITAR USUARIO","USUARIOS",String(u["ID USUARIO"]||""),nombre+" · "+rol+" · "+estado);
    return json({ok:true});
  }
- if(url.pathname==="/api/users/reset-pin"&&req.method==="POST"){
-   if(!hasPermission(permissions,"USUARIOS_GESTIONAR"))return permissionDenied("USUARIOS_GESTIONAR");
+ if(url.pathname==="/api/users/reset-pin"&&req.method==="POST"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
    const b=await body(req),pin=String(b.pin||"");if(!validPin(pin))return json({error:"El PIN debe tener 6–8 dígitos y no puede ser una secuencia simple o repetida."},400);
    const hit=await findUserById(b.id);if(!hit)return json({error:"Usuario no encontrado."},404);
    const u=Object.assign({},hit.payload),salt=randomUUID().replace(/-/g,""),version=Number(u["VERSIÓN SESIÓN"]||1)+1;
