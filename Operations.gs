@@ -475,6 +475,9 @@ function bulkImportApp_(token, body) {
   var config = operationalConfig_();
   var existing = existingProgrammingKeysApp_();
   var trackingTokens = existingTrackingTokensSetApp_();
+  var programNotice = companionMessagesConfig_().find(function(item) {
+    return item.enabled && item.automatic && item.trigger === 'PROGRAMADO';
+  }) || null;
   var inserted = 0;
   var skipped = 0;
   var errors = [];
@@ -534,6 +537,16 @@ function bulkImportApp_(token, body) {
         'CREADO SEGUIMIENTO': new Date(),
         'ÚLTIMA ACTUALIZACIÓN WEB': new Date()
       };
+
+      if (programNotice) {
+        record['AVISO ACOMPAÑANTE'] = renderCompanionMessage_(
+          programNotice.text,
+          record
+        );
+        record['FECHA/HORA AVISO ACOMPAÑANTE'] = new Date();
+        record['ORIGEN AVISO ACOMPAÑANTE'] = 'AUTOMÁTICO';
+        record['ID MENSAJE ACOMPAÑANTE'] = programNotice.id;
+      }
 
       output.push(headers.map(function(header) {
         return Object.prototype.hasOwnProperty.call(record, header) ?
