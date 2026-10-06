@@ -16,7 +16,7 @@ function norm(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/
 function nowBog(){return new Date().toLocaleString("sv-SE",{timeZone:"America/Bogota"}).replace("T"," ")}
 function monthName(n){return ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][n-1]||""}
 async function body(req){try{return await req.json()}catch{return {}}}
-function mapCase(p){return {id:p["ID CASO"]||"",fecha:p["FECHA CIRUGÍA"]||"",hora:p["HORA PROGRAMADA"]||"",documento:p["DOCUMENTO"]||"",paciente:p["PACIENTE"]||"",edad:p["EDAD"]||"",telefono:p["TELÉFONO"]||"",sexo:p["SEXO"]||"",procedimiento:p["PROCEDIMIENTO"]||"",especialidad:p["ESPECIALIDAD"]||"",especialista:p["ESPECIALISTA"]||"",qno:p["SALA / QNO"]||"",estado:String(p["ESTADO ACTUAL"]||"PROGRAMADO").toUpperCase(),observaciones:p["OBSERVACIONES"]||"",tipoAtencion:p["TIPO DE ATENCIÓN"]||"",operado:["TRUE","SI","SÍ","1"].includes(norm(p["OPERADO"])),destino:p["DESTINO POSTOP"]||"",salida:p["HORA SALIDA RECUPERACIÓN"]||"",observacionEgreso:p["OBSERVACIÓN EGRESO / HOSPITALIZACIÓN"]||"",codigo:p["CÓDIGO SEGUIMIENTO"]||"",token:p["TOKEN SEGUIMIENTO"]||"",actualizado:p["ÚLTIMA ACTUALIZACIÓN WEB"]||p["FECHA/HORA ÚLTIMO MOVIMIENTO"]||"",tPrepa:Number(p["TIEMPO PREPA → QNO (MIN)"]||0)||0,tQnoRec:Number(p["TIEMPO QNO → RECUPERACIÓN (MIN)"]||0)||0,tMuerto:Number(p["INTERVALO ENTRE PACIENTES QNO (MIN)"]||0)||0,prof:p["PROFILAXIS ADMINISTRADA"]||"",profHora:p["HORA ADMINISTRACIÓN PROFILAXIS"]||"",profMin:p["PROFILAXIS → INCISIÓN (MIN)"]||"",clasif:p["CLASIFICACIÓN CIRUGÍA"]||"",antibiotico:p["PROFILAXIS ANTIBIÓTICA / MEDICAMENTO"]||"",cups:p["CUPS"]||"",uvr:p["UVR"]||"",tiempoQx:p["TIEMPO QX ESTIMADO (MIN)"]||"",recursos:p["RECURSOS / ALERTAS PREQUIRÚRGICAS"]||"",cama:p["CAMA / UBICACIÓN PROGRAMADA"]||"",enfermeroJefe:p["ENFERMERO JEFE"]||"",horaAnestesia:p["HORA INICIO ANESTESIA"]||"",horaFinAnestesia:p["HORA FIN ANESTESIA"]||"",horaInicioCirugia:p["HORA INICIO CIRUGÍA / INCISIÓN"]||"",horaFinCirugia:p["HORA FIN CIRUGÍA"]||""}}
+function mapCase(p){return {id:p["ID CASO"]||"",fecha:p["FECHA CIRUGÍA"]||"",hora:p["HORA PROGRAMADA"]||"",documento:p["DOCUMENTO"]||"",paciente:p["PACIENTE"]||"",edad:p["EDAD"]||"",telefono:p["TELÉFONO"]||"",sexo:p["SEXO"]||"",procedimiento:p["PROCEDIMIENTO"]||"",especialidad:p["ESPECIALIDAD"]||"",especialista:p["ESPECIALISTA"]||"",qno:p["SALA / QNO"]||"",estado:String(p["ESTADO ACTUAL"]||"PROGRAMADO").toUpperCase(),observaciones:p["OBSERVACIONES"]||"",tipoAtencion:p["TIPO DE ATENCIÓN"]||"",operado:["TRUE","SI","SÍ","1"].includes(norm(p["OPERADO"])),destino:p["DESTINO POSTOP"]||"",salida:p["HORA SALIDA RECUPERACIÓN"]||"",observacionEgreso:p["OBSERVACIÓN EGRESO / HOSPITALIZACIÓN"]||"",codigo:p["CÓDIGO SEGUIMIENTO"]||"",token:p["TOKEN SEGUIMIENTO"]||"",actualizado:p["ÚLTIMA ACTUALIZACIÓN WEB"]||p["FECHA/HORA ÚLTIMO MOVIMIENTO"]||"",tPrepa:Number(p["TIEMPO PREPA → QNO (MIN)"]||0)||0,tQnoRec:Number(p["TIEMPO QNO → RECUPERACIÓN (MIN)"]||0)||0,tMuerto:Number(p["INTERVALO ENTRE PACIENTES QNO (MIN)"]||0)||0,prof:p["PROFILAXIS ADMINISTRADA"]||"",profHora:p["HORA ADMINISTRACIÓN PROFILAXIS"]||"",profMin:p["PROFILAXIS → INCISIÓN (MIN)"]||"",clasif:p["CLASIFICACIÓN CIRUGÍA"]||"",antibiotico:p["PROFILAXIS ANTIBIÓTICA / MEDICAMENTO"]||"",cups:p["CUPS"]||"",uvr:p["UVR"]||"",tiempoQx:p["TIEMPO QX ESTIMADO (MIN)"]||"",recursos:p["RECURSOS / ALERTAS PREQUIRÚRGICAS"]||"",cama:p["CAMA / UBICACIÓN PROGRAMADA"]||"",enfermeroJefe:p["ENFERMERO JEFE"]||"",horaAnestesia:p["HORA INICIO ANESTESIA"]||"",horaFinAnestesia:p["HORA FIN ANESTESIA"]||"",horaInicioCirugia:p["HORA INICIO CIRUGÍA / INCISIÓN"]||"",horaFinCirugia:p["HORA FIN CIRUGÍA"]||"",aviso:p["AVISO ACOMPAÑANTE"]||"",avisoFecha:p["FECHA/HORA AVISO ACOMPAÑANTE"]||"",avisoOrigen:p["ORIGEN AVISO ACOMPAÑANTE"]||"",avisoId:p["ID MENSAJE ACOMPAÑANTE"]||""}}
 async function casesFor(date){const d=safeDate(date);const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'FECHA CIRUGÍA'=$1 order by payload->>'HORA PROGRAMADA'",[d]);return r.map(x=>mapCase(x.payload))}
 function metrics(rows){const m={total:rows.length,programado:0,preparacion:0,quirofano:0,recuperacion:0,finalizados:0,cancelados:0,operados:0};rows.forEach(r=>{if(r.estado==="PROGRAMADO")m.programado++;if(r.estado==="PREPARACIÓN")m.preparacion++;if(r.estado==="QUIRÓFANO")m.quirofano++;if(r.estado==="RECUPERACIÓN")m.recuperacion++;if(["ALTA","HOSPITALIZACIÓN"].includes(r.estado)||["ALTA","HOSPITALIZACIÓN"].includes(norm(r.destino)))m.finalizados++;if(r.estado==="CANCELADO")m.cancelados++;if(r.operado)m.operados++});return m}
 async function nextRow(sheet){const r=await sql.unsafe("select coalesce(max(row_number),1)+1 as n from source_sheets where source_key='MAIN' and sheet_name=$1",[sheet]);return Number(r[0].n||2)}
@@ -127,6 +127,13 @@ const DEFAULT_FLOW={
   "RECUPERACIÓN":["ALTA","HOSPITALIZACIÓN"]
 };
 const FLOW_STATES=["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"];
+const DEFAULT_COMPANION_MESSAGES=[
+  {id:"PREPARACION",name:"Ingreso a preparación",trigger:"PREPARACIÓN",text:"Su familiar ingresó a preparación prequirúrgica.",automatic:false,enabled:true,terminal:false},
+  {id:"QUIROFANO",name:"Ingreso a quirófano",trigger:"QUIRÓFANO",text:"Su familiar ingresó a quirófano.",automatic:false,enabled:true,terminal:false},
+  {id:"RECUPERACION",name:"Ingreso a recuperación",trigger:"RECUPERACIÓN",text:"Su familiar ingresó a recuperación postanestésica.",automatic:true,enabled:true,terminal:false},
+  {id:"ALTA",name:"Paciente de alta",trigger:"ALTA",text:"Su familiar se encuentra de alta. Por favor acérquese a Admisiones.",automatic:true,enabled:true,terminal:true},
+  {id:"HOSPITALIZACION",name:"Paso a hospitalización",trigger:"HOSPITALIZACIÓN",text:"Su familiar pasó a hospitalización. {{CAMA_FRASE}}",automatic:true,enabled:true,terminal:true}
+];
 async function readSystemConfig(param,fallback){
   const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA' and upper(payload->>'PARÁMETRO')=$1 order by row_number desc limit 1",[String(param||"").toUpperCase()]);
   if(!r.length)return fallback;
@@ -156,6 +163,66 @@ async function operationalConfig(){
   if(!flow||typeof flow!=="object"||Array.isArray(flow))flow=JSON.parse(JSON.stringify(DEFAULT_FLOW));
   return {qnos,flow,states:FLOW_STATES};
 }
+async function companionMessagesConfig(){
+  let rows=await readSystemConfig("MENSAJES ACOMPAÑANTE",DEFAULT_COMPANION_MESSAGES);
+  if(!Array.isArray(rows)||!rows.length)rows=JSON.parse(JSON.stringify(DEFAULT_COMPANION_MESSAGES));
+  const seen=new Set();
+  rows=rows.map((m,i)=>{
+    const id=String(m?.id||("MSG_"+(i+1))).trim().toUpperCase().replace(/[^A-Z0-9_]/g,"_").slice(0,40);
+    if(!id||seen.has(id))return null;seen.add(id);
+    const trigger=String(m?.trigger||"MANUAL").trim().toUpperCase();
+    const terminal=["ALTA","HOSPITALIZACIÓN"].includes(trigger);
+    return {
+      id,
+      name:String(m?.name||id).trim().slice(0,80),
+      trigger:["MANUAL",...FLOW_STATES].includes(trigger)?trigger:"MANUAL",
+      text:String(m?.text||"").trim().slice(0,300),
+      automatic:terminal?true:Boolean(m?.automatic),
+      enabled:m?.enabled!==false,
+      terminal
+    };
+  }).filter(Boolean);
+  for(const terminalId of ["ALTA","HOSPITALIZACION"]){
+    const trigger=terminalId==="ALTA"?"ALTA":"HOSPITALIZACIÓN";
+    if(!rows.some(x=>x.trigger===trigger)){
+      const d=DEFAULT_COMPANION_MESSAGES.find(x=>x.trigger===trigger);
+      rows.push({...d});
+    }
+  }
+  return rows;
+}
+function renderCompanionMessage(template,payload){
+  const cama=String(payload?.["CAMA / UBICACIÓN PROGRAMADA"]||"").trim();
+  const camaFrase=cama?("Ubicación asignada: cama "+cama+"."):"";
+  return String(template||"")
+    .replace(/\{\{CAMA_FRASE\}\}/g,camaFrase)
+    .replace(/\{\{CAMA\}\}/g,cama)
+    .replace(/\s{2,}/g," ")
+    .replace(/\s+([.,;:])/g,"$1")
+    .trim();
+}
+async function setCompanionNotice(session,id,messageId,origin="MANUAL"){
+  const hit=await findCase(id);if(!hit)throw new Error("Paciente no encontrado.");
+  const cfg=await companionMessagesConfig(),msg=cfg.find(x=>x.id===String(messageId||"").toUpperCase()&&x.enabled);
+  if(!msg)throw new Error("Mensaje de acompañante no disponible.");
+  const text=renderCompanionMessage(msg.text,hit.payload);
+  if(!text)throw new Error("El mensaje configurado está vacío.");
+  const patch={
+    "AVISO ACOMPAÑANTE":text,
+    "FECHA/HORA AVISO ACOMPAÑANTE":nowBog(),
+    "ORIGEN AVISO ACOMPAÑANTE":String(origin||"MANUAL").toUpperCase(),
+    "ID MENSAJE ACOMPAÑANTE":msg.id
+  };
+  const c=await updateCase(session,id,patch,"AVISO ACOMPAÑANTE");
+  await audit(session,"NOTIFICAR ACOMPAÑANTE","ACOMPAÑANTES",id,msg.id+" · "+patch["ORIGEN AVISO ACOMPAÑANTE"]);
+  return {...c,aviso:text,avisoFecha:patch["FECHA/HORA AVISO ACOMPAÑANTE"],avisoId:msg.id};
+}
+async function autoNotifyCompanion(session,id,stateName){
+  const state=String(stateName||"").toUpperCase(),cfg=await companionMessagesConfig();
+  const msg=cfg.find(x=>x.enabled&&x.automatic&&x.trigger===state);
+  if(!msg)return null;
+  return setCompanionNotice(session,id,msg.id,"AUTOMÁTICO");
+}
 function profSearchScore(q,row){
   if(!q)return 1;
   const fields=[row["ESPECIALIDAD"],row["PROCEDIMIENTO"],row["TÉRMINOS SIMILARES / SINÓNIMOS"],row["CUPS / GRUPO"]].map(norm);
@@ -178,7 +245,7 @@ async function patchUserRow(rowNumber,payload){
 function csvCell(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 Bun.serve({port:PORT,async fetch(req){
  const url=new URL(req.url);if(url.pathname==="/health")return json({ok:true});if(url.pathname==="/")return html(PAGE);
- if(url.pathname==="/api/tracking"){const code=String(url.searchParams.get("code")||"").replace(/\D/g,"").slice(0,5);if(!/^\d{5}$/.test(code))return json({error:"Ingrese el código temporal de 5 dígitos."},400);const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'TOKEN SEGUIMIENTO'=$1 limit 1",[code]);if(!r.length)return json({error:"No se encontró un seguimiento activo asociado a ese código."},404);const c=mapCase(r[0].payload);return json({ok:true,estadoPublico:publicState(c.estado,c.destino),actualizado:c.actualizado,active:trackingActiveState(c.estado)})}
+ if(url.pathname==="/api/tracking"){const code=String(url.searchParams.get("code")||"").replace(/\D/g,"").slice(0,5);if(!/^\d{5}$/.test(code))return json({error:"Ingrese el código temporal de 5 dígitos."},400);const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'TOKEN SEGUIMIENTO'=$1 limit 1",[code]);if(!r.length)return json({error:"No se encontró un seguimiento asociado a ese código."},404);const c=mapCase(r[0].payload),terminal=["ALTA","HOSPITALIZACIÓN"].includes(c.estado)||["ALTA","HOSPITALIZACIÓN"].includes(String(c.destino||"").toUpperCase());return json({ok:true,estadoPublico:terminal?"":publicState(c.estado,c.destino),actualizado:c.avisoFecha||c.actualizado,active:!terminal&&trackingActiveState(c.estado),terminal,aviso:c.aviso||"",avisoFecha:c.avisoFecha||""})}
  if(url.pathname==="/api/login"&&req.method==="POST"){const b=await body(req),u=String(b.user||"").trim().toLowerCase(),pin=String(b.pin||"");const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='USUARIOS' and lower(payload->>'USUARIO')=$1 limit 1",[u]);if(!r.length)return json({error:"Usuario o PIN incorrectos."},401);const x=r[0].payload;if(norm(x["ESTADO"])!=="ACTIVO")return json({error:"Cuenta inactiva."},403);const salt=String(x["SALT PIN"]||""),algo=String(x["ALGORITMO PIN"]||"");if(salt&&algo!=="RAILWAY_V1"&&!Bun.env.QX_AUTH_PEPPER_V1)return json({error:"Esta cuenta antigua requiere migración de autenticación. Un SUPERADMIN puede asignar un nuevo PIN desde Usuarios."},409);const ok=verifyUserPinPayload(x,pin);if(!ok)return json({error:"Usuario o PIN incorrectos."},401);const p={uid:x["ID USUARIO"],user:x["USUARIO"],name:x["NOMBRE"],role:x["ROL"],exp:Date.now()+SESSION_TTL},t=sign(p),permissions=await getRolePermissions(p.role);return json({ok:true,user:p.user,name:p.name,role:p.role,permissions},200,{"set-cookie":"qx_session="+encodeURIComponent(t)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=21600"})}
  if(url.pathname==="/api/logout"&&req.method==="POST")return json({ok:true},200,{"set-cookie":"qx_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"});
  if(url.pathname==="/api/attachment"&&req.method==="POST"){
@@ -212,6 +279,34 @@ Bun.serve({port:PORT,async fetch(req){
    }
    await writeSystemConfig(s,"QNO HABILITADOS",qnos);await writeSystemConfig(s,"FLUJO QUIRÚRGICO",clean);
    return json({ok:true,qnos,flow:clean,states:FLOW_STATES});
+ }
+ if(url.pathname==="/api/companion-messages"&&req.method==="GET"){
+   if(!(hasPermission(permissions,"OPERACION_VER")||hasPermission(permissions,"OPERACION_GESTIONAR")||String(s.role||"").toUpperCase()==="SUPERADMIN"))return permissionDenied("OPERACION_VER");
+   return json({rows:await companionMessagesConfig()});
+ }
+ if(url.pathname==="/api/companion-messages"&&req.method==="POST"){
+   if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede configurar mensajes para acompañantes."},403);
+   const b=await body(req),rows=Array.isArray(b.rows)?b.rows:[];
+   if(!rows.length||rows.length>30)return json({error:"Configure entre 1 y 30 mensajes."},400);
+   const clean=[],ids=new Set();
+   for(let i=0;i<rows.length;i++){
+     const raw=rows[i]||{},id=String(raw.id||("MSG_"+(i+1))).trim().toUpperCase().replace(/[^A-Z0-9_]/g,"_").slice(0,40),trigger=String(raw.trigger||"MANUAL").trim().toUpperCase(),text=String(raw.text||"").trim().slice(0,300);
+     if(!id||ids.has(id))return json({error:"Hay códigos de mensaje duplicados o inválidos."},400);ids.add(id);
+     if(!["MANUAL",...FLOW_STATES].includes(trigger))return json({error:"Momento de envío inválido: "+trigger},400);
+     if(!text)return json({error:"Todos los mensajes deben tener texto."},400);
+     const terminal=["ALTA","HOSPITALIZACIÓN"].includes(trigger);
+     clean.push({id,name:String(raw.name||id).trim().slice(0,80),trigger,text,automatic:terminal?true:Boolean(raw.automatic),enabled:raw.enabled!==false,terminal});
+   }
+   for(const trigger of ["ALTA","HOSPITALIZACIÓN"]){
+     if(!clean.some(x=>x.trigger===trigger))return json({error:"Debe existir un mensaje final para "+trigger+"."},400);
+   }
+   await writeSystemConfig(s,"MENSAJES ACOMPAÑANTE",clean);
+   return json({ok:true,rows:await companionMessagesConfig()});
+ }
+ if(url.pathname==="/api/companion/notify"&&req.method==="POST"){
+   if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");
+   const b=await body(req),c=await setCompanionNotice(s,String(b.id||""),String(b.messageId||""),"MANUAL");
+   return json({ok:true,case:c});
  }
  if(url.pathname==="/api/change-pin"&&req.method==="POST"){
    const b=await body(req),current=String(b.currentPin||""),next=String(b.newPin||"");
@@ -295,7 +390,7 @@ Bun.serve({port:PORT,async fetch(req){
    return json({ok:true});
  }
 
- if(url.pathname==="/api/tracking-admin"){if(!(hasPermission(permissions,"OPERACION_VER")||hasPermission(permissions,"PROGRAMACION_VER")))return permissionDenied("OPERACION_VER");const rows=await ensureTrackingForDate(s,url.searchParams.get("date")||"");return json({rows:rows.map(x=>({id:x.id,hora:x.hora,paciente:x.paciente,documento:x.documento,edad:x.edad,codigo:x.codigo,token:x.token,estado:x.estado}))})}
+ if(url.pathname==="/api/tracking-admin"){if(!(hasPermission(permissions,"OPERACION_VER")||hasPermission(permissions,"PROGRAMACION_VER")))return permissionDenied("OPERACION_VER");const rows=await ensureTrackingForDate(s,url.searchParams.get("date")||"");return json({rows:rows.map(x=>({id:x.id,hora:x.hora,paciente:x.paciente,documento:x.documento,edad:x.edad,codigo:x.codigo,token:x.token,estado:x.estado,aviso:x.aviso||"",avisoFecha:x.avisoFecha||""}))})}
  if(url.pathname==="/api/board"){if(!(hasPermission(permissions,"OPERACION_VER")||hasPermission(permissions,"PROGRAMACION_VER")))return permissionDenied("OPERACION_VER");const rows=await casesFor(url.searchParams.get("date")||""),config=await operationalConfig();return json({rows,metrics:metrics(rows),config})}
  if(url.pathname==="/api/case/move"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");
   const b=await body(req),hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);
@@ -329,11 +424,11 @@ Bun.serve({port:PORT,async fetch(req){
     if(to==="RECUPERACIÓN")patch["RECUPERACIÓN"]="TRUE";
     if(["ALTA","HOSPITALIZACIÓN"].includes(to)){patch["DESTINO POSTOP"]=to;patch["OBSERVACIÓN EGRESO / HOSPITALIZACIÓN"]=String(b.observacion||"");}
   }
-  const c=await updateCase(s,b.id,patch,"MOVER PACIENTE");await addMovement(s,Object.assign({},hit.payload,patch),from,to);return json(c)
+  let c=await updateCase(s,b.id,patch,"MOVER PACIENTE");await addMovement(s,Object.assign({},hit.payload,patch),from,to);const notice=await autoNotifyCompanion(s,b.id,to);if(notice)c=notice;return json(c)
 }
  if(url.pathname==="/api/case/qno"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req),q=String(b.qno||"").toUpperCase(),jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno."},400);const cfg=await operationalConfig();if(!cfg.qnos.includes(q))return json({error:"QNO inválido o no habilitado."},400);return json(await updateCase(s,b.id,{"SALA / QNO":q,"ENFERMERO JEFE":jefe},"CAMBIO QNO"))}
  if(url.pathname==="/api/case/cancel"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req);if(!String(b.jefeTurno||"").trim())return json({error:"Debe registrar el Jefe de turno."},400);if(!String(b.momento||"").trim()||!String(b.causa||"").trim()||!String(b.motivo||"").trim()||!String(b.atribuible||"").trim())return json({error:"Momento, causa, motivo y atribuibilidad son obligatorios."},400);const hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);await insertCancellation(s,hit.payload,b);const obs=[b.causa,b.motivo,b.observaciones].filter(Boolean).join(" | ");const c=await updateCase(s,b.id,{"ESTADO ACTUAL":"CANCELADO","CANCELAR":"TRUE","ENFERMERO JEFE":String(b.jefeTurno),"OBSERVACIONES":obs},"CANCELAR PACIENTE");await addMovement(s,Object.assign({},hit.payload,{"ESTADO ACTUAL":"CANCELADO"}),hit.payload["ESTADO ACTUAL"]||"","CANCELADO");return json(c)}
- if(url.pathname==="/api/case/finish"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req),d=String(b.destino||"").toUpperCase(),jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno."},400);if(!["ALTA","HOSPITALIZACIÓN"].includes(d))return json({error:"Destino inválido."},400);const c=await updateCase(s,b.id,{"ESTADO ACTUAL":d,"DESTINO POSTOP":d,"HORA SALIDA RECUPERACIÓN":nowBog(),"OBSERVACIÓN EGRESO / HOSPITALIZACIÓN":String(b.observacion||""),"ENFERMERO JEFE":jefe},"CIERRE RECUPERACIÓN");return json(c)}
+ if(url.pathname==="/api/case/finish"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req),d=String(b.destino||"").toUpperCase(),jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno."},400);if(!["ALTA","HOSPITALIZACIÓN"].includes(d))return json({error:"Destino inválido."},400);let c=await updateCase(s,b.id,{"ESTADO ACTUAL":d,"DESTINO POSTOP":d,"HORA SALIDA RECUPERACIÓN":nowBog(),"OBSERVACIÓN EGRESO / HOSPITALIZACIÓN":String(b.observacion||""),"ENFERMERO JEFE":jefe},"CIERRE RECUPERACIÓN");const notice=await autoNotifyCompanion(s,b.id,d);if(notice)c=notice;return json(c)}
  if(url.pathname==="/api/patient/update"&&req.method==="POST"){if(!hasPermission(permissions,"PROGRAMACION_EDITAR"))return permissionDenied("PROGRAMACION_EDITAR");
    const b=await body(req),ucfg=await operationalConfig();if(b.qno&&!ucfg.qnos.includes(String(b.qno).trim().toUpperCase()))return json({error:"QNO no habilitado."},400);const hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);
    const p=Object.assign({},hit.payload);
