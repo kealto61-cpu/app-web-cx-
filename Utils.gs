@@ -21,6 +21,22 @@ function normalDate_(value) {
   if (!value) return null;
 
   var text = String(value).trim();
+
+  var iso = text.match(
+    /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+
+  if (iso) {
+    return new Date(
+      Number(iso[1]),
+      Number(iso[2]) - 1,
+      Number(iso[3]),
+      Number(iso[4] || 0),
+      Number(iso[5] || 0),
+      Number(iso[6] || 0)
+    );
+  }
+
   var m = text.match(
     /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
   );
