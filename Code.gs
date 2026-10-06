@@ -44,3 +44,55 @@ function apiBoot(token, dateIso) {
 function apiHealth() {
   return setupSystem();
 }
+
+
+function apiWebAppInfo() {
+  return {
+    url: ScriptApp.getService().getUrl() || '',
+    version: APP.VERSION,
+    today: todayIso_()
+  };
+}
+
+function validateCurrentSchema() {
+  var sheet = getSheet_(SHEETS.PROGRAMACION, DATA_SOURCES.MAIN);
+  var headers = getHeaderMap_(sheet).map;
+  var required = [
+    'ID CASO',
+    'FECHA CIRUGÍA',
+    'HORA PROGRAMADA',
+    'DOCUMENTO',
+    'TELÉFONO',
+    'PACIENTE',
+    'EDAD',
+    'PROCEDIMIENTO',
+    'ESPECIALIDAD',
+    'ESPECIALISTA',
+    'SALA / QNO',
+    'ESTADO ACTUAL',
+    'TIPO DE ATENCIÓN',
+    'CAMA / UBICACIÓN PROGRAMADA',
+    'CUPS',
+    'TIEMPO QX ESTIMADO (MIN)',
+    'PROFILAXIS ADMINISTRADA',
+    'HORA ADMINISTRACIÓN PROFILAXIS',
+    'CLASIFICACIÓN CIRUGÍA',
+    'CÓDIGO SEGUIMIENTO',
+    'TOKEN SEGUIMIENTO',
+    'AVISO ACOMPAÑANTE',
+    'FECHA/HORA AVISO ACOMPAÑANTE',
+    'ORIGEN AVISO ACOMPAÑANTE',
+    'ID MENSAJE ACOMPAÑANTE'
+  ];
+
+  var missing = required.filter(function(header) {
+    return !headers[normalizeHeader_(header)];
+  });
+
+  return {
+    ok: missing.length === 0,
+    missingColumns: missing,
+    spreadsheet: mainSpreadsheet_().getName(),
+    version: APP.VERSION
+  };
+}
