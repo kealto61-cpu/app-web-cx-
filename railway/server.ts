@@ -107,12 +107,18 @@ function isAdminSession(s){return ["SUPERADMIN","ADMIN"].includes(String(s?.role
 async function getRolePermissions(roleCode){
   const role=String(roleCode||"").toUpperCase();
   if(role==="SUPERADMIN")return ["*"];
-  const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'ID ROL')=$1 and upper(coalesce(payload->>'ESTADO','ACTIVO'))='ACTIVO' limit 1",[role]);
-  if(!r.length)return [];
-  try{const p=JSON.parse(String(r[0].payload["PERMISOS JSON"]||"[]"));return Array.isArray(p)?p:[]}catch{return []}
+  const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES'");
+  const found=r.map(x=>objectPayload(x.payload)).find(p=>String(p["ID ROL"]||"").toUpperCase()===role&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO");
+  if(!found)return [];
+  try{const p=JSON.parse(String(found["PERMISOS JSON"]||"[]"));return Array.isArray(p)?p:[]}catch{return []}
 }
 function hasPermission(perms,permission){return Array.isArray(perms)&&(perms.includes("*")||perms.includes(permission))}
 function permissionDenied(permission){return json({error:"No tiene permiso para esta acción.",permission},403)}
+function objectPayload(v){
+  if(v&&typeof v==="object"&&!Array.isArray(v))return v;
+  if(typeof v==="string"){try{const x=JSON.parse(v);return x&&typeof x==="object"&&!Array.isArray(x)?x:{}}catch{}}
+  return {};
+}
 const DEFAULT_QNOS=["QNO 1","QNO 2","QNO 3"];
 const DEFAULT_FLOW={
   "PROGRAMADO":["PREPARACIÓN","QUIRÓFANO"],
@@ -222,14 +228,14 @@ Bun.serve({port:PORT,async fetch(req){
    return json({rows:r.map(x=>({id:x.payload["ID USUARIO"]||"",usuario:x.payload["USUARIO"]||"",nombre:x.payload["NOMBRE"]||"",rol:x.payload["ROL"]||"",estado:x.payload["ESTADO"]||"",ultimoIngreso:x.payload["ÚLTIMO INGRESO"]||"",cambioPin:String(x.payload["CAMBIO PIN REQUERIDO"]||"").toUpperCase()==="SI"||String(x.payload["CAMBIO PIN REQUERIDO"]||"").toUpperCase()==="SÍ"}))});
  }
  if(url.pathname==="/api/roles"&&req.method==="GET"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
-   const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(coalesce(payload->>'ESTADO','ACTIVO'))='ACTIVO' order by payload->>'NOMBRE'");
-   return json({rows:r.map(x=>{let perms=[];try{perms=JSON.parse(String(x.payload["PERMISOS JSON"]||"[]"))}catch{}return{id:x.payload["ID ROL"]||"",nombre:x.payload["NOMBRE"]||"",descripcion:x.payload["DESCRIPCIÓN"]||"",permisos:perms,estado:x.payload["ESTADO"]||"ACTIVO",sistema:String(x.payload["SISTEMA"]||"").toUpperCase()==="SI"}})});
+   const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' order by row_number");
+   return json({rows:r.map(x=>objectPayload(x.payload)).filter(p=>String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO").sort((a,b)=>String(a["NOMBRE"]||"").localeCompare(String(b["NOMBRE"]||""))).map(p=>{let perms=[];try{perms=JSON.parse(String(p["PERMISOS JSON"]||"[]"))}catch{}return{id:p["ID ROL"]||"",nombre:p["NOMBRE"]||"",descripcion:p["DESCRIPCIÓN"]||"",permisos:perms,estado:p["ESTADO"]||"ACTIVO",sistema:String(p["SISTEMA"]||"").toUpperCase()==="SI"}})});
  }
  if(url.pathname==="/api/roles-admin"&&req.method==="GET"){
    if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede editar roles."},403);
-   const r=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' order by payload->>'ID ROL'");
+   const r=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' order by row_number");
    const catalog=["OPERACION_VER","OPERACION_GESTIONAR","PROGRAMACION_VER","PROGRAMACION_EDITAR","CARGUE_MASIVO","COORDINACION_VER","INDICADORES_VER","DESCARGAS","REPORTES_PDF","USUARIOS_GESTIONAR","REINTERVENCIONES_REVISAR","REINTERVENCIONES_CERRAR","PROFILAXIS_PREQX","CUIDADOS_POSTOP","SINCRONIZAR"];
-   const rows=r.map(x=>{let permisos=[];try{permisos=JSON.parse(String(x.payload["PERMISOS JSON"]||"[]"))}catch{}return{rowNumber:x.row_number,id:x.payload["ID ROL"]||"",nombre:x.payload["NOMBRE"]||"",descripcion:x.payload["DESCRIPCIÓN"]||"",permisos,estado:x.payload["ESTADO"]||"ACTIVO",sistema:String(x.payload["SISTEMA"]||"").toUpperCase()==="SI"}});
+   const rows=r.map(x=>{const p=objectPayload(x.payload);let permisos=[];try{permisos=JSON.parse(String(p["PERMISOS JSON"]||"[]"))}catch{}return{rowNumber:x.row_number,id:p["ID ROL"]||"",nombre:p["NOMBRE"]||"",descripcion:p["DESCRIPCIÓN"]||"",permisos,estado:p["ESTADO"]||"ACTIVO",sistema:String(p["SISTEMA"]||"").toUpperCase()==="SI"}}).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
    return json({rows,catalog});
  }
  if(url.pathname==="/api/roles"&&req.method==="POST"){
@@ -237,17 +243,17 @@ Bun.serve({port:PORT,async fetch(req){
    const b=await body(req),id=String(b.id||"").trim().toUpperCase(),nombre=String(b.nombre||"").trim(),descripcion=String(b.descripcion||"").trim(),permisos=Array.isArray(b.permisos)?b.permisos.map(x=>String(x).trim()).filter(Boolean):[];
    if(!/^[A-Z0-9_]{2,40}$/.test(id))return json({error:"El código del rol debe usar letras mayúsculas, números o guion bajo."},400);
    if(!nombre)return json({error:"El nombre del rol es obligatorio."},400);
-   const dup=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'ID ROL')=$1 limit 1",[id]);if(dup.length)return json({error:"Ese código de rol ya existe."},409);
+   const allRoles=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES'");if(allRoles.some(x=>String(objectPayload(x.payload)["ID ROL"]||"").toUpperCase()===id))return json({error:"Ese código de rol ya existe."},409);
    const rn=await nextRow("ROLES"),now=nowBog(),row={"ID ROL":id,"NOMBRE":nombre,"DESCRIPCIÓN":descripcion,"PERMISOS JSON":JSON.stringify(permisos),"ESTADO":"ACTIVO","SISTEMA":"NO","CREADO EN":now,"CREADO POR":s.user,"ACTUALIZADO EN":now,"ACTUALIZADO POR":s.user};
-   await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','ROLES',$1,$2::jsonb)",[rn,JSON.stringify(row)]);
+   await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','ROLES',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(row)]);
    await outbox("ROL",id,"CREAR",row);await audit(s,"CREAR ROL","USUARIOS",id,nombre);
    return json({ok:true,id});
  }
  if(url.pathname==="/api/roles/update"&&req.method==="POST"){
    if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede editar roles."},403);
    const b=await body(req),id=String(b.id||"").trim().toUpperCase();
-   const hit=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'ID ROL')=$1 limit 1",[id]);if(!hit.length)return json({error:"Rol no encontrado."},404);
-   const row=Object.assign({},hit[0].payload),nombre=String(b.nombre??row["NOMBRE"]??"").trim(),descripcion=String(b.descripcion??row["DESCRIPCIÓN"]??"").trim(),estado=String(b.estado??row["ESTADO"]??"ACTIVO").trim().toUpperCase(),permisos=Array.isArray(b.permisos)?b.permisos.map(x=>String(x).trim()).filter(Boolean):[];
+   const roleRows=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' order by row_number");const hit=roleRows.map(x=>({row_number:x.row_number,payload:objectPayload(x.payload)})).find(x=>String(x.payload["ID ROL"]||"").toUpperCase()===id);if(!hit)return json({error:"Rol no encontrado."},404);
+   const row=Object.assign({},hit.payload),nombre=String(b.nombre??row["NOMBRE"]??"").trim(),descripcion=String(b.descripcion??row["DESCRIPCIÓN"]??"").trim(),estado=String(b.estado??row["ESTADO"]??"ACTIVO").trim().toUpperCase(),permisos=Array.isArray(b.permisos)?b.permisos.map(x=>String(x).trim()).filter(Boolean):[];
    if(id==="SUPERADMIN"){
      row["NOMBRE"]=nombre||"Superadministrador";row["DESCRIPCIÓN"]=descripcion;row["PERMISOS JSON"]=JSON.stringify(["*"]);row["ESTADO"]="ACTIVO";
    }else{
@@ -255,7 +261,7 @@ Bun.serve({port:PORT,async fetch(req){
      row["NOMBRE"]=nombre;row["DESCRIPCIÓN"]=descripcion;row["PERMISOS JSON"]=JSON.stringify(permisos);row["ESTADO"]=estado;
    }
    row["ACTUALIZADO EN"]=nowBog();row["ACTUALIZADO POR"]=s.user;
-   await sql.unsafe("update source_sheets set payload=$1::jsonb,imported_at=now() where source_key='MAIN' and sheet_name='ROLES' and row_number=$2",[JSON.stringify(row),hit[0].row_number]);
+   await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='ROLES' and row_number=$2",[JSON.stringify(row),hit.row_number]);
    await outbox("ROL",id,"EDITAR",row);await audit(s,"EDITAR ROL","USUARIOS",id,row["NOMBRE"]+" · "+row["ESTADO"]);
    return json({ok:true});
  }
@@ -265,7 +271,7 @@ Bun.serve({port:PORT,async fetch(req){
    if(!nombre)return json({error:"El nombre es obligatorio."},400);
    if(!validPin(pin))return json({error:"El PIN debe tener 6–8 dígitos y no puede ser una secuencia simple o repetida."},400);
    const dup=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='USUARIOS' and lower(payload->>'USUARIO')=$1 limit 1",[usuario]);if(dup.length)return json({error:"Ese usuario ya existe."},409);
-   const role=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'ID ROL')=$1 and upper(coalesce(payload->>'ESTADO','ACTIVO'))='ACTIVO' limit 1",[rol]);if(!role.length)return json({error:"Rol no válido."},400);
+   const validRoles=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES'");if(!validRoles.some(x=>{const p=objectPayload(x.payload);return String(p["ID ROL"]||"").toUpperCase()===rol&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO"}))return json({error:"Rol no válido."},400);
    const salt=randomUUID().replace(/-/g,""),id="USR-"+randomUUID().slice(0,8).toUpperCase(),rn=await nextRow("USUARIOS"),created=nowBog();
    const u={"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"HASH PIN":hashRailwayPin(pin,salt),"ESTADO":"ACTIVO","CREADO EN":created,"CREADO POR":s.user,"ÚLTIMO INGRESO":"","ACTUALIZADO EN":created,"CAMBIO PIN REQUERIDO":b.forceChange?"SI":"NO","SALT PIN":salt,"PIN ACTUALIZADO EN":created,"INTENTOS FALLIDOS":"0","BLOQUEADO HASTA":"","VERSIÓN SESIÓN":"1","ALGORITMO PIN":"RAILWAY_V1"};
    await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','USUARIOS',$1,$2::jsonb)",[rn,JSON.stringify(u)]);await outbox("USUARIO",id,"CREAR",{"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"ESTADO":"ACTIVO"});await audit(s,"CREAR USUARIO","USUARIOS",id,usuario+" · "+rol);
@@ -275,7 +281,7 @@ Bun.serve({port:PORT,async fetch(req){
    const b=await body(req),hit=await findUserById(b.id);if(!hit)return json({error:"Usuario no encontrado."},404);
    const u=Object.assign({},hit.payload),nombre=String(b.nombre??u["NOMBRE"]??"").trim(),rol=String(b.rol??u["ROL"]??"").trim().toUpperCase(),estado=String(b.estado??u["ESTADO"]??"ACTIVO").trim().toUpperCase();
    if(!["ACTIVO","INACTIVO"].includes(estado))return json({error:"Estado inválido."},400);
-   const roleOk=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='ROLES' and upper(payload->>'ID ROL')=$1 and upper(coalesce(payload->>'ESTADO','ACTIVO'))='ACTIVO' limit 1",[rol]);if(!roleOk.length)return json({error:"Rol no válido o inactivo."},400);
+   const roleList=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES'");if(!roleList.some(x=>{const p=objectPayload(x.payload);return String(p["ID ROL"]||"").toUpperCase()===rol&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO"}))return json({error:"Rol no válido o inactivo."},400);
    u["NOMBRE"]=nombre;u["ROL"]=rol;u["ESTADO"]=estado;u["ACTUALIZADO EN"]=nowBog();
    await patchUserRow(hit.row_number,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"EDITAR",{"ID USUARIO":u["ID USUARIO"],"NOMBRE":nombre,"ROL":rol,"ESTADO":estado});await audit(s,"EDITAR USUARIO","USUARIOS",String(u["ID USUARIO"]||""),nombre+" · "+rol+" · "+estado);
    return json({ok:true});
