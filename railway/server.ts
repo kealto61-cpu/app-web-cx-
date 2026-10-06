@@ -113,6 +113,43 @@ async function getRolePermissions(roleCode){
 }
 function hasPermission(perms,permission){return Array.isArray(perms)&&(perms.includes("*")||perms.includes(permission))}
 function permissionDenied(permission){return json({error:"No tiene permiso para esta acción.",permission},403)}
+const DEFAULT_QNOS=["QNO 1","QNO 2","QNO 3"];
+const DEFAULT_FLOW={
+  "PROGRAMADO":["PREPARACIÓN","QUIRÓFANO"],
+  "PREPARACIÓN":["PROGRAMADO","QUIRÓFANO"],
+  "QUIRÓFANO":["PREPARACIÓN","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"],
+  "RECUPERACIÓN":["ALTA","HOSPITALIZACIÓN"]
+};
+const FLOW_STATES=["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"];
+async function readSystemConfig(param,fallback){
+  const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA' and upper(payload->>'PARÁMETRO')=$1 order by row_number desc limit 1",[String(param||"").toUpperCase()]);
+  if(!r.length)return fallback;
+  const raw=r[0].payload["VALOR"];
+  if(typeof fallback==="string")return String(raw??fallback);
+  try{return JSON.parse(String(raw||""))}catch{return fallback}
+}
+async function writeSystemConfig(session,param,value){
+  const p=String(param||"").toUpperCase(),serialized=typeof value==="string"?value:JSON.stringify(value),now=nowBog();
+  const hit=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA' and upper(payload->>'PARÁMETRO')=$1 order by row_number desc limit 1",[p]);
+  const payload={"PARÁMETRO":p,"VALOR":serialized,"ACTUALIZADO EN":now,"ACTUALIZADO POR":session.user||""};
+  if(hit.length){
+    const merged=Object.assign({},hit[0].payload,payload);
+    await sql.unsafe("update source_sheets set payload=$1::jsonb,imported_at=now() where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA' and row_number=$2",[JSON.stringify(merged),hit[0].row_number]);
+  }else{
+    const rn=await nextRow("CONFIGURACIÓN SISTEMA");
+    await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','CONFIGURACIÓN SISTEMA',$1,$2::jsonb)",[rn,JSON.stringify(payload)]);
+  }
+  await outbox("CONFIGURACION",p,"ACTUALIZAR",payload);
+  await audit(session,"ACTUALIZAR CONFIGURACIÓN","CONFIGURACIÓN",p,serialized);
+}
+async function operationalConfig(){
+  let qnos=await readSystemConfig("QNO HABILITADOS",DEFAULT_QNOS);
+  let flow=await readSystemConfig("FLUJO QUIRÚRGICO",DEFAULT_FLOW);
+  if(!Array.isArray(qnos)||!qnos.length)qnos=DEFAULT_QNOS.slice();
+  qnos=[...new Set(qnos.map(x=>String(x||"").trim().toUpperCase()).filter(Boolean))];
+  if(!flow||typeof flow!=="object"||Array.isArray(flow))flow=JSON.parse(JSON.stringify(DEFAULT_FLOW));
+  return {qnos,flow,states:FLOW_STATES};
+}
 function profSearchScore(q,row){
   if(!q)return 1;
   const fields=[row["ESPECIALIDAD"],row["PROCEDIMIENTO"],row["TÉRMINOS SIMILARES / SINÓNIMOS"],row["CUPS / GRUPO"]].map(norm);
@@ -151,6 +188,25 @@ Bun.serve({port:PORT,async fetch(req){
    return json({ok:true,id,caseId,context,name:f.name,type:f.type||"application/octet-stream",size:f.size,sha256:digest});
  }
  const s=sess(req);if(!s)return json({error:"Sesión no autorizada o vencida."},401);const permissions=await getRolePermissions(s.role);if(url.pathname==="/api/me")return json({valid:true,user:s.user,name:s.name,role:s.role,permissions});
+ if(url.pathname==="/api/config-operativa"&&req.method==="GET"){
+   if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede acceder a Configuración."},403);
+   return json(await operationalConfig());
+ }
+ if(url.pathname==="/api/config-operativa"&&req.method==="POST"){
+   if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede modificar la configuración operativa."},403);
+   const b=await body(req),qnos=Array.isArray(b.qnos)?[...new Set(b.qnos.map(x=>String(x||"").trim().toUpperCase()).filter(Boolean))]:null,flow=b.flow;
+   if(!qnos||!qnos.length)return json({error:"Debe existir al menos un QNO habilitado."},400);
+   if(qnos.length>20)return json({error:"Máximo 20 QNO habilitados."},400);
+   if(qnos.some(q=>q.length<3||q.length>40))return json({error:"Revise los nombres de QNO."},400);
+   if(!flow||typeof flow!=="object"||Array.isArray(flow))return json({error:"Configuración de flujo inválida."},400);
+   const clean={};
+   for(const from of ["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN"]){
+     const arr=Array.isArray(flow[from])?flow[from]:[];
+     clean[from]=[...new Set(arr.map(x=>String(x||"").trim().toUpperCase()).filter(x=>FLOW_STATES.includes(x)&&x!==from))];
+   }
+   await writeSystemConfig(s,"QNO HABILITADOS",qnos);await writeSystemConfig(s,"FLUJO QUIRÚRGICO",clean);
+   return json({ok:true,qnos,flow:clean,states:FLOW_STATES});
+ }
  if(url.pathname==="/api/change-pin"&&req.method==="POST"){
    const b=await body(req),current=String(b.currentPin||""),next=String(b.newPin||"");
    if(!validPin(next))return json({error:"El nuevo PIN debe tener 6–8 dígitos y no puede ser una secuencia simple o repetida."},400);
@@ -239,12 +295,12 @@ Bun.serve({port:PORT,async fetch(req){
  }
 
  if(url.pathname==="/api/tracking-admin"){if(!(hasPermission(permissions,"OPERACION_VER")||hasPermission(permissions,"PROGRAMACION_VER")))return permissionDenied("OPERACION_VER");const rows=await ensureTrackingForDate(s,url.searchParams.get("date")||"");return json({rows:rows.map(x=>({id:x.id,hora:x.hora,paciente:x.paciente,documento:x.documento,edad:x.edad,codigo:x.codigo,token:x.token,estado:x.estado}))})}
- if(url.pathname==="/api/board"){if(!hasPermission(permissions,"OPERACION_VER"))return permissionDenied("OPERACION_VER");const rows=await casesFor(url.searchParams.get("date")||"");return json({rows,metrics:metrics(rows)})}
+ if(url.pathname==="/api/board"){if(!hasPermission(permissions,"OPERACION_VER"))return permissionDenied("OPERACION_VER");const rows=await casesFor(url.searchParams.get("date")||""),config=await operationalConfig();return json({rows,metrics:metrics(rows),config})}
  if(url.pathname==="/api/case/move"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");
   const b=await body(req),hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);
   const jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno antes de mover al paciente."},400);
   const from=String(hit.payload["ESTADO ACTUAL"]||"PROGRAMADO").toUpperCase(),to=String(b.destino||"").toUpperCase();
-  const allowed={PROGRAMADO:["PREPARACIÓN","QUIRÓFANO"],"PREPARACIÓN":["PROGRAMADO","QUIRÓFANO"],"QUIRÓFANO":["PREPARACIÓN","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"],"RECUPERACIÓN":["ALTA","HOSPITALIZACIÓN"]};
+  const allowed=(await operationalConfig()).flow;
   if(!(allowed[from]||[]).includes(to))return json({error:"Transición no permitida: "+from+" → "+to},409);
   const patch={"ESTADO ACTUAL":to,"ENFERMERO JEFE":jefe};
   if(to==="QUIRÓFANO")patch["EN QNO"]="TRUE";
@@ -274,11 +330,11 @@ Bun.serve({port:PORT,async fetch(req){
   }
   const c=await updateCase(s,b.id,patch,"MOVER PACIENTE");await addMovement(s,Object.assign({},hit.payload,patch),from,to);return json(c)
 }
- if(url.pathname==="/api/case/qno"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req),q=String(b.qno||"").toUpperCase(),jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno."},400);if(!["QNO 1","QNO 2","QNO 3"].includes(q))return json({error:"QNO inválido."},400);return json(await updateCase(s,b.id,{"SALA / QNO":q,"ENFERMERO JEFE":jefe},"CAMBIO QNO"))}
+ if(url.pathname==="/api/case/qno"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req),q=String(b.qno||"").toUpperCase(),jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno."},400);const cfg=await operationalConfig();if(!cfg.qnos.includes(q))return json({error:"QNO inválido o no habilitado."},400);return json(await updateCase(s,b.id,{"SALA / QNO":q,"ENFERMERO JEFE":jefe},"CAMBIO QNO"))}
  if(url.pathname==="/api/case/cancel"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req);if(!String(b.jefeTurno||"").trim())return json({error:"Debe registrar el Jefe de turno."},400);if(!String(b.momento||"").trim()||!String(b.causa||"").trim()||!String(b.motivo||"").trim()||!String(b.atribuible||"").trim())return json({error:"Momento, causa, motivo y atribuibilidad son obligatorios."},400);const hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);await insertCancellation(s,hit.payload,b);const obs=[b.causa,b.motivo,b.observaciones].filter(Boolean).join(" | ");const c=await updateCase(s,b.id,{"ESTADO ACTUAL":"CANCELADO","CANCELAR":"TRUE","ENFERMERO JEFE":String(b.jefeTurno),"OBSERVACIONES":obs},"CANCELAR PACIENTE");await addMovement(s,Object.assign({},hit.payload,{"ESTADO ACTUAL":"CANCELADO"}),hit.payload["ESTADO ACTUAL"]||"","CANCELADO");return json(c)}
  if(url.pathname==="/api/case/finish"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req),d=String(b.destino||"").toUpperCase(),jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno."},400);if(!["ALTA","HOSPITALIZACIÓN"].includes(d))return json({error:"Destino inválido."},400);const c=await updateCase(s,b.id,{"ESTADO ACTUAL":d,"DESTINO POSTOP":d,"HORA SALIDA RECUPERACIÓN":nowBog(),"OBSERVACIÓN EGRESO / HOSPITALIZACIÓN":String(b.observacion||""),"ENFERMERO JEFE":jefe},"CIERRE RECUPERACIÓN");return json(c)}
  if(url.pathname==="/api/patient/update"&&req.method==="POST"){if(!hasPermission(permissions,"PROGRAMACION_EDITAR"))return permissionDenied("PROGRAMACION_EDITAR");
-   const b=await body(req),hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);
+   const b=await body(req),ucfg=await operationalConfig();if(b.qno&&!ucfg.qnos.includes(String(b.qno).trim().toUpperCase()))return json({error:"QNO no habilitado."},400);const hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);
    const p=Object.assign({},hit.payload);
    const mapping={
     fecha:"FECHA CIRUGÍA",hora:"HORA PROGRAMADA",documento:"DOCUMENTO",paciente:"PACIENTE",edad:"EDAD",sexo:"SEXO",cups:"CUPS",
@@ -292,7 +348,7 @@ Bun.serve({port:PORT,async fetch(req){
    await outbox("PACIENTE",String(p["ID CASO"]||""),"EDITAR",p);await audit(s,"EDITAR PACIENTE","PROGRAMACIÓN",String(p["ID CASO"]||""),"Actualización desde Programación");
    return json({ok:true,case:mapCase(p)});
  }
- if(url.pathname==="/api/patient"&&req.method==="POST"){if(!hasPermission(permissions,"PROGRAMACION_EDITAR"))return permissionDenied("PROGRAMACION_EDITAR");const b=await body(req);if(!b.fecha||!b.hora||!b.documento||!b.paciente||!b.procedimiento)return json({error:"Fecha, hora, documento, paciente y procedimiento son obligatorios."},400);const id="QX-"+String(b.fecha).replace(/-/g,"")+"-"+randomBytes(4).toString("hex").toUpperCase(),track="SEG-"+String(b.fecha).replace(/-/g,"")+"-"+randomBytes(3).toString("hex").toUpperCase(),token=await uniqueTrackingToken();const p={"ID CASO":id,"FECHA CIRUGÍA":safeDate(b.fecha),"HORA PROGRAMADA":String(b.hora).slice(0,5),"DOCUMENTO":String(b.documento).trim(),"PACIENTE":String(b.paciente).trim().toUpperCase(),"EDAD":b.edad||"","SEXO":b.sexo||"","PROCEDIMIENTO":String(b.procedimiento).trim().toUpperCase(),"ESPECIALIDAD":String(b.especialidad||"").trim().toUpperCase(),"ESPECIALISTA":String(b.especialista||"").trim().toUpperCase(),"SALA / QNO":String(b.qno||"").toUpperCase(),"ESTADO ACTUAL":"PROGRAMADO","OBSERVACIONES":b.observaciones||"","TIPO DE ATENCIÓN":b.tipoAtencion||"","CAMA / UBICACIÓN PROGRAMADA":b.cama||"","CUPS":b.cups||"","UVR":b.uvr||"","TIEMPO QX ESTIMADO (MIN)":b.tiempoQx||"","RECURSOS / ALERTAS PREQUIRÚRGICAS":b.recursos||"","CÓDIGO SEGUIMIENTO":track,"TOKEN SEGUIMIENTO":token,"CREADO SEGUIMIENTO":nowBog(),"FUENTE DE PROGRAMACIÓN":"RAILWAY","ÚLTIMA ACTUALIZACIÓN WEB":nowBog()};const rn=await nextRow("BD PROGRAMACIÓN");await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','BD PROGRAMACIÓN',$1,$2::jsonb)",[rn,JSON.stringify(p)]);await outbox("PACIENTE",id,"CREAR",p);await audit(s,"CREAR PACIENTE","PROGRAMACIÓN",id,"Nuevo paciente");return json({ok:true,id,trackingCode:track,case:mapCase(p)})}
+ if(url.pathname==="/api/patient"&&req.method==="POST"){if(!hasPermission(permissions,"PROGRAMACION_EDITAR"))return permissionDenied("PROGRAMACION_EDITAR");const b=await body(req);const pcfg=await operationalConfig();if(b.qno&&!pcfg.qnos.includes(String(b.qno).trim().toUpperCase()))return json({error:"QNO no habilitado."},400);if(!b.fecha||!b.hora||!b.documento||!b.paciente||!b.procedimiento)return json({error:"Fecha, hora, documento, paciente y procedimiento son obligatorios."},400);const id="QX-"+String(b.fecha).replace(/-/g,"")+"-"+randomBytes(4).toString("hex").toUpperCase(),track="SEG-"+String(b.fecha).replace(/-/g,"")+"-"+randomBytes(3).toString("hex").toUpperCase(),token=await uniqueTrackingToken();const p={"ID CASO":id,"FECHA CIRUGÍA":safeDate(b.fecha),"HORA PROGRAMADA":String(b.hora).slice(0,5),"DOCUMENTO":String(b.documento).trim(),"PACIENTE":String(b.paciente).trim().toUpperCase(),"EDAD":b.edad||"","SEXO":b.sexo||"","PROCEDIMIENTO":String(b.procedimiento).trim().toUpperCase(),"ESPECIALIDAD":String(b.especialidad||"").trim().toUpperCase(),"ESPECIALISTA":String(b.especialista||"").trim().toUpperCase(),"SALA / QNO":String(b.qno||"").toUpperCase(),"ESTADO ACTUAL":"PROGRAMADO","OBSERVACIONES":b.observaciones||"","TIPO DE ATENCIÓN":b.tipoAtencion||"","CAMA / UBICACIÓN PROGRAMADA":b.cama||"","CUPS":b.cups||"","UVR":b.uvr||"","TIEMPO QX ESTIMADO (MIN)":b.tiempoQx||"","RECURSOS / ALERTAS PREQUIRÚRGICAS":b.recursos||"","CÓDIGO SEGUIMIENTO":track,"TOKEN SEGUIMIENTO":token,"CREADO SEGUIMIENTO":nowBog(),"FUENTE DE PROGRAMACIÓN":"RAILWAY","ÚLTIMA ACTUALIZACIÓN WEB":nowBog()};const rn=await nextRow("BD PROGRAMACIÓN");await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','BD PROGRAMACIÓN',$1,$2::jsonb)",[rn,JSON.stringify(p)]);await outbox("PACIENTE",id,"CREAR",p);await audit(s,"CREAR PACIENTE","PROGRAMACIÓN",id,"Nuevo paciente");return json({ok:true,id,trackingCode:track,case:mapCase(p)})}
  if(url.pathname==="/api/bulk"&&req.method==="POST"){if(!hasPermission(permissions,"CARGUE_MASIVO"))return permissionDenied("CARGUE_MASIVO");const b=await body(req),rows=Array.isArray(b.rows)?b.rows:[];if(rows.length>1000)return json({error:"Máximo 1000 filas por cargue."},400);let inserted=0,skipped=0;for(const r of rows){if(!r.fecha||!r.paciente||!r.procedimiento){skipped++;continue}const date=safeDate(r.fecha),dup=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'FECHA CIRUGÍA'=$1 and payload->>'DOCUMENTO'=$2 and upper(payload->>'PROCEDIMIENTO')=$3 limit 1",[date,String(r.documento||""),String(r.procedimiento||"").toUpperCase()]);if(dup.length){skipped++;continue}const id="QX-"+date.replace(/-/g,"")+"-"+randomBytes(4).toString("hex").toUpperCase(),p={"ID CASO":id,"FECHA CIRUGÍA":date,"HORA PROGRAMADA":String(r.hora||"").slice(0,5),"DOCUMENTO":String(r.documento||""),"PACIENTE":String(r.paciente||"").toUpperCase(),"EDAD":r.edad||"","SEXO":r.sexo||"","CUPS":r.cups||"","PROCEDIMIENTO":String(r.procedimiento||"").toUpperCase(),"ESPECIALIDAD":String(r.especialidad||"").toUpperCase(),"ESPECIALISTA":String(r.especialista||"").toUpperCase(),"SALA / QNO":String(r.qno||"").toUpperCase(),"TIPO DE ATENCIÓN":String(r.tipoAtencion||"").toUpperCase(),"CAMA / UBICACIÓN PROGRAMADA":r.cama||"","OBSERVACIONES":r.observaciones||"","ESTADO ACTUAL":"PROGRAMADO","FUENTE DE PROGRAMACIÓN":"CARGUE RAILWAY","CÓDIGO SEGUIMIENTO":"SEG-"+date.replace(/-/g,"")+"-"+randomBytes(3).toString("hex").toUpperCase(),"TOKEN SEGUIMIENTO":await uniqueTrackingToken(),"CREADO SEGUIMIENTO":nowBog(),"ÚLTIMA ACTUALIZACIÓN WEB":nowBog()};const rn=await nextRow("BD PROGRAMACIÓN");await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','BD PROGRAMACIÓN',$1,$2::jsonb)",[rn,JSON.stringify(p)]);await outbox("PACIENTE",id,"CARGUE_MASIVO",p);inserted++}await audit(s,"CARGUE MASIVO","PROGRAMACIÓN","",inserted+" insertados; "+skipped+" omitidos");return json({ok:true,inserted,skipped})}
  if(url.pathname==="/api/profilaxis-catalog"){
     if(!hasPermission(permissions,"PROFILAXIS_PREQX"))return permissionDenied("PROFILAXIS_PREQX");
