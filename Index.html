@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width,initial-scale=1,maximum-scale=1">
+  <title>Cirugía — Tablero Operativo</title>
+  <style>
+    :root{
+      --navy:#0D024E;
+      --navy-2:#201070;
+      --ink:#161625;
+      --muted:#727287;
+      --line:#e7e7ef;
+      --bg:#f4f5f8;
+      --card:#ffffff;
+      --ok:#18794e;
+      --warn:#a16207;
+      --danger:#b42318;
+      --blue:#2459d3;
+      --purple:#6f3fd1;
+      --shadow:0 10px 28px rgba(13,2,78,.08);
+      --radius:16px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;font-family:Inter,Arial,sans-serif;color:var(--ink)}
+    body{background:var(--bg)}
+    button,input{font:inherit}
+
+    .topbar{
+      height:64px;
+      background:var(--navy);
+      color:white;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 22px;
+      position:sticky;
+      top:0;
+      z-index:20;
+      box-shadow:0 4px 18px rgba(13,2,78,.16);
+    }
+
+    .brand{display:flex;align-items:center;gap:12px;font-weight:800}
+    .brand-mark{
+      width:36px;height:36px;border-radius:11px;
+      display:grid;place-items:center;
+      background:rgba(255,255,255,.12);
+      font-size:14px;
+    }
+    .brand small{display:block;font-size:11px;font-weight:600;opacity:.72;margin-top:2px}
+
+    .top-actions{display:flex;align-items:center;gap:8px}
+    .session-pill{
+      max-width:260px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:12px;
+      border:1px solid rgba(255,255,255,.2);
+      border-radius:999px;
+      padding:7px 10px;
+      display:none;
+    }
+
+    .btn{
+      border:0;border-radius:10px;padding:9px 12px;
+      cursor:pointer;font-weight:700;
+    }
+    .btn-light{background:white;color:var(--navy)}
+    .btn-primary{background:var(--navy);color:white}
+    .btn-soft{background:#efeff8;color:var(--navy)}
+    .btn-danger{background:#feeceb;color:var(--danger)}
+
+    .shell{
+      display:grid;
+      grid-template-columns:220px minmax(0,1fr);
+      min-height:calc(100vh - 64px);
+    }
+
+    aside{
+      background:white;
+      border-right:1px solid var(--line);
+      padding:18px 12px;
+    }
+
+    .nav-btn{
+      width:100%;border:0;background:transparent;
+      display:flex;align-items:center;gap:10px;
+      padding:11px 12px;border-radius:11px;
+      color:#4a4a5e;font-weight:700;text-align:left;
+      cursor:pointer;margin-bottom:5px;
+    }
+    .nav-btn.active{background:#efeff8;color:var(--navy)}
+    .nav-btn .lock{margin-left:auto;font-size:12px;opacity:.55}
+
+    main{padding:20px;min-width:0}
+    .view{display:none}
+    .view.active{display:block}
+
+    .page-head{
+      display:flex;align-items:center;justify-content:space-between;
+      gap:14px;margin-bottom:16px;
+    }
+    .page-head h1{font-size:22px;margin:0 0 4px}
+    .page-head p{margin:0;color:var(--muted);font-size:13px}
+    .filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .date-input{
+      border:1px solid var(--line);background:white;border-radius:10px;
+      padding:9px 11px;color:var(--ink);
+    }
+
+    .metrics{
+      display:grid;
+      grid-template-columns:repeat(6,minmax(110px,1fr));
+      gap:10px;margin-bottom:16px;
+    }
+    .metric{
+      background:white;border:1px solid var(--line);
+      border-radius:14px;padding:12px 13px;
+      box-shadow:0 5px 18px rgba(13,2,78,.035);
+    }
+    .metric span{display:block;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    .metric strong{font-size:24px;line-height:1.2;display:block;margin-top:4px}
+
+    .board{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(290px,1fr));
+      gap:11px;
+    }
+    .patient{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:14px;
+      box-shadow:var(--shadow);
+      min-width:0;
+    }
+    .patient-head{
+      display:flex;justify-content:space-between;align-items:flex-start;
+      gap:10px;margin-bottom:9px;
+    }
+    .patient-time{
+      min-width:54px;text-align:center;padding:7px 8px;
+      border-radius:10px;background:#efeff8;color:var(--navy);
+      font-weight:900;font-size:13px;
+    }
+    .patient h3{
+      font-size:14px;line-height:1.3;margin:0;
+      word-break:break-word;
+    }
+    .patient .doc{font-size:11px;color:var(--muted);margin-top:3px}
+    .patient-grid{
+      display:grid;grid-template-columns:1fr 1fr;gap:7px;
+      font-size:12px;margin-top:10px;
+    }
+    .info{
+      background:#fafafe;border-radius:9px;padding:7px 8px;
+      min-width:0;
+    }
+    .info b{
+      display:block;font-size:9px;text-transform:uppercase;
+      letter-spacing:.04em;color:var(--muted);margin-bottom:3px;
+    }
+    .info span{display:block;overflow-wrap:anywhere}
+    .info.full{grid-column:1/-1}
+
+    .status{
+      display:inline-flex;align-items:center;
+      font-size:10px;font-weight:900;
+      border-radius:999px;padding:5px 7px;
+      white-space:nowrap;
+    }
+    .status.programado{background:#eef3ff;color:var(--blue)}
+    .status.preparacion{background:#fff7dc;color:var(--warn)}
+    .status.quirofano{background:#f0eaff;color:var(--purple)}
+    .status.recuperacion{background:#e9f8f0;color:var(--ok)}
+    .status.cancelado{background:#feeceb;color:var(--danger)}
+    .status.final{background:#edf0f4;color:#55596a}
+
+    .empty{
+      border:1px dashed #c9cad6;background:white;border-radius:14px;
+      padding:34px;text-align:center;color:var(--muted);
+      grid-column:1/-1;
+    }
+
+    .loading{
+      position:fixed;inset:0;background:rgba(13,2,78,.12);
+      display:none;align-items:center;justify-content:center;z-index:60;
+      backdrop-filter:blur(2px);
+    }
+    .loading.show{display:flex}
+    .loading-card{
+      background:white;border-radius:14px;padding:18px 22px;
+      box-shadow:var(--shadow);font-weight:800;color:var(--navy)
+    }
+
+    .modal{
+      position:fixed;inset:0;background:rgba(12,10,28,.48);
+      display:none;align-items:center;justify-content:center;
+      padding:18px;z-index:70;
+    }
+    .modal.show{display:flex}
+    .modal-card{
+      width:min(420px,100%);background:white;border-radius:18px;
+      padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.22);
+    }
+    .modal-card h2{margin:0 0 6px;font-size:20px}
+    .modal-card p{margin:0 0 16px;color:var(--muted);font-size:13px}
+    .field{margin-bottom:11px}
+    .field label{display:block;font-size:11px;font-weight:800;margin-bottom:5px}
+    .field input{
+      width:100%;border:1px solid var(--line);border-radius:10px;
+      padding:11px 12px;outline:none;
+    }
+    .field input:focus{border-color:#7771aa;box-shadow:0 0 0 3px rgba(13,2,78,.08)}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:15px}
+    .error{color:var(--danger);font-size:12px;min-height:17px;margin-top:6px}
+
+    .program-toolbar{
+      display:flex;justify-content:space-between;align-items:center;
+      gap:10px;margin-bottom:12px;
+      background:white;border:1px solid var(--line);
+      padding:10px;border-radius:13px;
+    }
+
+    .toast{
+      position:fixed;right:18px;bottom:18px;z-index:90;
+      background:var(--navy);color:white;border-radius:12px;
+      padding:11px 14px;box-shadow:var(--shadow);
+      font-size:12px;font-weight:700;display:none;max-width:360px;
+    }
+    .toast.show{display:block}
+    .toast.error{background:var(--danger)}
+
+    @media(max-width:980px){
+      .metrics{grid-template-columns:repeat(3,1fr)}
+      .shell{grid-template-columns:76px minmax(0,1fr)}
+      aside{padding:14px 8px}
+      .nav-btn{justify-content:center;padding:11px 7px}
+      .nav-btn .label,.nav-btn .lock{display:none}
+    }
+
+    @media(max-width:680px){
+      .topbar{padding:0 12px}
+      .brand-text{display:none}
+      .shell{display:block}
+      aside{
+        position:fixed;left:0;right:0;bottom:0;z-index:30;
+        border-right:0;border-top:1px solid var(--line);
+        display:flex;padding:7px;background:white;
+      }
+      .nav-btn{margin:0;flex:1}
+      .nav-btn .label{display:block;font-size:10px}
+      main{padding:14px 12px 82px}
+      .page-head{align-items:flex-start;flex-direction:column}
+      .metrics{grid-template-columns:repeat(2,1fr)}
+      .board{grid-template-columns:1fr}
+      .patient-grid{grid-template-columns:1fr 1fr}
+      .session-pill{display:none!important}
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">CX</div>
+      <div class="brand-text">
+        Cirugía
+        <small id="versionLabel">Web App</small>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="session-pill" id="sessionPill"></div>
+      <button class="btn btn-light" id="accessBtn">Acceso</button>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside>
+      <button class="nav-btn active" data-view="operation">
+        <span>▦</span><span class="label">Operación</span>
+      </button>
+      <button class="nav-btn" data-view="programming">
+        <span>⌘</span><span class="label">Programación</span>
+        <span class="lock">●</span>
+      </button>
+    </aside>
+
+    <main>
+      <section class="view active" id="view-operation">
+        <div class="page-head">
+          <div>
+            <h1>Tablero operativo</h1>
+            <p id="operationTimestamp">Cargando información…</p>
+          </div>
+          <div class="filters">
+            <input class="date-input" type="date" id="operationDate">
+            <button class="btn btn-soft" id="refreshOperation">Actualizar</button>
+          </div>
+        </div>
+
+        <div class="metrics" id="metrics"></div>
+        <div class="board" id="operationBoard"></div>
+      </section>
+
+      <section class="view" id="view-programming">
+        <div class="page-head">
+          <div>
+            <h1>Programación</h1>
+            <p>Consulta protegida por roles y permisos.</p>
+          </div>
+        </div>
+
+        <div id="programLocked" class="empty">
+          Inicie sesión con una cuenta autorizada para consultar Programación.
+        </div>
+
+        <div id="programContent" style="display:none">
+          <div class="program-toolbar">
+            <div class="filters">
+              <input class="date-input" type="date" id="programDate">
+              <button class="btn btn-soft" id="refreshProgram">Actualizar</button>
+            </div>
+            <button class="btn btn-danger" id="logoutBtn">Cerrar sesión</button>
+          </div>
+          <div class="board" id="programBoard"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="loading-card" id="loadingText">Cargando…</div>
+  </div>
+
+  <div class="modal" id="loginModal">
+    <div class="modal-card">
+      <h2>Acceso</h2>
+      <p>Ingrese su usuario y PIN institucional.</p>
+      <div class="field">
+        <label for="loginUser">Usuario</label>
+        <input id="loginUser" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="loginPin">PIN</label>
+        <input id="loginPin" type="password"
+               inputmode="numeric" autocomplete="current-password">
+      </div>
+      <div class="error" id="loginError"></div>
+      <div class="modal-actions">
+        <button class="btn btn-soft" id="cancelLogin">Cancelar</button>
+        <button class="btn btn-primary" id="submitLogin">Ingresar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const state = {
+      token: sessionStorage.getItem('qx_token') || '',
+      session: null,
+      refreshSeconds: 30,
+      refreshTimer: null
+    };
+
+    const $ = id => document.getElementById(id);
+
+    function serverCall(name, ...args) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(error => {
+            reject(new Error(
+              error && error.message ? error.message : String(error)
+            ));
+          })[name](...args);
+      });
+    }
+
+    function setLoading(show, text) {
+      $('loadingText').textContent = text || 'Cargando…';
+      $('loading').classList.toggle('show', Boolean(show));
+    }
+
+    function toast(message, isError) {
+      const el = $('toast');
+      el.textContent = message;
+      el.className = 'toast show' + (isError ? ' error' : '');
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => {
+        el.className = 'toast';
+      }, 3500);
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/[&<>"']/g, char => ({
+          '&':'&amp;',
+          '<':'&lt;',
+          '>':'&gt;',
+          '"':'&quot;',
+          "'":'&#39;'
+        })[char]);
+    }
+
+    function statusClass(status) {
+      const s = String(status || '').toUpperCase();
+      if (s === 'PROGRAMADO') return 'programado';
+      if (s === 'PREPARACIÓN') return 'preparacion';
+      if (s === 'QUIRÓFANO') return 'quirofano';
+      if (s === 'RECUPERACIÓN') return 'recuperacion';
+      if (s === 'CANCELADO') return 'cancelado';
+      return 'final';
+    }
+
+    function patientCard(patient) {
+      return `
+        <article class="patient">
+          <div class="patient-head">
+            <div>
+              <h3>${escapeHtml(patient.paciente || 'Sin nombre')}</h3>
+              <div class="doc">${escapeHtml(patient.documento || '')}</div>
+            </div>
+            <div class="patient-time">${escapeHtml(patient.hora || '--:--')}</div>
+          </div>
+          <span class="status ${statusClass(patient.estado)}">
+            ${escapeHtml(patient.estado || 'PROGRAMADO')}
+          </span>
+          <div class="patient-grid">
+            <div class="info">
+              <b>Sala / QNO</b>
+              <span>${escapeHtml(patient.qno || 'Pendiente')}</span>
+            </div>
+            <div class="info">
+              <b>Especialidad</b>
+              <span>${escapeHtml(patient.especialidad || '—')}</span>
+            </div>
+            <div class="info full">
+              <b>Especialista</b>
+              <span>${escapeHtml(patient.especialista || '—')}</span>
+            </div>
+            <div class="info full">
+              <b>Procedimiento</b>
+              <span>${escapeHtml(patient.procedimiento || '—')}</span>
+            </div>
+            ${patient.recursos ? `
+              <div class="info full">
+                <b>Recursos / alertas</b>
+                <span>${escapeHtml(patient.recursos)}</span>
+              </div>` : ''}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderBoard(containerId, patients) {
+      const container = $(containerId);
+      if (!patients || !patients.length) {
+        container.innerHTML =
+          '<div class="empty">No hay pacientes para la fecha seleccionada.</div>';
+        return;
+      }
+      container.innerHTML = patients.map(patientCard).join('');
+    }
+
+    function renderMetrics(metrics) {
+      const items = [
+        ['Total', metrics.total || 0],
+        ['Programado', metrics.programado || 0],
+        ['Preparación', metrics.preparacion || 0],
+        ['Quirófano', metrics.quirofano || 0],
+        ['Recuperación', metrics.recuperacion || 0],
+        ['Cancelado', metrics.cancelado || 0]
+      ];
+
+      $('metrics').innerHTML = items.map(item => `
+        <div class="metric">
+          <span>${escapeHtml(item[0])}</span>
+          <strong>${escapeHtml(item[1])}</strong>
+        </div>
+      `).join('');
+    }
+
+    async function loadOperation(showLoader = true) {
+      if (showLoader) setLoading(true, 'Actualizando tablero…');
+
+      try {
+        const data = await serverCall(
+          'apiBoot',
+          $('operationDate').value || ''
+        );
+
+        state.refreshSeconds =
+          Number(data.config && data.config.autoRefreshSeconds) || 30;
+
+        $('versionLabel').textContent =
+          (data.app && data.app.version) || 'Web App';
+
+        if (!$('operationDate').value) {
+          $('operationDate').value =
+            (data.config && data.config.today) || '';
+        }
+
+        if (!$('programDate').value) {
+          $('programDate').value = $('operationDate').value;
+        }
+
+        $('operationTimestamp').textContent =
+          'Actualizado ' +
+          ((data.board && data.board.timestamp) || '');
+
+        renderMetrics((data.board && data.board.metrics) || {});
+        renderBoard(
+          'operationBoard',
+          (data.board && data.board.patients) || []
+        );
+
+        scheduleRefresh();
+      } catch (error) {
+        toast(error.message, true);
+        $('operationBoard').innerHTML =
+          '<div class="empty">No fue posible cargar la base de cirugía.</div>';
+      } finally {
+        if (showLoader) setLoading(false);
+      }
+    }
+
+    function scheduleRefresh() {
+      clearInterval(state.refreshTimer);
+      const seconds = Math.max(15, state.refreshSeconds || 30);
+      state.refreshTimer = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          loadOperation(false);
+        }
+      }, seconds * 1000);
+    }
+
+    function openLogin() {
+      $('loginError').textContent = '';
+      $('loginPin').value = '';
+      $('loginModal').classList.add('show');
+      setTimeout(() => $('loginUser').focus(), 50);
+    }
+
+    function closeLogin() {
+      $('loginModal').classList.remove('show');
+    }
+
+    async function login() {
+      const user = $('loginUser').value.trim();
+      const pin = $('loginPin').value;
+
+      if (!user || !pin) {
+        $('loginError').textContent = 'Ingrese usuario y PIN.';
+        return;
+      }
+
+      setLoading(true, 'Validando acceso…');
+
+      try {
+        const result = await serverCall('apiLogin', user, pin);
+
+        state.token = result.token;
+        state.session = result;
+        sessionStorage.setItem('qx_token', result.token);
+
+        closeLogin();
+        updateSessionUi();
+        await loadProgramming();
+
+        showView('programming');
+        toast('Acceso autorizado.');
+      } catch (error) {
+        $('loginError').textContent = error.message;
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function restoreSession() {
+      if (!state.token) {
+        updateSessionUi();
+        return;
+      }
+
+      try {
+        const session = await serverCall('apiSession', state.token);
+
+        if (!session || !session.valid) {
+          state.token = '';
+          state.session = null;
+          sessionStorage.removeItem('qx_token');
+        } else {
+          state.session = session;
+        }
+      } catch (error) {
+        state.token = '';
+        state.session = null;
+        sessionStorage.removeItem('qx_token');
+      }
+
+      updateSessionUi();
+    }
+
+    function updateSessionUi() {
+      const active = Boolean(state.session && state.session.valid !== false);
+
+      $('sessionPill').style.display = active ? 'block' : 'none';
+      $('sessionPill').textContent = active
+        ? (state.session.name || state.session.user || '') +
+          ' · ' + (state.session.role || '')
+        : '';
+
+      $('accessBtn').textContent = active ? 'Sesión activa' : 'Acceso';
+      $('programLocked').style.display = active ? 'none' : 'block';
+      $('programContent').style.display = active ? 'block' : 'none';
+    }
+
+    async function loadProgramming() {
+      if (!state.token) {
+        openLogin();
+        return;
+      }
+
+      setLoading(true, 'Consultando Programación…');
+
+      try {
+        const data = await serverCall(
+          'apiGetProgramming',
+          state.token,
+          $('programDate').value || $('operationDate').value,
+          true
+        );
+
+        renderBoard('programBoard', data.patients || []);
+      } catch (error) {
+        if (/sesión|autorizada|permiso/i.test(error.message)) {
+          toast(error.message, true);
+        } else {
+          toast(error.message, true);
+        }
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function logout() {
+      try {
+        if (state.token) {
+          await serverCall('apiLogout', state.token);
+        }
+      } catch (error) {}
+
+      state.token = '';
+      state.session = null;
+      sessionStorage.removeItem('qx_token');
+      updateSessionUi();
+      showView('operation');
+      toast('Sesión cerrada.');
+    }
+
+    function showView(name) {
+      if (name === 'programming' && !state.token) {
+        openLogin();
+        return;
+      }
+
+      document.querySelectorAll('.view').forEach(view => {
+        view.classList.toggle(
+          'active',
+          view.id === 'view-' + name
+        );
+      });
+
+      document.querySelectorAll('.nav-btn').forEach(button => {
+        button.classList.toggle(
+          'active',
+          button.dataset.view === name
+        );
+      });
+
+      if (name === 'programming' && state.token) {
+        loadProgramming().catch(() => {});
+      }
+    }
+
+    document.querySelectorAll('.nav-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        showView(button.dataset.view);
+      });
+    });
+
+    $('accessBtn').addEventListener('click', () => {
+      if (!state.token) openLogin();
+      else showView('programming');
+    });
+
+    $('cancelLogin').addEventListener('click', closeLogin);
+    $('submitLogin').addEventListener('click', login);
+    $('loginPin').addEventListener('keydown', event => {
+      if (event.key === 'Enter') login();
+    });
+
+    $('refreshOperation').addEventListener('click', () => loadOperation());
+    $('operationDate').addEventListener('change', () => {
+      $('programDate').value = $('operationDate').value;
+      loadOperation();
+    });
+
+    $('refreshProgram').addEventListener('click', () => {
+      loadProgramming().catch(() => {});
+    });
+
+    $('programDate').addEventListener('change', () => {
+      loadProgramming().catch(() => {});
+    });
+
+    $('logoutBtn').addEventListener('click', logout);
+
+    (async function init() {
+      await restoreSession();
+      await loadOperation();
+    })();
+  </script>
+</body>
+</html>
