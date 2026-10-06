@@ -1,131 +1,107 @@
-function nowIso_() {
-  return Utilities.formatDate(new Date(), APP.TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss");
+function normalizeText_(value) {
+  return String(value == null ? '' : value).trim();
 }
 
-function todayIso_() {
-  return Utilities.formatDate(new Date(), APP.TIMEZONE, 'yyyy-MM-dd');
+function normalizeUser_(value) {
+  return normalizeText_(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 function uuid_() {
   return Utilities.getUuid();
 }
 
-function normalizeText_(value) {
-  return String(value == null ? '' : value).trim();
-}
-
-function normalizeUser_(value) {
-  return normalizeText_(value).toLowerCase();
-}
-
-function sha256Hex_(value) {
-  var bytes = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    String(value),
-    Utilities.Charset.UTF_8
-  );
-  return bytes.map(function(b) {
-    var v = (b < 0 ? b + 256 : b).toString(16);
-    return v.length === 1 ? '0' + v : v;
-  }).join('');
-}
-
-function base64UrlEncode_(value) {
-  return Utilities.base64EncodeWebSafe(String(value), Utilities.Charset.UTF_8)
-    .replace(/=+$/g, '');
-}
-
-function base64UrlDecode_(value) {
-  return Utilities.newBlob(Utilities.base64DecodeWebSafe(value)).getDataAsString();
-}
-
-function getTokenSecret_() {
-  var props = PropertiesService.getScriptProperties();
-  var secret = props.getProperty(APP.PROPERTY_TOKEN_SECRET);
-  if (!secret) {
-    secret = Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid();
-    props.setProperty(APP.PROPERTY_TOKEN_SECRET, secret);
+function normalDate_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return value;
   }
-  return secret;
-}
 
-function signText_(text) {
-  var signature = Utilities.computeHmacSha256Signature(
-    String(text),
-    getTokenSecret_(),
-    Utilities.Charset.UTF_8
+  if (!value) return null;
+
+  var text = String(value).trim();
+  var m = text.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
   );
-  return Utilities.base64EncodeWebSafe(signature).replace(/=+$/g, '');
+
+  if (m) {
+    return new Date(
+      Number(m[3]),
+      Number(m[2]) - 1,
+      Number(m[1]),
+      Number(m[4] || 0),
+      Number(m[5] || 0),
+      Number(m[6] || 0)
+    );
+  }
+
+  var date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
 }
 
-function createSessionToken_(user) {
-  var payload = {
-    sub: user.ID,
-    usuario: user.USUARIO,
-    nombre: user.NOMBRE,
-    rol: user.ROL,
-    exp: Math.floor(Date.now() / 1000) + APP.SESSION_SECONDS
-  };
-  var body = base64UrlEncode_(JSON.stringify(payload));
-  return body + '.' + signText_(body);
+function formatDate_(value) {
+  var date = normalDate_(value);
+  return date
+    ? Utilities.formatDate(date, APP.TIMEZONE, 'yyyy-MM-dd')
+    : '';
 }
 
-function validateSessionToken_(token) {
-  try {
-    var raw = normalizeText_(token);
-    var parts = raw.split('.');
-    if (parts.length !== 2) throw new Error('Token inválido.');
-    if (signText_(parts[0]) !== parts[1]) throw new Error('Firma inválida.');
+function formatDateTime_(value) {
+  var date = normalDate_(value);
+  return date
+    ? Utilities.formatDate(date, APP.TIMEZONE, 'dd/MM/yyyy HH:mm:ss')
+    : '';
+}
 
-    var payload = JSON.parse(base64UrlDecode_(parts[0]));
-    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) {
-      throw new Error('Sesión vencida.');
+function formatTime_(value) {
+  var date = normalDate_(value);
+  if (date) {
+    return Utilities.formatDate(date, APP.TIMEZONE, 'HH:mm');
+  }
+
+  var text = normalizeText_(value);
+  var m = text.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return '';
+
+  var hh = Number(m[1]);
+  var mm = Number(m[2]);
+  if (hh > 23 || mm > 59) return '';
+
+  return String(hh).padStart(2, '0') + ':' +
+    String(mm).padStart(2, '0');
+}
+
+function todayIso_() {
+  return Utilities.formatDate(new Date(), APP.TIMEZONE, 'yyyy-MM-dd');
+}
+
+function jsonSafe_(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function assertRequired_(object, fields) {
+  fields.forEach(function(field) {
+    if (!normalizeText_(object && object[field])) {
+      throw new Error('Campo requerido: ' + field);
     }
-    return payload;
-  } catch (error) {
-    throw new Error('Sesión no válida. Inicie sesión nuevamente.');
-  }
-}
-
-function requireSession_(token, allowedRoles) {
-  var session = validateSessionToken_(token);
-  if (allowedRoles && allowedRoles.length && allowedRoles.indexOf(session.rol) === -1) {
-    throw new Error('No tiene permisos para ejecutar esta acción.');
-  }
-  return session;
-}
-
-function ok_(data, message) {
-  return {
-    ok: true,
-    message: message || '',
-    data: data == null ? null : data,
-    version: APP.VERSION
-  };
-}
-
-function fail_(error) {
-  return {
-    ok: false,
-    message: error && error.message ? error.message : String(error),
-    data: null,
-    version: APP.VERSION
-  };
+  });
 }
 
 function safeApi_(fn) {
   try {
-    return fn();
+    return {
+      ok: true,
+      data: jsonSafe_(fn()),
+      version: APP.VERSION
+    };
   } catch (error) {
     console.error(error && error.stack ? error.stack : error);
-    return fail_(error);
+    return {
+      ok: false,
+      message: error && error.message ? error.message : String(error),
+      data: null,
+      version: APP.VERSION
+    };
   }
-}
-
-function assertRequired_(obj, fields) {
-  fields.forEach(function(field) {
-    if (!normalizeText_(obj && obj[field])) {
-      throw new Error('Campo requerido: ' + field);
-    }
-  });
 }
