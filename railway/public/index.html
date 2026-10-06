@@ -436,10 +436,11 @@ function normalizeQnoValue(v){
   return m?"QNO "+m[1]:"";
 }
 function normalizeCareType(tipo,procedencia,cama){
-  const s=norm([tipo,procedencia,cama].filter(Boolean).join(" "));
-  if(s.includes("ambulator"))return "AMBULATORIO";
-  if(s.includes("hosp")||s.includes("intern")||s.includes("hospitaliz"))return "HOSPITALIZADO";
-  const c=String(cama||"").trim();
+  const t=norm(tipo),p=norm(procedencia),c=String(cama||"").trim();
+  if(t.includes("hospital")||t.includes("intern"))return "HOSPITALIZADO";
+  if(t.includes("ambulator"))return "AMBULATORIO";
+  if(p.includes("hospital")||p.includes("intern"))return "HOSPITALIZADO";
+  if(p.includes("ambulator"))return "AMBULATORIO";
   if(c&&norm(c)!=="amb")return "HOSPITALIZADO";
   return "";
 }
@@ -564,6 +565,7 @@ function parseOrderTextBulk(text,fileName){
 
   let cama=orderClean(pick(["tipo cama","cama"],100));if(badBed(cama))cama="";
   const tipoCirugia=pick(["tipo cirugía","tipo cirugia"],120);
+  const tipoCirugiaHeader=lines.find(x=>/^(AMBULATORI[AO]|HOSPITALARI[AO])\b/i.test(x))||"";
   let procedencia=pick(["procedencia","origen paciente"],160);
   if(!/(AMBULATORI|HOSPITAL|INTERN)/i.test(procedencia)){
     const pm=t.match(/PROCEDENCIA\s*[:#]?\s*(AMBULATORI[AO]|HOSPITALIZAD[AO]|HOSPITALARI[AO]|INTERN[AO])/i);if(pm)procedencia=pm[1];
@@ -571,7 +573,7 @@ function parseOrderTextBulk(text,fileName){
   if(!/(AMBULATORI|HOSPITAL|INTERN)/i.test(procedencia)){
     const top=lines.find(x=>/^(AMBULATORI[AO]|HOSPITALIZAD[AO]|HOSPITALARI[AO])\b/i.test(x));if(top)procedencia=top;
   }
-  const tipoAtencion=normalizeCareType(tipoCirugia,procedencia,cama);
+  const tipoAtencion=normalizeCareType(tipoCirugiaHeader||tipoCirugia,procedencia,cama);
   if(tipoAtencion==="AMBULATORIO"&&!cama)cama="AMB";
 
   let fecha=parseDateFlexibleText(pick(["fecha asignada","fecha cirugía","fecha cirugia"],130));
