@@ -1,63 +1,95 @@
 var APP = Object.freeze({
   NAME: 'APP WEB CX',
-  VERSION: '5.0.0-dev',
+  VERSION: '5.0.0-alpha.1',
   TIMEZONE: 'America/Bogota',
-  SESSION_SECONDS: 21600,
-  PROPERTY_SPREADSHEET_ID: 'SPREADSHEET_ID',
-  PROPERTY_TOKEN_SECRET: 'TOKEN_SECRET'
+
+  PROPERTY_MAIN_DB_ID: 'QX_MAIN_DB_ID',
+  PROPERTY_LEGACY_MAIN_DB_ID: 'SPREADSHEET_ID',
+  PROPERTY_ASSIGNMENTS_DB_ID: 'QX_ASSIGNMENTS_DB_ID',
+  PROPERTY_AUTH_PEPPER: 'QX_AUTH_PEPPER_V1',
+
+  SESSION_CACHE_PREFIX: 'QX_SESSION_',
+  USER_SECURITY_CACHE_PREFIX: 'QX_USER_SECURITY_'
+});
+
+var DATA_SOURCES = Object.freeze({
+  MAIN: 'MAIN',
+  ASSIGNMENTS: 'ASSIGNMENTS'
 });
 
 var SHEETS = Object.freeze({
-  USERS: 'USUARIOS',
-  SURGERIES: 'CIRUGIAS',
-  CANCELLATIONS: 'CANCELACIONES',
-  ASSIGNMENTS: 'ASIGNACIONES',
-  ROUNDS: 'RONDAS',
-  AUDIT: 'AUDITORIA'
+  PROGRAMACION: 'BD PROGRAMACIÓN',
+  CANCELACIONES: 'CANCELACIONES QX',
+  USUARIOS: 'USUARIOS',
+  ROLES: 'ROLES',
+  AUDITORIA: 'LOG AUDITORÍA',
+  MOVIMIENTOS: 'HISTORIAL MOVIMIENTOS',
+  REINTERVENCIONES: 'REINTERVENCIONES QX',
+  CONFIGURACION: 'CONFIGURACIÓN SISTEMA',
+  LISTAS: 'LISTAS',
+  LOG_CARGUES: 'LOG CARGUES'
 });
 
-var SCHEMA = Object.freeze({
-  USUARIOS: [
-    'ID', 'USUARIO', 'NOMBRE', 'ROL', 'PASSWORD_HASH', 'ACTIVO',
-    'CREADO_EN', 'ACTUALIZADO_EN'
-  ],
-  CIRUGIAS: [
-    'ID', 'FECHA', 'HORA', 'DOCUMENTO', 'PACIENTE', 'PROCEDIMIENTO',
-    'ESPECIALISTA', 'SALA', 'ESTADO', 'OBSERVACION',
-    'CREADO_POR', 'CREADO_EN', 'ACTUALIZADO_EN'
-  ],
-  CANCELACIONES: [
-    'ID', 'FECHA', 'DOCUMENTO', 'PACIENTE', 'PROCEDIMIENTO',
-    'MOTIVO', 'OBSERVACION', 'RESPONSABLE',
-    'CREADO_POR', 'CREADO_EN'
-  ],
-  ASIGNACIONES: [
-    'ID', 'FECHA', 'TURNO', 'QNO', 'RESPONSABLE', 'CARGO',
-    'TAREA', 'ESTADO', 'CREADO_POR', 'CREADO_EN', 'ACTUALIZADO_EN'
-  ],
-  RONDAS: [
-    'ID', 'FECHA', 'HORA', 'AREA', 'RESPONSABLE', 'ITEM',
-    'HALLAZGO', 'ACCION', 'ESTADO',
-    'CREADO_POR', 'CREADO_EN', 'ACTUALIZADO_EN'
-  ],
-  AUDITORIA: [
-    'ID', 'FECHA_HORA', 'USUARIO', 'ROL', 'ACCION',
-    'MODULO', 'REGISTRO_ID', 'DETALLE'
-  ]
-});
+var REQUIRED_MAIN_SHEETS = Object.freeze([
+  SHEETS.PROGRAMACION,
+  SHEETS.CANCELACIONES,
+  SHEETS.USUARIOS,
+  SHEETS.ROLES,
+  SHEETS.AUDITORIA,
+  SHEETS.MOVIMIENTOS,
+  SHEETS.CONFIGURACION
+]);
 
-var ROLES = Object.freeze({
-  ADMIN: 'ADMIN',
-  COORDINADOR: 'COORDINADOR',
-  ENFERMERIA: 'ENFERMERIA',
-  CONSULTA: 'CONSULTA'
-});
+var TERMINAL_STATES = Object.freeze([
+  'CANCELADO',
+  'ALTA',
+  'HOSPITALIZACIÓN'
+]);
 
-function setSpreadsheetId(spreadsheetId) {
-  if (!spreadsheetId || String(spreadsheetId).trim().length < 20) {
-    throw new Error('El ID de Google Sheets no es válido.');
+var ACTIVE_STATES = Object.freeze([
+  'PROGRAMADO',
+  'PREPARACIÓN',
+  'QUIRÓFANO',
+  'RECUPERACIÓN'
+]);
+
+function setDataSources(mainSpreadsheetId, assignmentsSpreadsheetId) {
+  var mainId = normalizeText_(mainSpreadsheetId);
+  var assignmentsId = normalizeText_(assignmentsSpreadsheetId);
+
+  if (!mainId || mainId.length < 20) {
+    throw new Error('Debe indicar el ID válido de la base principal de cirugía.');
   }
-  PropertiesService.getScriptProperties()
-    .setProperty(APP.PROPERTY_SPREADSHEET_ID, String(spreadsheetId).trim());
-  return { ok: true };
+
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(APP.PROPERTY_MAIN_DB_ID, mainId);
+
+  // Compatibilidad con el proyecto Apps Script anterior.
+  props.setProperty(APP.PROPERTY_LEGACY_MAIN_DB_ID, mainId);
+
+  if (assignmentsId) {
+    if (assignmentsId.length < 20) {
+      throw new Error('El ID de la base de asignaciones no es válido.');
+    }
+    props.setProperty(APP.PROPERTY_ASSIGNMENTS_DB_ID, assignmentsId);
+  }
+
+  return {
+    ok: true,
+    mainConfigured: true,
+    assignmentsConfigured: Boolean(assignmentsId)
+  };
+}
+
+function getConfiguredDataSources() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    main: Boolean(
+      props.getProperty(APP.PROPERTY_MAIN_DB_ID) ||
+      props.getProperty(APP.PROPERTY_LEGACY_MAIN_DB_ID)
+    ),
+    assignments: Boolean(
+      props.getProperty(APP.PROPERTY_ASSIGNMENTS_DB_ID)
+    )
+  };
 }
