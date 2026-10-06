@@ -5,7 +5,6 @@ var APP = Object.freeze({
 
   PROPERTY_MAIN_DB_ID: 'QX_MAIN_DB_ID',
   PROPERTY_LEGACY_MAIN_DB_ID: 'SPREADSHEET_ID',
-  PROPERTY_ASSIGNMENTS_DB_ID: 'QX_ASSIGNMENTS_DB_ID',
   PROPERTY_AUTH_PEPPER: 'QX_AUTH_PEPPER_V1',
   PROPERTY_ATTACHMENTS_FOLDER_ID: 'QX_ATTACHMENTS_FOLDER_ID',
 
@@ -14,8 +13,7 @@ var APP = Object.freeze({
 });
 
 var DATA_SOURCES = Object.freeze({
-  MAIN: 'MAIN',
-  ASSIGNMENTS: 'ASSIGNMENTS'
+  MAIN: 'MAIN'
 });
 
 var SHEETS = Object.freeze({
@@ -55,9 +53,8 @@ var ACTIVE_STATES = Object.freeze([
   'RECUPERACIÓN'
 ]);
 
-function setDataSources(mainSpreadsheetId, assignmentsSpreadsheetId) {
+function setDataSources(mainSpreadsheetId) {
   var mainId = normalizeText_(mainSpreadsheetId);
-  var assignmentsId = normalizeText_(assignmentsSpreadsheetId);
 
   if (!mainId || mainId.length < 20) {
     throw new Error('Debe indicar el ID válido de la base principal de cirugía.');
@@ -65,21 +62,11 @@ function setDataSources(mainSpreadsheetId, assignmentsSpreadsheetId) {
 
   var props = PropertiesService.getScriptProperties();
   props.setProperty(APP.PROPERTY_MAIN_DB_ID, mainId);
-
-  // Compatibilidad con el proyecto Apps Script anterior.
   props.setProperty(APP.PROPERTY_LEGACY_MAIN_DB_ID, mainId);
-
-  if (assignmentsId) {
-    if (assignmentsId.length < 20) {
-      throw new Error('El ID de la base de asignaciones no es válido.');
-    }
-    props.setProperty(APP.PROPERTY_ASSIGNMENTS_DB_ID, assignmentsId);
-  }
 
   return {
     ok: true,
-    mainConfigured: true,
-    assignmentsConfigured: Boolean(assignmentsId)
+    mainConfigured: true
   };
 }
 
@@ -89,9 +76,6 @@ function getConfiguredDataSources() {
     main: Boolean(
       props.getProperty(APP.PROPERTY_MAIN_DB_ID) ||
       props.getProperty(APP.PROPERTY_LEGACY_MAIN_DB_ID)
-    ),
-    assignments: Boolean(
-      props.getProperty(APP.PROPERTY_ASSIGNMENTS_DB_ID)
     )
   };
 }
