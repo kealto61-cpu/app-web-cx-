@@ -438,6 +438,34 @@ function existingProgrammingKeysApp_() {
   return keys;
 }
 
+
+function existingTrackingTokensSetApp_() {
+  var sheet = getSheet_(SHEETS.PROGRAMACION, DATA_SOURCES.MAIN);
+  var col = requireColumn_(sheet, 'TOKEN SEGUIMIENTO');
+  var lastRow = sheet.getLastRow();
+  var tokens = {};
+  if (lastRow >= 2) {
+    sheet.getRange(2, col, lastRow - 1, 1)
+      .getDisplayValues()
+      .forEach(function(row) {
+        var token = normalizeText_(row[0]);
+        if (token) tokens[token] = true;
+      });
+  }
+  return tokens;
+}
+
+function uniqueTrackingTokenFromSetApp_(tokens) {
+  for (var i = 0; i < 100; i++) {
+    var token = String(Math.floor(10000 + Math.random() * 90000));
+    if (!tokens[token]) {
+      tokens[token] = true;
+      return token;
+    }
+  }
+  throw new Error('No fue posible generar un token de seguimiento único.');
+}
+
 function bulkImportApp_(token, body) {
   var session = requirePermission_(token, 'CARGUE_MASIVO');
   body = body || {};
@@ -446,6 +474,7 @@ function bulkImportApp_(token, body) {
 
   var config = operationalConfig_();
   var existing = existingProgrammingKeysApp_();
+  var trackingTokens = existingTrackingTokensSetApp_();
   var inserted = 0;
   var skipped = 0;
   var errors = [];
@@ -501,7 +530,7 @@ function bulkImportApp_(token, body) {
         'CÓDIGO SEGUIMIENTO':
           'SEG-' + date.replace(/-/g, '') + '-' +
           Utilities.getUuid().replace(/-/g, '').slice(0, 6).toUpperCase(),
-        'TOKEN SEGUIMIENTO': uniqueTrackingToken_(),
+        'TOKEN SEGUIMIENTO': uniqueTrackingTokenFromSetApp_(trackingTokens),
         'CREADO SEGUIMIENTO': new Date(),
         'ÚLTIMA ACTUALIZACIÓN WEB': new Date()
       };
