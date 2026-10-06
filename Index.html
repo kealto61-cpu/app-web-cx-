@@ -234,6 +234,35 @@
     .toast.show{display:block}
     .toast.error{background:var(--danger)}
 
+    .assignment-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+      gap:10px;
+    }
+    .assignment-card{
+      background:white;border:1px solid var(--line);
+      border-radius:14px;padding:13px;
+      box-shadow:0 6px 20px rgba(13,2,78,.045);
+    }
+    .assignment-role{
+      font-size:12px;font-weight:900;color:var(--navy);
+      text-transform:uppercase;letter-spacing:.04em;
+      margin-bottom:9px;
+    }
+    .assignment-person{
+      border-top:1px solid var(--line);
+      padding-top:8px;margin-top:8px;
+    }
+    .assignment-person:first-of-type{
+      border-top:0;padding-top:0;margin-top:0;
+    }
+    .assignment-name{font-weight:800;font-size:13px;line-height:1.3}
+    .assignment-meta{font-size:11px;color:var(--muted);margin-top:3px}
+    .assignment-note{
+      margin-top:8px;padding:7px 8px;border-radius:9px;
+      background:#fafafe;color:#55596a;font-size:11px;
+    }
+
     @media(max-width:980px){
       .metrics{grid-template-columns:repeat(3,1fr)}
       .shell{grid-template-columns:76px minmax(0,1fr)}
@@ -286,6 +315,9 @@
         <span>⌘</span><span class="label">Programación</span>
         <span class="lock">●</span>
       </button>
+      <button class="nav-btn" data-view="assignments">
+        <span>◎</span><span class="label">Asignaciones</span>
+      </button>
     </aside>
 
     <main>
@@ -327,6 +359,20 @@
           </div>
           <div class="board" id="programBoard"></div>
         </div>
+      </section>
+
+      <section class="view" id="view-assignments">
+        <div class="page-head">
+          <div>
+            <h1>Asignaciones de personal</h1>
+            <p>Vista informativa conectada al cuadro operativo real.</p>
+          </div>
+          <div class="filters">
+            <input class="date-input" type="date" id="assignmentDate">
+            <button class="btn btn-soft" id="refreshAssignments">Actualizar</button>
+          </div>
+        </div>
+        <div class="assignment-grid" id="assignmentGrid"></div>
       </section>
     </main>
   </div>
@@ -508,6 +554,10 @@
           $('programDate').value = $('operationDate').value;
         }
 
+        if (!$('assignmentDate').value) {
+          $('assignmentDate').value = $('operationDate').value;
+        }
+
         $('operationTimestamp').textContent =
           'Actualizado ' +
           ((data.board && data.board.timestamp) || '');
@@ -619,6 +669,75 @@
       $('programContent').style.display = active ? 'block' : 'none';
     }
 
+    function renderAssignments(data) {
+      const container = $('assignmentGrid');
+
+      if (!data || !data.configured) {
+        container.innerHTML =
+          '<div class="empty">La fuente de asignaciones aún no está configurada en Script Properties.</div>';
+        return;
+      }
+
+      const rows = data.rows || [];
+      if (!rows.length) {
+        container.innerHTML =
+          '<div class="empty">No hay asignaciones registradas para esta fecha.</div>';
+        return;
+      }
+
+      container.innerHTML = rows.map(item => `
+        <article class="assignment-card">
+          <div class="assignment-role">${escapeHtml(item.asignacion)}</div>
+
+          ${item.personal1 ? `
+            <div class="assignment-person">
+              <div class="assignment-name">${escapeHtml(item.personal1)}</div>
+              <div class="assignment-meta">
+                Turno: ${escapeHtml(item.turno1 || '—')}
+                ${item.origen1 ? ' · ' + escapeHtml(item.origen1) : ''}
+              </div>
+            </div>` : ''}
+
+          ${item.personal2 ? `
+            <div class="assignment-person">
+              <div class="assignment-name">${escapeHtml(item.personal2)}</div>
+              <div class="assignment-meta">
+                Turno: ${escapeHtml(item.turno2 || '—')}
+                ${item.origen2 ? ' · ' + escapeHtml(item.origen2) : ''}
+              </div>
+            </div>` : ''}
+
+          ${item.observacion ? `
+            <div class="assignment-note">
+              ${escapeHtml(item.observacion)}
+            </div>` : ''}
+
+          ${item.actualizado ? `
+            <div class="assignment-meta" style="margin-top:9px">
+              Actualizado: ${escapeHtml(item.actualizado)}
+            </div>` : ''}
+        </article>
+      `).join('');
+    }
+
+    async function loadAssignments() {
+      setLoading(true, 'Consultando asignaciones…');
+
+      try {
+        const data = await serverCall(
+          'apiGetAssignments',
+          $('assignmentDate').value || $('operationDate').value
+        );
+        renderAssignments(data);
+      } catch (error) {
+        toast(error.message, true);
+        $('assignmentGrid').innerHTML =
+          '<div class="empty">No fue posible consultar las asignaciones.</div>';
+      } finally {
+        setLoading(false);
+      }
+    }
+
     async function loadProgramming() {
       if (!state.token) {
         openLogin();
@@ -686,6 +805,10 @@
       if (name === 'programming' && state.token) {
         loadProgramming().catch(() => {});
       }
+
+      if (name === 'assignments') {
+        loadAssignments().catch(() => {});
+      }
     }
 
     document.querySelectorAll('.nav-btn').forEach(button => {
@@ -708,6 +831,7 @@
     $('refreshOperation').addEventListener('click', () => loadOperation());
     $('operationDate').addEventListener('change', () => {
       $('programDate').value = $('operationDate').value;
+      $('assignmentDate').value = $('operationDate').value;
       loadOperation();
     });
 
@@ -720,6 +844,14 @@
     });
 
     $('logoutBtn').addEventListener('click', logout);
+
+    $('refreshAssignments').addEventListener('click', () => {
+      loadAssignments().catch(() => {});
+    });
+
+    $('assignmentDate').addEventListener('change', () => {
+      loadAssignments().catch(() => {});
+    });
 
     (async function init() {
       await restoreSession();
