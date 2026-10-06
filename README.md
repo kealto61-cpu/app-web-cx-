@@ -1,39 +1,76 @@
 # APP WEB CX
 
-Web App de gestión quirúrgica desarrollada para Google Apps Script.
+Reconstrucción desde cero de la Web App de gestión quirúrgica para Google Apps Script.
 
-## Objetivo técnico
+## Principio de arquitectura
 
-El repositorio contiene únicamente código que puede copiarse a un proyecto de Google Apps Script sin compilación, Node.js, npm, React, TypeScript ni bundlers.
+**Google Drive / Google Sheets es la fuente de verdad. GitHub contiene solamente el código.**
 
-## Arquitectura inicial
+La aplicación no crea una base paralela, no reemplaza las hojas existentes y no cambia los encabezados de la base real para adaptarlos al código. El código se adapta a las hojas existentes.
 
-- `Code.gs`: entrada de la Web App y API pública.
-- `Config.gs`: configuración, constantes y esquema de hojas.
-- `Utils.gs`: utilidades, respuestas y seguridad.
-- `Database.gs`: acceso centralizado a Google Sheets.
-- `Auth.gs`: usuarios, autenticación y token de sesión.
-- `Audit.gs`: trazabilidad.
-- `Surgery.gs`: programación quirúrgica.
-- `Cancellations.gs`: cancelaciones.
-- `Assignments.gs`: asignaciones.
-- `Rounds.gs`: rondas.
-- `Index.html`: aplicación.
-- `Styles.html`: estilos.
-- `Scripts.html`: lógica del cliente.
-- `appsscript.json`: manifiesto.
+La base principal contiene, entre otras:
 
-## Puesta en marcha
+- `BD PROGRAMACIÓN`
+- `CANCELACIONES QX`
+- `USUARIOS`
+- `ROLES`
+- `LOG AUDITORÍA`
+- `HISTORIAL MOVIMIENTOS`
+- `REINTERVENCIONES QX`
+- `CONFIGURACIÓN SISTEMA`
+- hojas diarias de programación
 
-1. Crear un proyecto de Google Apps Script.
-2. Copiar cada archivo del repositorio respetando su nombre.
-3. Si el script es independiente, ejecutar `setSpreadsheetId('ID_DEL_SHEET')`.
-4. Ejecutar una vez `setupSystem()`.
-5. Ejecutar `createInitialAdmin(usuario, clave, nombre)`.
-6. Implementar como Aplicación web.
+Las asignaciones de personal se manejan mediante su Google Sheet operativo independiente.
 
-La autenticación usa hash SHA-256 para credenciales almacenadas y tokens de sesión firmados con HMAC-SHA256. Nunca se guarda la contraseña en texto plano.
+## Seguridad del repositorio
+
+Este repositorio es público. Por esa razón:
+
+- no se almacenan IDs de Google Sheets;
+- no se almacenan credenciales;
+- no se almacenan PIN, salts ni pepper;
+- no se almacenan datos de pacientes.
+
+Los IDs de las fuentes se guardan en **Script Properties** de Google Apps Script.
+
+## Compatibilidad
+
+Solo se utiliza código ejecutable directamente en Google Apps Script V8:
+
+- archivos `.gs`;
+- HTML;
+- CSS;
+- JavaScript nativo del navegador;
+- `google.script.run`.
+
+No se usa Node.js, npm, React, TypeScript, Vite ni bundlers.
+
+## Configuración
+
+La aplicación reutiliza la propiedad histórica `SPREADSHEET_ID` si ya existe en el proyecto Apps Script. Esto permite conservar la conexión con la base actual al reemplazar el código.
+
+También reconoce:
+
+- `QX_MAIN_DB_ID`
+- `QX_ASSIGNMENTS_DB_ID`
+- `QX_AUTH_PEPPER_V1`
+
+El valor de `QX_AUTH_PEPPER_V1` es crítico para validar los PIN que ya fueron migrados a hash + salt. **No debe eliminarse ni regenerarse al reemplazar el código.**
+
+Si fuera necesario configurar las fuentes manualmente:
+
+```javascript
+setDataSources('ID_BASE_PRINCIPAL', 'ID_BASE_ASIGNACIONES');
+```
+
+Después:
+
+```javascript
+setupSystem();
+```
+
+`setupSystem()` valida la estructura existente pero no crea ni modifica hojas.
 
 ## Estado
 
-Base reconstruida desde cero. Versión inicial: 5.0.0-dev.
+Versión de reconstrucción: `5.0.0-alpha.1`.
