@@ -445,7 +445,10 @@ function parseDateFlexibleText(v){
   m=s.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
   if(m){let y=m[3];if(y.length===2)y="20"+y;return y+"-"+String(m[2]).padStart(2,"0")+"-"+String(m[1]).padStart(2,"0")}
   const months={ENE:1,ENERO:1,JAN:1,FEB:2,MAR:3,ABR:4,APR:4,MAY:5,JUN:6,JUL:7,AGO:8,AUG:8,SEP:9,SEPT:9,OCT:10,NOV:11,DIC:12,DEC:12};
-  m=s.toUpperCase().match(/\b(\d{1,2})\s*[.\-/ ]\s*(ENE|ENERO|JAN|FEB|MAR|ABR|APR|MAY|JUN|JUL|AGO|AUG|SEP|SEPT|OCT|NOV|DIC|DEC)[A-Z]*\.?[\s\-/]+(\d{4})\b/);
+  const u=s.toUpperCase();
+  m=u.match(/\b(ENE|ENERO|JAN|FEB|MAR|ABR|APR|MAY|JUN|JUL|AGO|AUG|SEP|SEPT|OCT|NOV|DIC|DEC)[A-Z]*[.\-/ ]+(\d{1,2})[.\-/ ]+(\d{4})\b/);
+  if(m){const mo=months[m[1]]||months[m[1].slice(0,3)];if(mo)return m[3]+"-"+String(mo).padStart(2,"0")+"-"+String(m[2]).padStart(2,"0")}
+  m=u.match(/\b(\d{1,2})\s*[.\-/ ]\s*(ENE|ENERO|JAN|FEB|MAR|ABR|APR|MAY|JUN|JUL|AGO|AUG|SEP|SEPT|OCT|NOV|DIC|DEC)[A-Z]*\.?[\s\-/]+(\d{4})\b/);
   if(m){const mo=months[m[2]]||months[m[2].slice(0,3)];if(mo)return m[3]+"-"+String(mo).padStart(2,"0")+"-"+String(m[1]).padStart(2,"0")}
   return "";
 }
@@ -456,18 +459,19 @@ function parseTimeFlexibleText(v){
 }
 function parseOrderTextBulk(text,fileName){
   const t=String(text||"").replace(/\r/g,"\n").replace(/[ \t]+/g," ").replace(/\n{2,}/g,"\n").trim();
-  const flat=t.replace(/\n/g," ");
+  const flat=t.replace(/\n/g," "),lines=t.split("\n").map(orderClean).filter(Boolean);
   function rxEsc(s){return String(s||"").replace(/[-\/\\^$*+?.()|[\]{}]/g,"\\$&")}
   const labels=[
     "fecha asignada","fecha cirugía","fecha cirugia","fecha solicitud","fecha de solicitud","fecha orden","fecha de orden","fecha de la orden","fecha ingreso","fecha de ingreso",
-    "hora inicial","hora asignada","hora cirugía","hora cirugia","hora generación orden","hora generacion orden","hora de generación de la orden","hora de generacion de la orden","hora solicitud","hora de solicitud","hora orden","hora de orden","hora",
+    "hora inicial","hora asignada","hora cirugía","hora cirugia","hora generación orden","hora generacion orden","hora de generación de la orden","hora de generacion de la orden","hora solicitud","hora de solicitud","hora orden","hora de orden","hora final","hora",
     "nombre del paciente","nombre paciente","nombre completo","nombres y apellidos","paciente","nombre",
-    "tipo documento","número de documento","numero de documento","documento","identificación","identificacion","cédula","cedula","n° hc","nº hc","no hc","hc","historia clínica","historia clinica",
+    "tipo documento","entidad administradora","número de documento","numero de documento","documento","identificación","identificacion","cédula","cedula","n° hc","nº hc","no hc","hc","historia clínica","historia clinica",
     "edad","sexo","teléfono","telefono","celular","número de contacto","numero de contacto","contacto","dirección","direccion",
     "tipo cirugía","tipo cirugia","especialidad","anestesia","tiempo quirúrgico","tiempo quirurgico","prioridad","observaciones","observación","observacion","procedencia","origen paciente","reserva cama","tipo cama","cama",
+    "imagenologias intra-operatorios","imagenologías intra-operatorios","tiempo de preparación para la cirugía","tiempo de preparacion para la cirugia",
     "diagnóstico","diagnostico","diagnósticos","diagnosticos","dx","cups","código cups","codigo cups","código procedimiento","codigo procedimiento",
     "procedimientos","procedimiento","procedimiento quirúrgico","procedimiento quirurgico","cirugía propuesta","cirugia propuesta","cirugía","cirugia","vía","via","abordaje",
-    "reserva de hemoderivados","material","equipos","equipo requerido","equipo","instrumental","programación","programacion","quirófano","quirofano","qno","sala",
+    "reserva de hemoderivados","material cantidad observaciones","material","equipos observaciones","equipos","equipo requerido","equipo","instrumental","programación","programacion","quirófano","quirofano","qno","sala",
     "especialista","cirujano","médico especialista","medico especialista","médico tratante","medico tratante","médico que ordena","medico que ordena","médico solicitante","medico solicitante","profesional solicitante","médico que comenta","medico que comenta","anestesiólogo","anestesiologo","aval anestesia","aval de anestesia"
   ].sort((a,b)=>b.length-a.length);
   const stop="(?=\\s+(?:"+labels.map(rxEsc).join("|")+")\\s*[:#?\\-–]?|$)";
@@ -478,49 +482,119 @@ function parseOrderTextBulk(text,fileName){
     }
     return "";
   }
-  function pickLineAfter(label){
-    const re=new RegExp(rxEsc(label)+"\\s*[:#?\\-–]?\\s*(?:\\n|$)","i"),m=t.match(re);if(!m)return "";
-    const rest=t.slice((m.index||0)+m[0].length),line=rest.split("\n").map(orderClean).find(Boolean);return line||"";
+  function cleanDoc(v){
+    const ds=String(v||"").match(/[0-9][0-9.\- ]{4,24}[0-9]/);
+    return ds?ds[0].replace(/\D/g,""):"";
   }
-  let documento=pick(["número de documento","numero de documento","documento","identificación","identificacion","cédula","cedula"],90);
-  let dm=String(documento||"").match(/[A-Z0-9][A-Z0-9.\- ]{4,24}[A-Z0-9]/i);documento=dm?dm[0].replace(/[^A-Z0-9]/gi,""):"";
-  let hc=pick(["historia clínica","historia clinica","número historia clínica","numero historia clinica","n° hc","nº hc","no hc","hc"],90);
-  hc=String(hc||"").replace(/^N[°ºO]?\.?\s*/i,"").replace(/[^A-Z0-9]/gi,"").trim();if(!documento&&hc)documento=hc;
+  function badPerson(v){
+    const x=orderClean(v);return !x||x.length<5||x.length>120||/(TIPO DOCUMENTO|ENTIDAD|TELEF|DIRECCI|EDAD|SEXO|PROCED|ESPECIALIDAD|ANESTESIA|CAMA|OBSERV)/i.test(x)||!/[A-ZÁÉÍÓÚÑa-záéíóúñ]/.test(x);
+  }
+  function badSpecialty(v){
+    const x=orderClean(v);return !x||x.length>80||/(ANESTESIA|TIEMPO|PRIORIDAD|CAMA|IMAGENOLOG|PROCEDIM|MATERIAL|PROGRAMACI|DOCUMENTO)/i.test(x);
+  }
+  function badBed(v){
+    const x=orderClean(v);return !x||x.length>45||/(IMAGENOLOG|PROCEDIM|MATERIAL|PROGRAMACI|ESPECIALIDAD|ANESTESIA|TIEMPO|PRIORIDAD|OBSERV)/i.test(x);
+  }
+
+  let documento=cleanDoc(pick(["número de documento","numero de documento","documento","identificación","identificacion","cédula","cedula"],90));
+  if(!documento){
+    const allDoc=[...t.matchAll(/(?:^|\n)\s*DOCUMENTO\s*[:#]?\s*([0-9.\- ]{5,30})/gim)].map(m=>cleanDoc(m[1])).filter(x=>x.length>=5);
+    if(allDoc.length)documento=allDoc[allDoc.length-1];
+  }
+  let hc=cleanDoc(pick(["historia clínica","historia clinica","número historia clínica","numero historia clinica","n° hc","nº hc","no hc","hc"],90));
+  if(!hc){
+    const hm=t.match(/N[º°]?\.?\s*H\.?C\.?\s*[:#]?\s*([0-9.\-]{5,30})/i);if(hm)hc=cleanDoc(hm[1]);
+  }
+  if(!documento&&hc)documento=hc;
+
   let paciente=pick(["nombre del paciente","nombre paciente","nombre completo","nombres y apellidos","paciente"],180);
-  if(!paciente){
+  if(badPerson(paciente)){
+    const edadIndex=lines.findIndex(x=>/^EDAD\s*[:#]/i.test(x));
+    if(edadIndex>0&&!badPerson(lines[edadIndex-1]))paciente=lines[edadIndex-1];
+  }
+  if(badPerson(paciente)){
     const pm=t.match(/(?:N[º°]?\.?\s*H\.?C\.?|HISTORIA\s+CL[IÍ]NICA)\s*[:#]?\s*[A-Z0-9.\-]+\s*\n\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .'-]{5,})\s*\n\s*EDAD\b/im);
     if(pm)paciente=orderClean(pm[1]);
   }
+  if(badPerson(paciente))paciente="";
+
   const telefono=normalizePhone(pick(["teléfono","telefono","celular","número de contacto","numero de contacto","contacto"],70));
   const edad=normalizeAge(pick(["edad"],45));
-  let cupsRaw=pick(["cups","código cups","codigo cups","código procedimiento","codigo procedimiento"],160);
-  const procBlock=pick(["procedimientos","procedimiento quirúrgico","procedimiento quirurgico","procedimiento","cirugía propuesta","cirugia propuesta"],900);
-  let cupMatches=[...String(cupsRaw+" "+procBlock).matchAll(/\b\d{5,8}\b/g)].map(m=>m[0]);
-  cupMatches=[...new Set(cupMatches)];
-  const cups=cupMatches.join(" / ");
-  let procedimiento=String(procBlock||"");
-  cupMatches.forEach(c=>{procedimiento=procedimiento.replace(new RegExp("\\b"+rxEsc(c)+"\\b","g")," ")});
-  procedimiento=procedimiento.replace(/\s{2,}/g," ").trim();
+
+  let procLines=[],procStart=lines.findIndex(x=>/^PROCEDIMIENTOS?\s*:?$/i.test(x));
+  if(procStart>=0){
+    let procEnd=lines.findIndex((x,i)=>i>procStart&&/^(MATERIAL(?:\s+CANTIDAD)?|PROGRAMACI[ÓO]N|EQUIPOS?)\b/i.test(x));
+    if(procEnd<0)procEnd=Math.min(lines.length,procStart+30);
+    procLines=lines.slice(procStart+1,procEnd).filter(Boolean);
+  }
+  let cupsList=procLines.filter(x=>/^\d{5,8}$/.test(x.replace(/\s/g,""))).map(x=>x.replace(/\D/g,""));
+  let procedureLines=procLines.filter(x=>!/^\d{5,8}$/.test(x.replace(/\s/g,""))&&!/^(V[IÍ]A|M[ÚU]LTIPLE|BILATERAL)/i.test(x));
+
+  let cupsRaw=pick(["cups","código cups","codigo cups","código procedimiento","codigo procedimiento"],180);
+  let procBlock=pick(["procedimientos","procedimiento quirúrgico","procedimiento quirurgico","procedimiento","cirugía propuesta","cirugia propuesta"],900);
+  if(!cupsList.length)cupsList=[...String(cupsRaw+" "+procBlock).matchAll(/\b\d{5,8}\b/g)].map(m=>m[0]);
+  cupsList=[...new Set(cupsList)];
+  const cups=cupsList.join(" / ");
+
+  let procedimiento=procedureLines.length?procedureLines.join(" · "):String(procBlock||"");
+  cupsList.forEach(c=>{procedimiento=procedimiento.replace(new RegExp("\\b"+rxEsc(c)+"\\b","g")," ")});
+  procedimiento=procedimiento.replace(/\s{2,}/g," ").replace(/^[-·|\s]+|[-·|\s]+$/g,"").trim();
+
   let especialista=pick(["especialista","cirujano","médico especialista","medico especialista","médico tratante","medico tratante","médico que ordena","medico que ordena","médico solicitante","medico solicitante","profesional solicitante","médico que comenta","medico que comenta"],190);
-  if(!especialista){
-    const mm=t.match(/(?:^|\n)([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .'-]{7,})\n\s*(?:CC\s*)?[\d.\- ]+\s*(?:REGISTRO|RM|R\.M\.)\b/im)||t.match(/(?:^|\n)([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .'-]{7,})\n\s*(?:REGISTRO|RM|R\.M\.)\b/im);
+  if(badPerson(especialista)){
+    const mm=t.match(/(?:^|\n)([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .'-]{7,})\n\s*(?:CC\s*)?[\d.\- ]+\s*(?:REGISTRO|RM|R\.M\.)\s*[:#]?/im)||t.match(/(?:^|\n)([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .'-]{7,})\n\s*(?:REGISTRO|RM|R\.M\.)\b/im);
     if(mm&&mm[1])especialista=orderClean(mm[1]);
   }
-  const especialidad=orderClean(pick(["especialidad"],160)).replace(/^\d{2,6}\s+/,"").trim();
-  const cama=orderClean(pick(["tipo cama","cama"],100));
+  if(badPerson(especialista))especialista="";
+
+  let especialidad=orderClean(pick(["especialidad"],160)).replace(/^\d{2,6}\s+/,"").trim();
+  if(badSpecialty(especialidad)){
+    const sig=t.match(/(?:REGISTRO|RM|R\.M\.)\s*[:#]?[^\n]*\n\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ /-]{3,60})\s*(?:\n|$)/im);
+    if(sig)especialidad=orderClean(sig[1]).replace(/^\d{2,6}\s+/,"");
+  }
+  if(badSpecialty(especialidad)){
+    const known=/\b(CIRUG[IÍ]A\s+GENERAL|GINECOLOG[IÍ]A|UROLOG[IÍ]A|ORTOPEDIA(?:\s+Y\s+TRAUMATOLOG[IÍ]A)?|NEUROCIRUG[IÍ]A|OFTALMOLOG[IÍ]A|OTORRINOLARINGOLOG[IÍ]A|CIRUG[IÍ]A\s+PL[ÁA]STICA|CIRUG[IÍ]A\s+VASCULAR|CIRUG[IÍ]A\s+DE\s+MANO|MAXILOFACIAL|PEDIATR[IÍ]A)\b/i;
+    const found=lines.map(x=>x.replace(/^\d{2,6}\s+/,"")).find(x=>known.test(x));if(found){const m=found.match(known);if(m)especialidad=orderClean(m[1])}
+  }
+  if(badSpecialty(especialidad))especialidad="";
+
+  let cama=orderClean(pick(["tipo cama","cama"],100));if(badBed(cama))cama="";
   const tipoCirugia=pick(["tipo cirugía","tipo cirugia"],120);
-  const procedencia=pick(["procedencia","origen paciente"],160);
+  let procedencia=pick(["procedencia","origen paciente"],160);
+  if(!procedencia){
+    const pm=t.match(/PROCEDENCIA\s*[:#]?\s*(AMBULATORI[AO]|HOSPITALIZAD[AO]|HOSPITALARI[AO]|INTERN[AO])/i);if(pm)procedencia=pm[1];
+  }
+  if(!procedencia){
+    const top=lines.find(x=>/^(AMBULATORI[AO]|HOSPITALIZAD[AO]|HOSPITALARI[AO])\b/i.test(x));if(top)procedencia=top;
+  }
   const tipoAtencion=normalizeCareType(tipoCirugia,procedencia,cama);
-  const fecha=parseDateFlexibleText(pick(["fecha asignada","fecha cirugía","fecha cirugia"],130))||parseDateFlexibleText(pick(["fecha solicitud","fecha de solicitud","fecha orden","fecha de orden","fecha de la orden"],130));
-  const hora=parseTimeFlexibleText(pick(["hora inicial","hora asignada","hora cirugía","hora cirugia"],100))||parseTimeFlexibleText(pick(["hora generación orden","hora generacion orden","hora solicitud","hora de solicitud","hora orden","hora de orden","hora"],100));
+  if(tipoAtencion==="AMBULATORIO"&&!cama)cama="AMB";
+
+  let fecha=parseDateFlexibleText(pick(["fecha asignada","fecha cirugía","fecha cirugia"],130));
+  // No se usa Fecha Solicitud como fecha quirúrgica si "Fecha asignada" está vacía.
+  const hasAssigned=/FECHA\s+ASIGNADA\s*:\s*[^\n\r]+/i.test(t);
+  if(!fecha&&hasAssigned){
+    const fm=t.match(/FECHA\s+ASIGNADA\s*:\s*([^\n\r]+)/i);if(fm)fecha=parseDateFlexibleText(fm[1]);
+  }
+
+  let hora=parseTimeFlexibleText(pick(["hora inicial","hora asignada","hora cirugía","hora cirugia"],100));
+  if(!hora){
+    const hm=t.match(/(?:^|\n)\s*HORA\s*:\s*([^\n\r]+)/im);if(hm)hora=parseTimeFlexibleText(hm[1]);
+  }
   const qno=normalizeQnoValue(pick(["quirófano","quirofano","qno","sala"],70));
   const sexo=orderClean(pick(["sexo"],35));
-  const tiempoQx=orderClean(pick(["tiempo quirúrgico","tiempo quirurgico"],80));
+
+  let tiempoQx=orderClean(pick(["tiempo quirúrgico","tiempo quirurgico"],80));
+  if(!/^\d{1,2}:\d{2}$/.test(tiempoQx)){
+    const tq=lines.find(x=>/^\d{1,2}:\d{2}\s+(?:URGENTE|ELECTIV[AO]|PRIORITARI[AO])\b/i.test(x));
+    if(tq)tiempoQx=(tq.match(/^\d{1,2}:\d{2}/)||[])[0]||"";
+  }
   const observaciones=orderClean(pick(["observaciones","observación","observacion"],650));
+
   return {
     fecha,hora,documento,paciente,edad,telefono,sexo,cups,procedimiento,especialidad,especialista,qno,
     tipoAtencion,cama,tiempoQx,observaciones,
-    _source:fileName||"PDF",_review:(!paciente||!documento||!procedimiento||!especialidad||!especialista||!cups)
+    _source:fileName||"PDF",_review:(!paciente||!documento||!procedimiento||!especialidad||!especialista||!cups||!fecha||!hora)
   };
 }
 async function pdfTextContent(file){
@@ -668,7 +742,7 @@ async function changeQno(id,qno){
   const jefe=currentChief(true);if(!jefe){await loadPatients();return}
   try{await api("/api/case/qno",{method:"POST",body:JSON.stringify({id,qno,jefeTurno:jefe})});await loadPatients()}catch(e){alert(e.message);await loadPatients()}
 }
-async function directQno(id){const p=state.patients.find(x=>x.id===id);if(!p||!qnoNorm(p.qno)){alert("Seleccione QNO 1, 2 o 3.");return}await moveCase(id,"QUIRÓFANO")}
+async function directQno(id){const p=state.patients.find(x=>x.id===id);if(!p||!qnoNorm(p.qno)){alert("Seleccione un QNO habilitado.");return}await moveCase(id,"QUIRÓFANO")}
 function openCancel(id){
   const jefe=currentChief(true);if(!jefe)return;
   const p=state.patients.find(x=>x.id===id);if(!p)return;
