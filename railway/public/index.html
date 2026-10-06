@@ -433,7 +433,7 @@ function normalizeAge(v){const m=String(v||"").match(/\b(\d{1,3})\b/);return m?m
 function normalizeQnoValue(v){
   const s=String(v||"").toUpperCase();
   const m=s.match(/(?:QNO|QUIR[ÓO]FANO|SALA)\s*[-:]?\s*(\d{1,2})/i)||s.match(/^\s*(\d{1,2})\s*$/);
-  return m?"QNO "+m[1]:orderClean(v).toUpperCase();
+  return m?"QNO "+m[1]:"";
 }
 function normalizeCareType(tipo,procedencia,cama){
   const s=norm([tipo,procedencia,cama].filter(Boolean).join(" "));
