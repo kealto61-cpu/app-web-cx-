@@ -21,10 +21,10 @@ async function casesFor(date){const d=safeDate(date);const r=await sql.unsafe("s
 function metrics(rows){const m={total:rows.length,programado:0,preparacion:0,quirofano:0,recuperacion:0,finalizados:0,cancelados:0,operados:0};rows.forEach(r=>{if(r.estado==="PROGRAMADO")m.programado++;if(r.estado==="PREPARACIÓN")m.preparacion++;if(r.estado==="QUIRÓFANO")m.quirofano++;if(r.estado==="RECUPERACIÓN")m.recuperacion++;if(["ALTA","HOSPITALIZACIÓN"].includes(r.estado)||["ALTA","HOSPITALIZACIÓN"].includes(norm(r.destino)))m.finalizados++;if(r.estado==="CANCELADO")m.cancelados++;if(r.operado)m.operados++});return m}
 async function nextRow(sheet){const r=await sql.unsafe("select coalesce(max(row_number),1)+1 as n from source_sheets where source_key='MAIN' and sheet_name=$1",[sheet]);return Number(r[0].n||2)}
 async function findCase(id){const r=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'ID CASO'=$1 limit 1",[id]);return r[0]||null}
-async function audit(s,action,module,id,detail,result="OK"){try{const rn=await nextRow("LOG AUDITORÍA");const p={"MARCA TEMPORAL":nowBog(),"USUARIO":s?.user||"SISTEMA","ROL":s?.role||"SISTEMA","ACCIÓN":action,"ID CASO":id||"","MÓDULO":module,"DETALLE":detail||"","RESULTADO":result,"VERSIÓN":"RAILWAY-5"};await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','LOG AUDITORÍA',$1,$2::jsonb)",[rn,JSON.stringify(p)])}catch{}}
-async function outbox(entity,id,action,payload){try{await sql.unsafe("insert into sync_outbox(entity_type,entity_id,action,payload) values($1,$2,$3,$4::jsonb)",[entity,id||"",action,JSON.stringify(payload)])}catch{}}
+async function audit(s,action,module,id,detail,result="OK"){try{const rn=await nextRow("LOG AUDITORÍA");const p={"MARCA TEMPORAL":nowBog(),"USUARIO":s?.user||"SISTEMA","ROL":s?.role||"SISTEMA","ACCIÓN":action,"ID CASO":id||"","MÓDULO":module,"DETALLE":detail||"","RESULTADO":result,"VERSIÓN":"RAILWAY-5"};await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','LOG AUDITORÍA',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(p)])}catch{}}
+async function outbox(entity,id,action,payload){try{await sql.unsafe("insert into sync_outbox(entity_type,entity_id,action,payload) values($1,$2,$3,case when jsonb_typeof($4::jsonb)='string' then (($4::jsonb)#>>'{}')::jsonb else $4::jsonb end)",[entity,id||"",action,JSON.stringify(payload)])}catch{}}
 async function updateCase(s,id,patch,action){const hit=await findCase(id);if(!hit)throw new Error("Paciente no encontrado.");const old=hit.payload,p=Object.assign({},old,patch,{"FECHA/HORA ÚLTIMO MOVIMIENTO":nowBog(),"USUARIO ÚLTIMO MOVIMIENTO":s.user||"Railway","ÚLTIMA ACTUALIZACIÓN WEB":nowBog(),"ESTADO ANTERIOR":old["ESTADO ACTUAL"]||""});await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and row_number=$2",[JSON.stringify(p),hit.row_number]);await outbox("PACIENTE",id,action,p);await audit(s,action,"OPERACIÓN",id,JSON.stringify(patch));return mapCase(p)}
-async function addMovement(s,p,from,to){const rn=await nextRow("HISTORIAL MOVIMIENTOS");const row={"MARCA TEMPORAL":nowBog(),"ID CASO":p["ID CASO"]||"","DOCUMENTO":p["DOCUMENTO"]||"","PACIENTE":p["PACIENTE"]||"","ORIGEN":from||"","DESTINO":to||"","USUARIO":s.user||"","ROL":s.role||"","QNO":p["SALA / QNO"]||"","OBSERVACIÓN":"Railway"};await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','HISTORIAL MOVIMIENTOS',$1,$2::jsonb)",[rn,JSON.stringify(row)])}
+async function addMovement(s,p,from,to){const rn=await nextRow("HISTORIAL MOVIMIENTOS");const row={"MARCA TEMPORAL":nowBog(),"ID CASO":p["ID CASO"]||"","DOCUMENTO":p["DOCUMENTO"]||"","PACIENTE":p["PACIENTE"]||"","ORIGEN":from||"","DESTINO":to||"","USUARIO":s.user||"","ROL":s.role||"","QNO":p["SALA / QNO"]||"","OBSERVACIÓN":"Railway"};await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','HISTORIAL MOVIMIENTOS',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(row)])}
 async function uniqueTrackingToken(){
   for(let i=0;i<60;i++){
     const token=String(Math.floor(10000+Math.random()*90000));
@@ -55,7 +55,7 @@ async function ensureTrackingForDate(session,date){
     if(!p["CREADO SEGUIMIENTO"]){p["CREADO SEGUIMIENTO"]=nowBog();changed=true;}
     if(changed){
       p["ÚLTIMA ACTUALIZACIÓN WEB"]=nowBog();
-      await sql.unsafe("update source_sheets set payload=$1::jsonb,imported_at=now() where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and row_number=$2",[JSON.stringify(p),rec.row_number]);
+      await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and row_number=$2",[JSON.stringify(p),rec.row_number]);
       await outbox("PACIENTE",String(p["ID CASO"]||""),"SEGUIMIENTO_GENERADO",p);
       await audit(session,"GENERAR SEGUIMIENTO","ACOMPAÑANTES",String(p["ID CASO"]||""),"Identificador/token temporal creado");
     }
@@ -80,7 +80,7 @@ async function insertCancellation(session,old,b){
     "OPORTUNIDAD DEL REGISTRO":"","PREVENIBLE":String(b.prevenible||""),"OBSERVACIONES":String(b.observaciones||""),
     "CUMPLIMIENTO DEL REGISTRO":"COMPLETO","MES":date?date.slice(5,7):"","AÑO":date?date.slice(0,4):"","ATRIBUIBLE A":String(b.atribuible||"")
   };
-  await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','CANCELACIONES QX',$1,$2::jsonb)",[rn,JSON.stringify(row)]);
+  await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','CANCELACIONES QX',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(row)]);
   await outbox("CANCELACION",String(old["ID CASO"]||""),"CREAR",row);
 }
 function pct(a,b){return b?Math.round(a*1000/b)/10:0}function avg(a){const x=a.filter(n=>Number.isFinite(n)&&n>0);return x.length?Math.round(x.reduce((s,n)=>s+n,0)*10/x.length)/10:0}
@@ -140,10 +140,10 @@ async function writeSystemConfig(session,param,value){
   const payload={"PARÁMETRO":p,"VALOR":serialized,"ACTUALIZADO EN":now,"ACTUALIZADO POR":session.user||""};
   if(hit.length){
     const merged=Object.assign({},hit[0].payload,payload);
-    await sql.unsafe("update source_sheets set payload=$1::jsonb,imported_at=now() where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA' and row_number=$2",[JSON.stringify(merged),hit[0].row_number]);
+    await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA' and row_number=$2",[JSON.stringify(merged),hit[0].row_number]);
   }else{
     const rn=await nextRow("CONFIGURACIÓN SISTEMA");
-    await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','CONFIGURACIÓN SISTEMA',$1,$2::jsonb)",[rn,JSON.stringify(payload)]);
+    await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','CONFIGURACIÓN SISTEMA',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(payload)]);
   }
   await outbox("CONFIGURACION",p,"ACTUALIZAR",payload);
   await audit(session,"ACTUALIZAR CONFIGURACIÓN","CONFIGURACIÓN",p,serialized);
@@ -173,7 +173,7 @@ async function findUserById(id){
   return r[0]||null;
 }
 async function patchUserRow(rowNumber,payload){
-  await sql.unsafe("update source_sheets set payload=$1::jsonb,imported_at=now() where source_key='MAIN' and sheet_name='USUARIOS' and row_number=$2",[JSON.stringify(payload),rowNumber]);
+  await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='USUARIOS' and row_number=$2",[JSON.stringify(payload),rowNumber]);
 }
 function csvCell(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 Bun.serve({port:PORT,async fetch(req){
@@ -274,7 +274,7 @@ Bun.serve({port:PORT,async fetch(req){
    const validRoles=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES'");if(!validRoles.some(x=>{const p=objectPayload(x.payload);return String(p["ID ROL"]||"").toUpperCase()===rol&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO"}))return json({error:"Rol no válido."},400);
    const salt=randomUUID().replace(/-/g,""),id="USR-"+randomUUID().slice(0,8).toUpperCase(),rn=await nextRow("USUARIOS"),created=nowBog();
    const u={"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"HASH PIN":hashRailwayPin(pin,salt),"ESTADO":"ACTIVO","CREADO EN":created,"CREADO POR":s.user,"ÚLTIMO INGRESO":"","ACTUALIZADO EN":created,"CAMBIO PIN REQUERIDO":b.forceChange?"SI":"NO","SALT PIN":salt,"PIN ACTUALIZADO EN":created,"INTENTOS FALLIDOS":"0","BLOQUEADO HASTA":"","VERSIÓN SESIÓN":"1","ALGORITMO PIN":"RAILWAY_V1"};
-   await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','USUARIOS',$1,$2::jsonb)",[rn,JSON.stringify(u)]);await outbox("USUARIO",id,"CREAR",{"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"ESTADO":"ACTIVO"});await audit(s,"CREAR USUARIO","USUARIOS",id,usuario+" · "+rol);
+   await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','USUARIOS',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(u)]);await outbox("USUARIO",id,"CREAR",{"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"ESTADO":"ACTIVO"});await audit(s,"CREAR USUARIO","USUARIOS",id,usuario+" · "+rol);
    return json({ok:true,id});
  }
  if(url.pathname==="/api/users/update"&&req.method==="POST"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
@@ -345,7 +345,7 @@ Bun.serve({port:PORT,async fetch(req){
    Object.entries(mapping).forEach(([k,h])=>{if(Object.prototype.hasOwnProperty.call(b,k))p[h]=String(b[k]??"").trim()});
    if(!p["FECHA CIRUGÍA"]||!p["HORA PROGRAMADA"]||!p["DOCUMENTO"]||!p["PACIENTE"]||!p["PROCEDIMIENTO"])return json({error:"Fecha, hora, documento, paciente y procedimiento son obligatorios."},400);
    p["FECHA CIRUGÍA"]=safeDate(p["FECHA CIRUGÍA"]);p["PACIENTE"]=String(p["PACIENTE"]).toUpperCase();p["PROCEDIMIENTO"]=String(p["PROCEDIMIENTO"]).toUpperCase();p["ESPECIALIDAD"]=String(p["ESPECIALIDAD"]||"").toUpperCase();p["ESPECIALISTA"]=String(p["ESPECIALISTA"]||"").toUpperCase();p["SALA / QNO"]=String(p["SALA / QNO"]||"").toUpperCase();p["ÚLTIMA ACTUALIZACIÓN WEB"]=nowBog();p["USUARIO ÚLTIMO MOVIMIENTO"]=s.user;
-   await sql.unsafe("update source_sheets set payload=$1::jsonb,imported_at=now() where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and row_number=$2",[JSON.stringify(p),hit.row_number]);
+   await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and row_number=$2",[JSON.stringify(p),hit.row_number]);
    await outbox("PACIENTE",String(p["ID CASO"]||""),"EDITAR",p);await audit(s,"EDITAR PACIENTE","PROGRAMACIÓN",String(p["ID CASO"]||""),"Actualización desde Programación");
    return json({ok:true,case:mapCase(p)});
  }
