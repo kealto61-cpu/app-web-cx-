@@ -35,7 +35,7 @@ main{max-width:1750px;margin:auto;padding:14px 16px 30px}.view{display:none}.vie
 .ops-chief-bar input{width:100%;height:42px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:14px}
 .ops-flow-title{font-size:13px;font-weight:900;color:var(--navy);margin:14px 0 7px}
 .preop-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.qno-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.qno-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px}
 .recovery-panel{margin-top:10px}.recovery-panel table{min-width:1050px}
 .clinical-choice{display:flex;gap:7px;flex-wrap:wrap}.clinical-choice button{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:8px;padding:8px 12px;font-weight:850;font-size:12px}.clinical-choice button.active{background:var(--navy);color:#fff}
 .intraop-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.intraop-calc{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}.intraop-calc>div{background:#F8F7FC;border:1px solid var(--line2);border-radius:9px;padding:9px}.intraop-calc small{display:block;color:var(--muted);font-size:10px}.intraop-calc b{display:block;color:var(--navy);font-size:16px;margin-top:3px}
@@ -48,6 +48,15 @@ main{max-width:1750px;margin:auto;padding:14px 16px 30px}.view{display:none}.vie
 .roles-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 0 8px}
 .roles-toolbar h3{margin:0;color:var(--navy);font-size:16px}
 @media(max-width:760px){.permissions-grid{grid-template-columns:1fr}}
+
+.config-panel{display:none}.config-panel.active{display:block}
+.config-qno-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid var(--line);border-radius:999px;background:#F7F5FC;color:var(--navy);font-size:11px;font-weight:850}
+.config-qno-chip button{border:0;background:transparent;color:var(--danger);font-weight:900;cursor:pointer}
+.flow-row{display:grid;grid-template-columns:180px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--line2)}
+.flow-row:last-child{border-bottom:0}.flow-source{font-weight:900;color:var(--navy);font-size:12px}
+.flow-targets{display:flex;gap:7px;flex-wrap:wrap}.flow-targets label{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:#FAF9FD;font-size:10px;color:var(--navy)}
+.flow-targets input{width:auto;height:auto}
+@media(max-width:760px){.flow-row{grid-template-columns:1fr}}
 </style>
 
 <style>
@@ -210,12 +219,12 @@ header .logo{
   </div>
 </div>
 <header><div class="head"><div class="brand"><div class="logo">AMA</div><div><strong>Control de Pacientes Quirúrgicos</strong><small style="display:inline-block;margin-top:3px;padding:3px 7px;border-radius:999px;background:#E8F3FF;color:#0A4F91;font-weight:900;font-size:10px">CX 5.5 · OPERATIVO ACTUALIZADO</small><small id="subtitle">Flujo quirúrgico del servicio</small></div></div><div class="head-actions"><div class="datebox"><small>Fecha</small><input id="date" type="date"></div><div class="session"><b id="sn">Sin sesión</b><small id="sr">—</small></div><button class="btn soft sm" id="changePinBtn">Cambiar PIN</button><button class="btn soft sm" id="logout">Cerrar sesión</button></div></div><div class="nav">
-<button class="active" data-view="operativo"><b>Operativo</b><small>QNO 1 · 2 · 3</small></button>
-<button data-view="programacion"><b>Programación</b><small>Agenda y cargue</small></button>
+<button class="active" data-view="operativo"><b>Operativo</b></button>
+<button data-view="programacion"><b>Programación</b></button>
 <button data-view="profilaxis"><b>Profilaxis</b><small>Prequirúrgica</small></button>
 <button data-view="postop"><b>Cuidados POP</b><small>Postoperatorio</small></button>
 <button data-view="acompanantes"><b>Acompañantes</b><small>Seguimiento</small></button>
-<button data-view="coordinacion"><b>Coordinación</b><small>KPI · MCI · reportes</small></button>
+<button data-view="coordinacion"><b>Coordinación</b><small>KPI · MCI · reportes</small></button><button data-view="configuracion" id="configNavBtn" class="hidden"><b>Configuración</b></button>
 </div></header>
 <main>
 <section class="view active" id="view-operativo">
@@ -228,11 +237,11 @@ header .logo{
   <div class="ops-flow-title">Programación y preparación</div>
   <div class="preop-grid"><div class="lane"><div class="lane-head">PROGRAMADOS <span class="count" id="count-programado">0</span></div><div id="lane-programado"></div></div><div class="lane"><div class="lane-head">PREPARACIÓN <span class="count" id="count-preparacion">0</span></div><div id="lane-preparacion"></div></div></div>
   <div class="ops-flow-title">Quirófanos</div>
-  <div class="qno-grid"><div class="lane"><div class="lane-head">QNO 1 <span class="count" id="count-qno1">0</span></div><div id="lane-qno1"></div></div><div class="lane"><div class="lane-head">QNO 2 <span class="count" id="count-qno2">0</span></div><div id="lane-qno2"></div></div><div class="lane"><div class="lane-head">QNO 3 <span class="count" id="count-qno3">0</span></div><div id="lane-qno3"></div></div></div>
+  <div class="qno-grid" id="qnoGrid"></div>
   <div class="ops-flow-title">Recuperación postanestésica</div>
   <div class="panel table-wrap recovery-panel"><table><thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Procedimiento</th><th>Especialidad</th><th>Especialista</th><th>QNO</th><th>Ingreso</th><th>Acciones</th></tr></thead><tbody id="recoveryBody"></tbody></table></div>
 </section>
-<section class="view" id="view-programacion"><div class="hero"><div><span class="kicker">PROGRAMACIÓN</span><h2>Programación quirúrgica</h2><p>Consulta, nuevo paciente y cargue masivo.</p></div><div><button class="btn" id="newPatient">Nuevo paciente</button> <button class="btn soft" id="bulkOpen">Carga masiva</button></div></div><div class="toolbar"><input id="pq" placeholder="Buscar paciente, documento, procedimiento o especialista"><select id="pst"><option value="">Todos los estados</option><option>PROGRAMADO</option><option>PREPARACIÓN</option><option>QUIRÓFANO</option><option>RECUPERACIÓN</option><option>ALTA</option><option>HOSPITALIZACIÓN</option><option>CANCELADO</option></select><select id="pqn"><option value="">Todos los QNO</option><option>QNO 1</option><option>QNO 2</option><option>QNO 3</option></select><button class="btn soft" id="refreshProg">Actualizar</button></div><div class="panel table-wrap"><table><thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Procedimiento</th><th>Especialidad</th><th>Especialista</th><th>QNO</th><th>Estado</th><th>Tipo</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody id="progBody"></tbody></table></div></section>
+<section class="view" id="view-programacion"><div class="hero"><div><span class="kicker">PROGRAMACIÓN</span><h2>Programación quirúrgica</h2><p>Consulta, nuevo paciente y cargue masivo.</p></div><div><button class="btn" id="newPatient">Nuevo paciente</button> <button class="btn soft" id="bulkOpen">Carga masiva</button></div></div><div class="toolbar"><input id="pq" placeholder="Buscar paciente, documento, procedimiento o especialista"><select id="pst"><option value="">Todos los estados</option><option>PROGRAMADO</option><option>PREPARACIÓN</option><option>QUIRÓFANO</option><option>RECUPERACIÓN</option><option>ALTA</option><option>HOSPITALIZACIÓN</option><option>CANCELADO</option></select><select id="pqn"><option value="">Todos los QNO</option></select><button class="btn soft" id="refreshProg">Actualizar</button></div><div class="panel table-wrap"><table><thead><tr><th>Hora</th><th>Paciente</th><th>Documento</th><th>Procedimiento</th><th>Especialidad</th><th>Especialista</th><th>QNO</th><th>Estado</th><th>Tipo</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody id="progBody"></tbody></table></div></section>
 <section class="view" id="view-profilaxis">
   <div class="hero"><div><span class="kicker">PROFILAXIS</span><h2>Profilaxis antibiótica</h2><p>Consulta del protocolo institucional y seguimiento de la profilaxis administrada.</p></div></div>
   <div class="panel" style="margin-bottom:10px">
@@ -281,13 +290,53 @@ header .logo{
     <div id="trackResult"></div>
   </div>
 </section>
-<section class="view" id="view-coordinacion"><div class="hero"><div><span class="kicker">COORDINACIÓN</span><h2>Centro de Coordinación Quirúrgica</h2><p>Resumen, KPI, MCI, seguridad y descargas.</p></div></div><div class="subnav"><button class="active" data-coord="resumen">Resumen</button><button data-coord="kpi">KPI</button><button data-coord="mci">MCI</button><button data-coord="seguridad">Seguridad</button><button data-coord="descargas">Descargas</button><button data-coord="usuarios" id="usersTabBtn">Usuarios</button></div>
+<section class="view" id="view-coordinacion"><div class="hero"><div><span class="kicker">COORDINACIÓN</span><h2>Centro de Coordinación Quirúrgica</h2><p>Resumen, KPI, MCI, seguridad y descargas.</p></div></div><div class="subnav"><button class="active" data-coord="resumen">Resumen</button><button data-coord="kpi">KPI</button><button data-coord="mci">MCI</button><button data-coord="seguridad">Seguridad</button><button data-coord="descargas">Descargas</button></div>
 <div class="coord-panel active" id="coord-resumen"><div class="metrics" id="coordMetrics"></div><div class="panel table-wrap"><table style="min-width:600px"><thead><tr><th>Especialidad</th><th>Casos</th><th>Operados</th><th>Cancelados</th></tr></thead><tbody id="coordBody"></tbody></table></div></div>
 <div class="coord-panel" id="coord-kpi"><div class="toolbar"><select id="kpiPeriod"><option value="MES">Mes</option><option value="DIA">Día</option></select><select id="kpiView"><option value="general">General</option><option value="productividad">Productividad</option><option value="tiempos">Tiempos</option><option value="muertos">Tiempos muertos</option><option value="especialidades">Especialidades</option><option value="cancelaciones">Cancelaciones</option><option value="flujo">Flujo</option></select><button class="btn soft" id="kpiRefresh">Actualizar KPI</button><div></div></div><div class="metrics" id="kpiMetrics"></div><div class="panel"><div class="chartbars" id="kpiChart"></div></div><div class="panel table-wrap" style="margin-top:8px"><table style="min-width:760px"><thead id="kpiHead"></thead><tbody id="kpiBody"></tbody></table></div></div>
 <div class="coord-panel" id="coord-mci"><div class="metrics" id="mciMetrics"></div><div class="panel"><div class="chartbars" id="mciChart"></div></div><div class="panel table-wrap" style="margin-top:8px"><table style="min-width:900px"><thead><tr><th>Fecha</th><th>Día</th><th>QNO disponibles</th><th>Meta</th><th>Programadas</th><th>Ejecutadas</th><th>Diferencia</th><th>Cumple</th><th>Acumulado</th></tr></thead><tbody id="mciBody"></tbody></table></div></div>
 <div class="coord-panel" id="coord-seguridad"><div class="metrics" id="secMetrics"></div><div class="panel table-wrap"><table style="min-width:900px"><thead><tr><th>Paciente</th><th>Documento</th><th>Cirugía previa</th><th>Nueva cirugía</th><th>Días</th><th>Especialidad</th></tr></thead><tbody id="reintBody"></tbody></table></div></div>
-<div class="coord-panel" id="coord-descargas"><div class="panel"><div class="formgrid"><div class="field"><label>Periodo</label><select id="dlPeriod"><option value="DIA">Día</option><option value="MES">Mes</option></select></div><div class="field"><label>Información</label><select id="dlType"><option value="PROGRAMACION">Programación</option><option value="ACTIVOS">Activos</option><option value="EJECUTADAS">Ejecutadas</option><option value="FINALIZADOS">Finalizados</option><option value="CANCELADOS">Cancelados</option><option value="QNO 1">QNO 1</option><option value="QNO 2">QNO 2</option><option value="QNO 3">QNO 3</option><option value="TIEMPOS_QNO">Tiempos QNO</option><option value="PROFILAXIS">Profilaxis</option></select></div><div class="field"><label>Formato</label><select id="dlFormat"><option value="CSV">CSV</option><option value="XLSX">Excel XLSX</option><option value="PDF">PDF ejecutivo</option></select></div><div class="field" style="display:flex;align-items:end"><button class="btn" id="downloadBtn" style="width:100%">Descargar</button></div></div><div class="notice" style="margin-top:10px">La descarga se genera desde la réplica PostgreSQL. Toda modificación operativa queda en cola de sincronización con Drive.</div></div></div><div class="coord-panel" id="coord-usuarios"><div class="hero" style="margin-bottom:10px"><div><span class="kicker">USUARIOS Y ROLES</span><h2>Administración de accesos</h2><p>Crear, editar, activar/inactivar, reiniciar PIN y administrar permisos por rol.</p></div><button class="btn" id="newUserBtn">Nuevo usuario</button></div><div class="panel table-wrap"><table style="min-width:900px"><thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Último ingreso</th><th>Cambio PIN</th><th>Acciones</th></tr></thead><tbody id="usersBody"></tbody></table></div><div id="rolesAdminBlock" class="hidden"><div class="roles-toolbar"><div><h3>Editor de roles</h3><div style="font-size:10px;color:var(--muted);margin-top:2px">Permisos funcionales del sistema. Solo SUPERADMIN puede modificarlos.</div></div><button class="btn" id="newRoleBtn">Nuevo rol</button></div><div class="panel table-wrap"><table style="min-width:900px"><thead><tr><th>Código</th><th>Nombre</th><th>Descripción</th><th>Permisos</th><th>Estado</th><th>Sistema</th><th>Acciones</th></tr></thead><tbody id="rolesBody"></tbody></table></div></div></div>
+<div class="coord-panel" id="coord-descargas"><div class="panel"><div class="formgrid"><div class="field"><label>Periodo</label><select id="dlPeriod"><option value="DIA">Día</option><option value="MES">Mes</option></select></div><div class="field"><label>Información</label><select id="dlType"><option value="PROGRAMACION">Programación</option><option value="ACTIVOS">Activos</option><option value="EJECUTADAS">Ejecutadas</option><option value="FINALIZADOS">Finalizados</option><option value="CANCELADOS">Cancelados</option><option value="TIEMPOS_QNO">Tiempos QNO</option><option value="PROFILAXIS">Profilaxis</option></select></div><div class="field"><label>Formato</label><select id="dlFormat"><option value="CSV">CSV</option><option value="XLSX">Excel XLSX</option><option value="PDF">PDF ejecutivo</option></select></div><div class="field" style="display:flex;align-items:end"><button class="btn" id="downloadBtn" style="width:100%">Descargar</button></div></div><div class="notice" style="margin-top:10px">La descarga se genera desde la réplica PostgreSQL. Toda modificación operativa queda en cola de sincronización con Drive.</div></div></div>
 </section>
+<section class="view" id="view-configuracion">
+  <div class="hero">
+    <div><span class="kicker">SUPERADMIN</span><h2>Configuración del sistema</h2><p>Administración de operación, QNO, flujos, usuarios, roles y permisos.</p></div>
+  </div>
+  <div class="subnav" id="configSubnav">
+    <button class="active" data-config="operacion">Operación y flujos</button>
+    <button data-config="usuarios">Usuarios</button>
+    <button data-config="roles">Roles y permisos</button>
+  </div>
+
+  <div class="config-panel active" id="config-operacion">
+    <div class="panel">
+      <div class="roles-toolbar"><div><h3>QNO habilitados</h3><div style="font-size:10px;color:var(--muted)">Agregue o retire quirófanos. El cambio se refleja en Operativo, Programación y formularios.</div></div></div>
+      <div id="configQnoList" class="chips" style="margin:8px 0 12px"></div>
+      <div class="toolbar" style="grid-template-columns:1fr 150px">
+        <input id="newQnoName" placeholder="Ej. QNO 4">
+        <button class="btn" id="addQnoBtn">Agregar QNO</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:10px">
+      <div class="roles-toolbar"><div><h3>Flujo quirúrgico</h3><div style="font-size:10px;color:var(--muted)">Defina los destinos permitidos desde cada etapa. Las validaciones clínicas de salida de QNO se mantienen obligatorias.</div></div></div>
+      <div id="flowEditor"></div>
+      <div class="modal-actions"><button class="btn" id="saveOperationalConfigBtn">Guardar configuración operativa</button></div>
+    </div>
+  </div>
+
+  <div class="config-panel" id="config-usuarios">
+    <div class="hero" style="margin-bottom:10px"><div><span class="kicker">USUARIOS</span><h2>Administración de accesos</h2><p>Crear, editar, activar/inactivar y reiniciar PIN.</p></div><button class="btn" id="newUserBtn">Nuevo usuario</button></div>
+    <div class="panel table-wrap"><table style="min-width:900px"><thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Último ingreso</th><th>Cambio PIN</th><th>Acciones</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+  </div>
+
+  <div class="config-panel" id="config-roles">
+    <div id="rolesAdminBlock">
+      <div class="roles-toolbar"><div><h3>Editor de roles</h3><div style="font-size:10px;color:var(--muted)">Permisos funcionales del sistema. SUPERADMIN permanece protegido.</div></div><button class="btn" id="newRoleBtn">Nuevo rol</button></div>
+      <div class="panel table-wrap"><table style="min-width:900px"><thead><tr><th>Código</th><th>Nombre</th><th>Descripción</th><th>Permisos</th><th>Estado</th><th>Sistema</th><th>Acciones</th></tr></thead><tbody id="rolesBody"></tbody></table></div>
+    </div>
+  </div>
+</section>
+
 </main>
 <div class="modal" id="cancelModal"><div class="modal-card">
   <div class="modal-head"><div><span class="kicker">CANCELACIÓN</span><h3>Registrar cancelación quirúrgica</h3></div><button class="btn soft sm" data-close="cancelModal">Cerrar</button></div>
@@ -331,13 +380,13 @@ header .logo{
 <div class="modal" id="roleModal"><div class="modal-card" style="max-width:900px"><div class="modal-head"><div><span class="kicker">ROLES Y PERMISOS</span><h3 id="roleModalTitle">Nuevo rol</h3></div><button class="btn soft sm" data-close="roleModal">Cerrar</button></div><input id="roleEditingId" type="hidden"><div class="formgrid"><div class="field"><label>Código del rol *</label><input id="roleId" placeholder="Ej. AUDITOR"></div><div class="field"><label>Nombre *</label><input id="roleName" placeholder="Ej. Auditor clínico"></div><div class="field"><label>Estado</label><select id="roleState"><option>ACTIVO</option><option>INACTIVO</option></select></div><div class="field span4"><label>Descripción</label><textarea id="roleDescription"></textarea></div></div><div class="ops-flow-title">Permisos del rol</div><div id="rolePermissions" class="permissions-grid"></div><div class="notice" id="roleProtectionNote" style="margin-top:10px">Los cambios de permisos quedan auditados. El rol SUPERADMIN conserva siempre acceso total.</div><div class="modal-actions"><button class="btn soft" data-close="roleModal">Cancelar</button><button class="btn" id="saveRoleBtn">Guardar rol</button></div></div></div>
 <div class="modal" id="patientModal"><div class="modal-card"><div class="modal-head"><div><span class="kicker">PROGRAMACIÓN</span><h3 id="patientTitle">Nuevo paciente</h3></div><button class="btn soft sm" data-close="patientModal">Cerrar</button></div><div class="formgrid">
 <div class="field"><label>Fecha *</label><input id="fFecha" type="date"></div><div class="field"><label>Hora *</label><input id="fHora" type="time"></div><div class="field"><label>Documento *</label><input id="fDoc"></div><div class="field"><label>Paciente *</label><input id="fPaciente"></div>
-<div class="field"><label>Edad</label><input id="fEdad" type="number"></div><div class="field"><label>Sexo</label><select id="fSexo"><option value=""></option><option>F</option><option>M</option></select></div><div class="field"><label>CUPS</label><input id="fCups"></div><div class="field"><label>QNO</label><select id="fQno"><option value=""></option><option>QNO 1</option><option>QNO 2</option><option>QNO 3</option></select></div>
+<div class="field"><label>Edad</label><input id="fEdad" type="number"></div><div class="field"><label>Sexo</label><select id="fSexo"><option value=""></option><option>F</option><option>M</option></select></div><div class="field"><label>CUPS</label><input id="fCups"></div><div class="field"><label>QNO</label><select id="fQno"><option value=""></option></select></div>
 <div class="field span2"><label>Procedimiento *</label><input id="fProc"></div><div class="field"><label>Especialidad</label><input id="fEsp"></div><div class="field"><label>Especialista</label><input id="fMed"></div>
 <div class="field"><label>Tipo atención</label><select id="fTipo"><option value=""></option><option>AMBULATORIO</option><option>HOSPITALIZADO</option></select></div><div class="field"><label>Cama / ubicación</label><input id="fCama"></div><div class="field"><label>UVR</label><input id="fUvr"></div><div class="field"><label>Tiempo estimado (min)</label><input id="fTiempo" type="number"></div>
 <div class="field span2"><label>Recursos / alertas</label><textarea id="fRecursos"></textarea></div><div class="field span2"><label>Observaciones</label><textarea id="fObs"></textarea></div><div class="field span4"><label>Archivos / soportes del paciente</label><input id="patientFiles" type="file" multiple><div class="notice" id="patientFilesStatus" style="margin:6px 0 0">Puede adjuntar cualquier tipo de archivo. Los archivos se asocian al caso y no se ejecutan dentro de la aplicación.</div></div></div><div class="modal-actions"><button class="btn soft" data-close="patientModal">Cancelar</button><button class="btn" id="savePatient">Guardar paciente</button></div></div></div>
 <div class="modal" id="bulkModal"><div class="modal-card"><div class="modal-head"><div><span class="kicker">CARGA MASIVA</span><h3>Importar programación</h3></div><button class="btn soft sm" data-close="bulkModal">Cerrar</button></div><div class="field"><label>Archivos de programación / soportes</label><input id="bulkFile" type="file" multiple></div><div class="notice" id="bulkStatus">Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.</div><div class="preview" id="bulkPreview"></div><div class="modal-actions"><button class="btn soft" data-close="bulkModal">Cancelar</button><button class="btn" id="bulkImport" disabled>Importar filas</button></div></div></div>
 <script>
-const $=id=>document.getElementById(id);const state={view:"operativo",patients:[],session:null,bulk:[],bulkFiles:[],patientFiles:[],trackingRows:[],editPatientId:null,users:[],roles:[]};
+const $=id=>document.getElementById(id);const state={view:"operativo",patients:[],session:null,bulk:[],bulkFiles:[],patientFiles:[],trackingRows:[],editPatientId:null,users:[],roles:[],config:{qnos:["QNO 1","QNO 2","QNO 3"],flow:{},states:["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"]},rolesAdmin:[],rolePermissionCatalog:[]};
 function esc(v){const d=document.createElement("div");d.textContent=String(v==null?"":v);return d.innerHTML}
 function fileExt(name){const p=String(name||"").toLowerCase().split(".");return p.length>1?p.pop():""}
 async function uploadAttachment(file,caseId,context,metadata){
