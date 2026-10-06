@@ -424,9 +424,10 @@ async function uploadMany(files,caseId,context,metadata){
 function orderClean(v){return String(v||"").replace(/\s+/g," ").trim()}
 function normalizePhone(v){
   const raw=String(v||"").trim();if(!raw)return "";
+  const nums=[...new Set(raw.split(/\D+/).map(x=>x.trim()).filter(x=>x.length>=7&&x.length<=15))];
+  if(nums.length)return nums.join(" / ");
   const digits=raw.replace(/\D/g,"");
-  if(digits.length>=7&&digits.length<=15)return digits;
-  return raw.slice(0,30);
+  return digits.length>=7&&digits.length<=15?digits:raw.slice(0,40);
 }
 function normalizeAge(v){const m=String(v||"").match(/\b(\d{1,3})\b/);return m?m[1]:""}
 function normalizeQnoValue(v){
@@ -574,17 +575,23 @@ function parseOrderTextBulk(text,fileName){
   if(tipoAtencion==="AMBULATORIO"&&!cama)cama="AMB";
 
   let fecha=parseDateFlexibleText(pick(["fecha asignada","fecha cirugía","fecha cirugia"],130));
-  // No se usa Fecha Solicitud como fecha quirúrgica si "Fecha asignada" está vacía.
-  const hasAssigned=/FECHA\s+ASIGNADA\s*:\s*[^\n\r]+/i.test(t);
-  if(!fecha&&hasAssigned){
-    const fm=t.match(/FECHA\s+ASIGNADA\s*:\s*([^\n\r]+)/i);if(fm)fecha=parseDateFlexibleText(fm[1]);
-  }
-
   let hora=parseTimeFlexibleText(pick(["hora inicial","hora asignada","hora cirugía","hora cirugia"],100));
+  let qno=normalizeQnoValue(pick(["quirófano","quirofano","qno","sala"],70));
+
+  // XENCO suele dejar vacías las etiquetas de programación y escribir la programación
+  // real en una línea posterior: "May.07/2026 11:00 Hora Final: 12:00".
+  const scheduledLine=t.match(/(?:^|\n)\s*((?:[A-ZÁÉÍÓÚÑ]{3,10}\.?|\d{1,2})[.\-/ ]+\d{1,2}[.\-/ ]+\d{4})\s+([01]?\d|2[0-3]):([0-5]\d)\s+HORA\s+FINAL\s*:/im);
+  if(scheduledLine){
+    const d=parseDateFlexibleText(scheduledLine[1]);if(d)fecha=d;
+    hora=String(scheduledLine[2]).padStart(2,"0")+":"+scheduledLine[3];
+  }
+  const qxLine=t.match(/(?:^|\n)\s*\d{1,2}\s+QX\s+QUIR[ÓO]FANO\s+(\d{1,2})\b/im);
+  if(qxLine)qno="QNO "+qxLine[1];
+
+  // Si no existe programación real, no se usa Fecha Solicitud como fecha quirúrgica.
   if(!hora){
     const hm=t.match(/(?:^|\n)\s*HORA\s*:\s*([^\n\r]+)/im);if(hm)hora=parseTimeFlexibleText(hm[1]);
   }
-  const qno=normalizeQnoValue(pick(["quirófano","quirofano","qno","sala"],70));
   const sexo=orderClean(pick(["sexo"],35));
 
   let tiempoQx=orderClean(pick(["tiempo quirúrgico","tiempo quirurgico"],80));
