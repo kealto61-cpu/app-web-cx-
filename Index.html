@@ -451,7 +451,7 @@ function gasCall(name,args){
     const runner=google.script.run
       .withSuccessHandler(resolve)
       .withFailureHandler(err=>reject(new Error(err&&err.message?err.message:String(err))));
-    runner[name].apply(runner,args||[]);
+    runner[name](...(args||[]));
   });
 }
 function arrayBufferToBase64(buffer){
