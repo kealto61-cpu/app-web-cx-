@@ -57,6 +57,18 @@ main{max-width:1750px;margin:auto;padding:14px 16px 30px}.view{display:none}.vie
 .flow-targets{display:flex;gap:7px;flex-wrap:wrap}.flow-targets label{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:#FAF9FD;font-size:10px;color:var(--navy)}
 .flow-targets input{width:auto;height:auto}
 @media(max-width:760px){.flow-row{grid-template-columns:1fr}}
+
+.bulk-preview-wrap{overflow:auto;max-height:58vh;border:1px solid var(--line);border-radius:10px;margin-top:10px}
+.bulk-edit-table{border-collapse:separate;border-spacing:0;min-width:2100px;width:100%;font-size:11px}
+.bulk-edit-table th{position:sticky;top:0;z-index:3;background:#EEEAF7;color:var(--navy);white-space:nowrap}
+.bulk-edit-table td{padding:4px;background:#fff;vertical-align:top}
+.bulk-edit-table input,.bulk-edit-table select,.bulk-edit-table textarea{width:100%;min-width:105px;border:1px solid var(--line);border-radius:6px;padding:6px;font:inherit;background:#fff}
+.bulk-edit-table textarea{min-width:220px;min-height:42px;resize:vertical}
+.bulk-edit-table .wide{min-width:260px}.bulk-edit-table .med{min-width:180px}.bulk-edit-table .short{min-width:80px}
+.bulk-edit-table .missing{border-color:#D64545;background:#FFF7F7}
+.bulk-row-actions{display:flex;gap:4px;white-space:nowrap}.bulk-row-actions button{min-width:auto}
+.bulk-quality{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.bulk-quality .chip{font-size:10px}
 </style>
 
 <style>
@@ -384,7 +396,7 @@ header .logo{
 <div class="field span2"><label>Procedimiento *</label><input id="fProc"></div><div class="field"><label>Especialidad</label><input id="fEsp"></div><div class="field"><label>Especialista</label><input id="fMed"></div>
 <div class="field"><label>Tipo atención</label><select id="fTipo"><option value=""></option><option>AMBULATORIO</option><option>HOSPITALIZADO</option></select></div><div class="field"><label>Cama / ubicación</label><input id="fCama"></div><div class="field"><label>UVR</label><input id="fUvr"></div><div class="field"><label>Tiempo estimado (min)</label><input id="fTiempo" type="number"></div>
 <div class="field span2"><label>Recursos / alertas</label><textarea id="fRecursos"></textarea></div><div class="field span2"><label>Observaciones</label><textarea id="fObs"></textarea></div><div class="field span4"><label>Archivos / soportes del paciente</label><input id="patientFiles" type="file" multiple><div class="notice" id="patientFilesStatus" style="margin:6px 0 0">Puede adjuntar cualquier tipo de archivo. Los archivos se asocian al caso y no se ejecutan dentro de la aplicación.</div></div></div><div class="modal-actions"><button class="btn soft" data-close="patientModal">Cancelar</button><button class="btn" id="savePatient">Guardar paciente</button></div></div></div>
-<div class="modal" id="bulkModal"><div class="modal-card"><div class="modal-head"><div><span class="kicker">CARGA MASIVA</span><h3>Importar programación</h3></div><button class="btn soft sm" data-close="bulkModal">Cerrar</button></div><div class="field"><label>Archivos de programación / soportes</label><input id="bulkFile" type="file" multiple></div><div class="notice" id="bulkStatus">Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.</div><div class="preview" id="bulkPreview"></div><div class="modal-actions"><button class="btn soft" data-close="bulkModal">Cancelar</button><button class="btn" id="bulkImport" disabled>Importar filas</button></div></div></div>
+<div class="modal" id="bulkModal"><div class="modal-card"><div class="modal-head"><div><span class="kicker">CARGA MASIVA</span><h3>Importar programación</h3></div><button class="btn soft sm" data-close="bulkModal">Cerrar</button></div><div class="field"><label>Archivos de programación / soportes</label><input id="bulkFile" type="file" multiple></div><div class="notice" id="bulkStatus">Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.</div><div class="bulk-quality" id="bulkQuality"></div><div class="preview bulk-preview-wrap" id="bulkPreview"></div><div class="modal-actions"><button class="btn soft" data-close="bulkModal">Cancelar</button><button class="btn" id="bulkImport" disabled>Importar filas</button></div></div></div>
 <script>
 const $=id=>document.getElementById(id);const state={view:"operativo",patients:[],session:null,bulk:[],bulkFiles:[],patientFiles:[],trackingRows:[],editPatientId:null,users:[],roles:[],config:{qnos:["QNO 1","QNO 2","QNO 3"],flow:{},states:["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"]},rolesAdmin:[],rolePermissionCatalog:[]};
 function esc(v){const d=document.createElement("div");d.textContent=String(v==null?"":v);return d.innerHTML}
@@ -406,32 +418,136 @@ async function uploadMany(files,caseId,context,metadata){
   for(const file of Array.from(files||[])) result.push(await uploadAttachment(file,caseId,context,metadata));
   return result;
 }
-async function parsePdfBulk(file){
+function orderClean(v){return String(v||"").replace(/\s+/g," ").trim()}
+function normalizePhone(v){
+  const raw=String(v||"").trim();if(!raw)return "";
+  const digits=raw.replace(/\D/g,"");
+  if(digits.length>=7&&digits.length<=15)return digits;
+  return raw.slice(0,30);
+}
+function normalizeAge(v){const m=String(v||"").match(/\b(\d{1,3})\b/);return m?m[1]:""}
+function normalizeQnoValue(v){
+  const s=String(v||"").toUpperCase();
+  const m=s.match(/(?:QNO|QUIR[ÓO]FANO|SALA)\s*[-:]?\s*(\d{1,2})/i)||s.match(/^\s*(\d{1,2})\s*$/);
+  return m?"QNO "+m[1]:orderClean(v).toUpperCase();
+}
+function normalizeCareType(tipo,procedencia,cama){
+  const s=norm([tipo,procedencia,cama].filter(Boolean).join(" "));
+  if(s.includes("ambulator"))return "AMBULATORIO";
+  if(s.includes("hosp")||s.includes("intern")||s.includes("hospitaliz"))return "HOSPITALIZADO";
+  const c=String(cama||"").trim();
+  if(c&&norm(c)!=="amb")return "HOSPITALIZADO";
+  return "";
+}
+function parseDateFlexibleText(v){
+  const s=String(v||"").trim();let m=s.match(/\b(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/);
+  if(m)return m[1]+"-"+String(m[2]).padStart(2,"0")+"-"+String(m[3]).padStart(2,"0");
+  m=s.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
+  if(m){let y=m[3];if(y.length===2)y="20"+y;return y+"-"+String(m[2]).padStart(2,"0")+"-"+String(m[1]).padStart(2,"0")}
+  const months={ENE:1,ENERO:1,JAN:1,FEB:2,MAR:3,ABR:4,APR:4,MAY:5,JUN:6,JUL:7,AGO:8,AUG:8,SEP:9,SEPT:9,OCT:10,NOV:11,DIC:12,DEC:12};
+  m=s.toUpperCase().match(/\b(\d{1,2})\s*[.\-/ ]\s*(ENE|ENERO|JAN|FEB|MAR|ABR|APR|MAY|JUN|JUL|AGO|AUG|SEP|SEPT|OCT|NOV|DIC|DEC)[A-Z]*\.?[\s\-/]+(\d{4})\b/);
+  if(m){const mo=months[m[2]]||months[m[2].slice(0,3)];if(mo)return m[3]+"-"+String(mo).padStart(2,"0")+"-"+String(m[1]).padStart(2,"0")}
+  return "";
+}
+function parseTimeFlexibleText(v){
+  const s=String(v||"").trim().toUpperCase(),m=s.match(/\b([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?\s*(A\.?\s*M\.?|P\.?\s*M\.?)?\b/i);
+  if(!m)return "";let hh=Number(m[1]),mm=m[2],ap=String(m[3]||"").replace(/[^APM]/g,"");
+  if(ap==="PM"&&hh<12)hh+=12;if(ap==="AM"&&hh===12)hh=0;return String(hh).padStart(2,"0")+":"+mm;
+}
+function parseOrderTextBulk(text,fileName){
+  const t=String(text||"").replace(/\r/g,"\n").replace(/[ \t]+/g," ").replace(/\n{2,}/g,"\n").trim();
+  const flat=t.replace(/\n/g," ");
+  function rxEsc(s){return String(s||"").replace(/[-\/\\^$*+?.()|[\]{}]/g,"\\$&")}
+  const labels=[
+    "fecha asignada","fecha cirugía","fecha cirugia","fecha solicitud","fecha de solicitud","fecha orden","fecha de orden","fecha de la orden","fecha ingreso","fecha de ingreso",
+    "hora inicial","hora asignada","hora cirugía","hora cirugia","hora generación orden","hora generacion orden","hora de generación de la orden","hora de generacion de la orden","hora solicitud","hora de solicitud","hora orden","hora de orden","hora",
+    "nombre del paciente","nombre paciente","nombre completo","nombres y apellidos","paciente","nombre",
+    "tipo documento","número de documento","numero de documento","documento","identificación","identificacion","cédula","cedula","n° hc","nº hc","no hc","hc","historia clínica","historia clinica",
+    "edad","sexo","teléfono","telefono","celular","número de contacto","numero de contacto","contacto","dirección","direccion",
+    "tipo cirugía","tipo cirugia","especialidad","anestesia","tiempo quirúrgico","tiempo quirurgico","prioridad","observaciones","observación","observacion","procedencia","origen paciente","reserva cama","tipo cama","cama",
+    "diagnóstico","diagnostico","diagnósticos","diagnosticos","dx","cups","código cups","codigo cups","código procedimiento","codigo procedimiento",
+    "procedimientos","procedimiento","procedimiento quirúrgico","procedimiento quirurgico","cirugía propuesta","cirugia propuesta","cirugía","cirugia","vía","via","abordaje",
+    "reserva de hemoderivados","material","equipos","equipo requerido","equipo","instrumental","programación","programacion","quirófano","quirofano","qno","sala",
+    "especialista","cirujano","médico especialista","medico especialista","médico tratante","medico tratante","médico que ordena","medico que ordena","médico solicitante","medico solicitante","profesional solicitante","médico que comenta","medico que comenta","anestesiólogo","anestesiologo","aval anestesia","aval de anestesia"
+  ].sort((a,b)=>b.length-a.length);
+  const stop="(?=\\s+(?:"+labels.map(rxEsc).join("|")+")\\s*[:#?\\-–]?|$)";
+  function pick(names,maxLen=180){
+    for(const name of names){
+      const m=flat.match(new RegExp("(?:^|\\s)"+rxEsc(name)+"\\s*[:#?\\-–]?\\s*(.{1,"+maxLen+"}?)(?:"+stop+")","i"));
+      if(m&&m[1])return orderClean(m[1]);
+    }
+    return "";
+  }
+  function pickLineAfter(label){
+    const re=new RegExp(rxEsc(label)+"\\s*[:#?\\-–]?\\s*(?:\\n|$)","i"),m=t.match(re);if(!m)return "";
+    const rest=t.slice((m.index||0)+m[0].length),line=rest.split("\n").map(orderClean).find(Boolean);return line||"";
+  }
+  let documento=pick(["número de documento","numero de documento","documento","identificación","identificacion","cédula","cedula"],90);
+  let dm=String(documento||"").match(/[A-Z0-9][A-Z0-9.\- ]{4,24}[A-Z0-9]/i);documento=dm?dm[0].replace(/[^A-Z0-9]/gi,""):"";
+  let hc=pick(["historia clínica","historia clinica","número historia clínica","numero historia clinica","n° hc","nº hc","no hc","hc"],90);
+  hc=String(hc||"").replace(/^N[°ºO]?\.?\s*/i,"").replace(/[^A-Z0-9]/gi,"").trim();if(!documento&&hc)documento=hc;
+  let paciente=pick(["nombre del paciente","nombre paciente","nombre completo","nombres y apellidos","paciente"],180);
+  if(!paciente){
+    const pm=t.match(/(?:N[º°]?\.?\s*H\.?C\.?|HISTORIA\s+CL[IÍ]NICA)\s*[:#]?\s*[A-Z0-9.\-]+\s*\n\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .'-]{5,})\s*\n\s*EDAD\b/im);
+    if(pm)paciente=orderClean(pm[1]);
+  }
+  const telefono=normalizePhone(pick(["teléfono","telefono","celular","número de contacto","numero de contacto","contacto"],70));
+  const edad=normalizeAge(pick(["edad"],45));
+  let cupsRaw=pick(["cups","código cups","codigo cups","código procedimiento","codigo procedimiento"],160);
+  const procBlock=pick(["procedimientos","procedimiento quirúrgico","procedimiento quirurgico","procedimiento","cirugía propuesta","cirugia propuesta"],900);
+  let cupMatches=[...String(cupsRaw+" "+procBlock).matchAll(/\b\d{5,8}\b/g)].map(m=>m[0]);
+  cupMatches=[...new Set(cupMatches)];
+  const cups=cupMatches.join(" / ");
+  let procedimiento=String(procBlock||"");
+  cupMatches.forEach(c=>{procedimiento=procedimiento.replace(new RegExp("\\b"+rxEsc(c)+"\\b","g")," ")});
+  procedimiento=procedimiento.replace(/\s{2,}/g," ").trim();
+  let especialista=pick(["especialista","cirujano","médico especialista","medico especialista","médico tratante","medico tratante","médico que ordena","medico que ordena","médico solicitante","medico solicitante","profesional solicitante","médico que comenta","medico que comenta"],190);
+  if(!especialista){
+    const mm=t.match(/(?:^|\n)([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .'-]{7,})\n\s*(?:CC\s*)?[\d.\- ]+\s*(?:REGISTRO|RM|R\.M\.)\b/im)||t.match(/(?:^|\n)([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .'-]{7,})\n\s*(?:REGISTRO|RM|R\.M\.)\b/im);
+    if(mm&&mm[1])especialista=orderClean(mm[1]);
+  }
+  const especialidad=orderClean(pick(["especialidad"],160)).replace(/^\d{2,6}\s+/,"").trim();
+  const cama=orderClean(pick(["tipo cama","cama"],100));
+  const tipoCirugia=pick(["tipo cirugía","tipo cirugia"],120);
+  const procedencia=pick(["procedencia","origen paciente"],160);
+  const tipoAtencion=normalizeCareType(tipoCirugia,procedencia,cama);
+  const fecha=parseDateFlexibleText(pick(["fecha asignada","fecha cirugía","fecha cirugia"],130))||parseDateFlexibleText(pick(["fecha solicitud","fecha de solicitud","fecha orden","fecha de orden","fecha de la orden"],130));
+  const hora=parseTimeFlexibleText(pick(["hora inicial","hora asignada","hora cirugía","hora cirugia"],100))||parseTimeFlexibleText(pick(["hora generación orden","hora generacion orden","hora solicitud","hora de solicitud","hora orden","hora de orden","hora"],100));
+  const qno=normalizeQnoValue(pick(["quirófano","quirofano","qno","sala"],70));
+  const sexo=orderClean(pick(["sexo"],35));
+  const tiempoQx=orderClean(pick(["tiempo quirúrgico","tiempo quirurgico"],80));
+  const observaciones=orderClean(pick(["observaciones","observación","observacion"],650));
+  return {
+    fecha,hora,documento,paciente,edad,telefono,sexo,cups,procedimiento,especialidad,especialista,qno,
+    tipoAtencion,cama,tiempoQx,observaciones,
+    _source:fileName||"PDF",_review:(!paciente||!documento||!procedimiento||!especialidad||!especialista||!cups)
+  };
+}
+async function pdfTextContent(file){
   if(!window.pdfjsLib)throw new Error("No se pudo cargar el lector PDF.");
   pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-  const data=new Uint8Array(await file.arrayBuffer());
-  const pdf=await pdfjsLib.getDocument({data}).promise;
-  const rows=[];
-  let qno="";
+  const data=new Uint8Array(await file.arrayBuffer()),pdf=await pdfjsLib.getDocument({data}).promise;
+  const pages=[];
   for(let n=1;n<=pdf.numPages;n++){
     const p=await pdf.getPage(n),tc=await p.getTextContent();
-    const text=tc.items.map(x=>String(x.str||"").trim()).filter(Boolean).join(" ").replace(/\s+/g," ");
-    const qm=[...text.matchAll(/QUIR[ÓO]FANO\s*(\d{1,2})/gi)];
-    if(qm.length)qno="QNO "+qm[qm.length-1][1];
-    const chunks=text.split(/(?=\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b)/g);
-    chunks.forEach(ch=>{
-      const dm=ch.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
-      const tm=ch.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
-      if(!dm||!tm)return;
-      const yy=dm[3].length===2?"20"+dm[3]:dm[3];
-      const fecha=yy+"-"+String(dm[2]).padStart(2,"0")+"-"+String(dm[1]).padStart(2,"0");
-      const documento=(ch.match(/\b\d{6,12}\b/)||[])[0]||"";
-      const cups=(ch.match(/\b\d{5,6}\b/)||[])[0]||"";
-      const cleaned=ch.replace(dm[0]," ").replace(tm[0]," ").replace(documento," ").replace(cups," ").replace(/QUIR[ÓO]FANO\s*\d{1,2}/ig," ").replace(/\s+/g," ").trim();
-      rows.push({fecha,hora:tm[0],documento,paciente:"",edad:"",sexo:"",cups,procedimiento:cleaned,especialidad:"",especialista:"",qno,tipoAtencion:"",cama:"",observaciones:"Fuente PDF · revisar datos extraídos"});
-    });
+    const items=tc.items.map(x=>({s:String(x.str||"").trim(),x:Number(x.transform?.[4]||0),y:Number(x.transform?.[5]||0)})).filter(x=>x.s);
+    items.sort((a,b)=>Math.abs(b.y-a.y)>2?b.y-a.y:a.x-b.x);
+    const lines=[];
+    for(const it of items){
+      let line=lines.find(l=>Math.abs(l.y-it.y)<=2);
+      if(!line){line={y:it.y,items:[]};lines.push(line)}
+      line.items.push(it);
+    }
+    lines.sort((a,b)=>b.y-a.y);
+    pages.push(lines.map(l=>l.items.sort((a,b)=>a.x-b.x).map(x=>x.s).join(" ")).join("\n"));
   }
-  return rows.filter(x=>x.fecha&&(x.documento||x.procedimiento));
+  return pages.join("\n");
+}
+async function parsePdfBulk(file){
+  const text=await pdfTextContent(file);
+  if(text.replace(/\s+/g," ").trim().length<30)throw new Error("El PDF no contiene texto legible. Requiere OCR.");
+  const row=parseOrderTextBulk(text,file.name);
+  return (row.paciente||row.documento||row.procedimiento)?[row]:[];
 }
 async function parseTextLikeBulk(file){
   const text=await file.text();
@@ -443,14 +559,14 @@ async function parseTextLikeBulk(file){
       fecha:o.fecha||o["FECHA CIRUGÍA"]||o["Fecha"]||"",
       hora:o.hora||o["HORA PROGRAMADA"]||o["Hora"]||"",
       documento:o.documento||o["DOCUMENTO"]||"",
-      paciente:o.paciente||o["PACIENTE"]||o.nombre||"",
+      paciente:o.paciente||o["PACIENTE"]||o.nombre||"",telefono:o.telefono||o["TELÉFONO"]||o["TELEFONO"]||o["TEL"]||"",
       edad:o.edad||o["EDAD"]||"",sexo:o.sexo||o["SEXO"]||"",cups:o.cups||o["CUPS"]||"",
       procedimiento:o.procedimiento||o["PROCEDIMIENTO"]||"",
       especialidad:o.especialidad||o["ESPECIALIDAD"]||"",
       especialista:o.especialista||o["ESPECIALISTA"]||"",
       qno:o.qno||o["SALA / QNO"]||"",
       tipoAtencion:o.tipoAtencion||o["TIPO DE ATENCIÓN"]||"",
-      cama:o.cama||o["CAMA / UBICACIÓN PROGRAMADA"]||"",
+      cama:o.cama||o["CAMA / UBICACIÓN PROGRAMADA"]||"",tiempoQx:o.tiempoQx||o["TIEMPO QX ESTIMADO (MIN)"]||"",
       observaciones:o.observaciones||o["OBSERVACIONES"]||""
     }));
   }catch(e){}
@@ -542,7 +658,7 @@ function renderProgram(){
   $("progBody").innerHTML=rows.map(p=>{let a="";if(canEdit)a+='<button class="btn soft sm" onclick="editPatient(\''+p.id+'\')">Editar</button> ';if(canCancel&&!["CANCELADO","ALTA","HOSPITALIZACIÓN"].includes(p.estado))a+='<button class="btn red sm" onclick="openCancel(\''+p.id+'\')">Cancelar</button>';return '<tr><td>'+esc(p.hora)+'</td><td>'+esc(p.paciente)+'</td><td>'+esc(p.documento)+'</td><td>'+esc(p.procedimiento)+'</td><td>'+esc(p.especialidad)+'</td><td>'+esc(p.especialista)+'</td><td>'+esc(p.qno)+'</td><td>'+esc(p.estado)+'</td><td>'+esc(p.tipoAtencion)+'</td><td>'+esc(p.observaciones)+'</td><td>'+(a||"—")+'</td></tr>'}).join("")||'<tr><td colspan="11">Sin registros</td></tr>';
 }
 function editPatient(id){
-  const p=state.patients.find(x=>x.id===id);if(!p)return;state.editPatientId=id;$("patientTitle").textContent="Editar paciente";$("fFecha").value=p.fecha||$("date").value;$("fHora").value=String(p.hora||"").slice(0,5);$("fDoc").value=p.documento||"";$("fPaciente").value=p.paciente||"";$("fEdad").value=p.edad||"";$("fSexo").value=p.sexo||"";$("fCups").value=p.cups||"";$("fProc").value=p.procedimiento||"";$("fEsp").value=p.especialidad||"";$("fMed").value=p.especialista||"";$("fQno").value=qnoNorm(p.qno)||"";$("fTipo").value=p.tipoAtencion||"";$("fCama").value=p.cama||"";$("fUvr").value=p.uvr||"";$("fTiempo").value=p.tiempoQx||"";$("fRecursos").value=p.recursos||"";$("fObs").value=p.observaciones||"";state.patientFiles=[];$("patientFiles").value="";$("patientFilesStatus").textContent="Puede adjuntar archivos adicionales al actualizar el paciente.";openModal("patientModal");
+  const p=state.patients.find(x=>x.id===id);if(!p)return;state.editPatientId=id;$("patientTitle").textContent="Editar paciente";$("fFecha").value=p.fecha||$("date").value;$("fHora").value=String(p.hora||"").slice(0,5);$("fDoc").value=p.documento||"";$("fTel").value=p.telefono||"";$("fPaciente").value=p.paciente||"";$("fEdad").value=p.edad||"";$("fSexo").value=p.sexo||"";$("fCups").value=p.cups||"";$("fProc").value=p.procedimiento||"";$("fEsp").value=p.especialidad||"";$("fMed").value=p.especialista||"";$("fQno").value=qnoNorm(p.qno)||"";$("fTipo").value=p.tipoAtencion||"";$("fCama").value=p.cama||"";$("fUvr").value=p.uvr||"";$("fTiempo").value=p.tiempoQx||"";$("fRecursos").value=p.recursos||"";$("fObs").value=p.observaciones||"";state.patientFiles=[];$("patientFiles").value="";$("patientFilesStatus").textContent="Puede adjuntar archivos adicionales al actualizar el paciente.";openModal("patientModal");
 }
 async function moveCase(id,dest){
   const jefe=currentChief(true);if(!jefe)return;
@@ -746,33 +862,89 @@ async function download(){
   doc.save(base+".pdf");
 }
 function openModal(id){$(id).classList.add("show")}function closeModal(id){$(id).classList.remove("show")}
-function openPatient(){state.editPatientId=null;$("patientTitle").textContent="Nuevo paciente";["fHora","fDoc","fPaciente","fEdad","fCups","fProc","fEsp","fMed","fCama","fUvr","fTiempo","fRecursos","fObs"].forEach(i=>$(i).value="");$("fFecha").value=$("date").value;$("fSexo").value="";$("fQno").value="";$("fTipo").value="";state.patientFiles=[];$("patientFiles").value="";$("patientFilesStatus").textContent="Puede adjuntar cualquier tipo de archivo. Los archivos se asocian al caso y no se ejecutan dentro de la aplicación.";openModal("patientModal")}
-async function savePatient(){const p={fecha:$("fFecha").value,hora:$("fHora").value,documento:$("fDoc").value,paciente:$("fPaciente").value,edad:$("fEdad").value,sexo:$("fSexo").value,cups:$("fCups").value,procedimiento:$("fProc").value,especialidad:$("fEsp").value,especialista:$("fMed").value,qno:$("fQno").value,tipoAtencion:$("fTipo").value,cama:$("fCama").value,uvr:$("fUvr").value,tiempoQx:$("fTiempo").value,recursos:$("fRecursos").value,observaciones:$("fObs").value};try{let saved;if(state.editPatientId){saved=await api("/api/patient/update",{method:"POST",body:JSON.stringify(Object.assign({id:state.editPatientId},p))});}else{saved=await api("/api/patient",{method:"POST",body:JSON.stringify(p)});}const caseId=state.editPatientId||saved.id;const files=Array.from(state.patientFiles||[]);if(files.length){$("patientFilesStatus").textContent="Guardando "+files.length+" archivo(s)...";await uploadMany(files,caseId,state.editPatientId?"PATIENT_UPDATE":"PATIENT_NEW",{patient:p.paciente,date:p.fecha});}state.editPatientId=null;closeModal("patientModal");$("date").value=p.fecha;await loadPatients()}catch(e){alert(e.message)}}
-const fields={fecha:["fecha","fecha cirugia","fecha de cirugia","fecha qx","dia"],hora:["hora","hora cirugia","hora de cirugia","hora qx"],documento:["documento","numero de documento","cedula","identificacion","doc"],paciente:["paciente","nombre paciente","nombre completo"],edad:["edad"],sexo:["sexo","genero"],cups:["cups","codigo cups"],procedimiento:["procedimiento","procedimiento programado","cirugia","descripcion procedimiento"],especialidad:["especialidad"],especialista:["especialista","cirujano","medico"],qno:["qno","quirofano","sala","sala qno"],tipoAtencion:["amb hosp","amb/hosp","modalidad","tipo atencion","ambulatorio","hospitalizado"],cama:["cama","habitacion"],observaciones:["observacion","observaciones","nota","notas"]};
+function openPatient(){state.editPatientId=null;$("patientTitle").textContent="Nuevo paciente";["fHora","fDoc","fTel","fPaciente","fEdad","fCups","fProc","fEsp","fMed","fCama","fUvr","fTiempo","fRecursos","fObs"].forEach(i=>$(i).value="");$("fFecha").value=$("date").value;$("fSexo").value="";$("fQno").value="";$("fTipo").value="";state.patientFiles=[];$("patientFiles").value="";$("patientFilesStatus").textContent="Puede adjuntar cualquier tipo de archivo. Los archivos se asocian al caso y no se ejecutan dentro de la aplicación.";openModal("patientModal")}
+async function savePatient(){const p={fecha:$("fFecha").value,hora:$("fHora").value,documento:$("fDoc").value,telefono:$("fTel").value,paciente:$("fPaciente").value,edad:$("fEdad").value,sexo:$("fSexo").value,cups:$("fCups").value,procedimiento:$("fProc").value,especialidad:$("fEsp").value,especialista:$("fMed").value,qno:$("fQno").value,tipoAtencion:$("fTipo").value,cama:$("fCama").value,uvr:$("fUvr").value,tiempoQx:$("fTiempo").value,recursos:$("fRecursos").value,observaciones:$("fObs").value};try{let saved;if(state.editPatientId){saved=await api("/api/patient/update",{method:"POST",body:JSON.stringify(Object.assign({id:state.editPatientId},p))});}else{saved=await api("/api/patient",{method:"POST",body:JSON.stringify(p)});}const caseId=state.editPatientId||saved.id;const files=Array.from(state.patientFiles||[]);if(files.length){$("patientFilesStatus").textContent="Guardando "+files.length+" archivo(s)...";await uploadMany(files,caseId,state.editPatientId?"PATIENT_UPDATE":"PATIENT_NEW",{patient:p.paciente,date:p.fecha});}state.editPatientId=null;closeModal("patientModal");$("date").value=p.fecha;await loadPatients()}catch(e){alert(e.message)}}
+const fields={fecha:["fecha","fecha cirugia","fecha de cirugia","fecha qx","dia"],hora:["hora","hora cirugia","hora de cirugia","hora qx"],documento:["documento","numero de documento","cedula","identificacion","doc"],paciente:["paciente","nombre paciente","nombre completo"],edad:["edad"],telefono:["telefono","teléfono","celular","contacto","numero de contacto"],sexo:["sexo","genero"],cups:["cups","codigo cups","codigo procedimiento"],procedimiento:["procedimiento","procedimiento programado","cirugia","descripcion procedimiento"],especialidad:["especialidad"],especialista:["especialista","cirujano","medico","medico tratante"],qno:["qno","quirofano","sala","sala qno"],tipoAtencion:["amb hosp","amb/hosp","modalidad","tipo atencion","ambulatorio","hospitalizado"],cama:["cama","habitacion","ubicacion"],tiempoQx:["tiempo qx","tiempo quirurgico","tiempo estimado"],observaciones:["observacion","observaciones","nota","notas"]};
 function norm(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim()}
 function autoMap(h){const m={};Object.entries(fields).forEach(([k,s])=>{const ns=s.map(norm);m[k]=h.findIndex(x=>ns.includes(norm(x))||ns.some(n=>norm(x).includes(n)||n.includes(norm(x))))});return m}
+function bulkFieldInput(rowIndex,key,value,type="text",cls=""){
+  const v=String(value??"");
+  if(type==="selectCare"){
+    const opts=["","AMBULATORIO","HOSPITALIZADO"].map(x=>'<option value="'+x+'" '+(v.toUpperCase()===x?'selected':'')+'>'+x+'</option>').join("");
+    return '<select class="'+cls+'" data-bulk-row="'+rowIndex+'" data-bulk-key="'+key+'">'+opts+'</select>';
+  }
+  if(type==="selectQno"){
+    const qnos=[""].concat(state.config?.qnos||[]);return '<select class="'+cls+'" data-bulk-row="'+rowIndex+'" data-bulk-key="'+key+'">'+qnos.map(x=>'<option value="'+esc(x)+'" '+(v.toUpperCase()===x?'selected':'')+'>'+esc(x)+'</option>').join("")+'</select>';
+  }
+  if(type==="textarea")return '<textarea class="'+cls+'" data-bulk-row="'+rowIndex+'" data-bulk-key="'+key+'">'+esc(v)+'</textarea>';
+  return '<input class="'+cls+'" type="'+type+'" value="'+esc(v)+'" data-bulk-row="'+rowIndex+'" data-bulk-key="'+key+'">';
+}
+function bulkRowMissing(r){return ["fecha","hora","paciente","documento","procedimiento"].filter(k=>!String(r[k]||"").trim())}
+function renderBulkPreview(){
+  const q=$("bulkQuality");
+  const missing=state.bulk.filter(r=>bulkRowMissing(r).length).length,review=state.bulk.filter(r=>r._review).length;
+  q.innerHTML='<span class="chip">'+state.bulk.length+' registros</span><span class="chip">'+missing+' con campos obligatorios incompletos</span><span class="chip">'+review+' requieren revisión del lector</span><span class="chip">Todos los campos pueden editarse antes de importar</span>';
+  if(!state.bulk.length){$("bulkPreview").innerHTML='<div class="empty">No se detectaron registros importables.</div>';return}
+  $("bulkPreview").innerHTML='<table class="bulk-edit-table"><thead><tr><th>#</th><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Documento</th><th>Edad</th><th>Teléfono</th><th>Sexo</th><th>CUPS</th><th>Procedimiento</th><th>Especialidad</th><th>Especialista</th><th>AMB/HOSP</th><th>Cama</th><th>QNO</th><th>Tiempo QX</th><th>Observaciones</th><th>Acción</th></tr></thead><tbody>'+
+    state.bulk.map((r,i)=>{const miss=new Set(bulkRowMissing(r));return '<tr><td>'+(i+1)+'</td>'+
+      '<td>'+bulkFieldInput(i,"fecha",r.fecha,"date",miss.has("fecha")?"missing short":"short")+'</td>'+
+      '<td>'+bulkFieldInput(i,"hora",r.hora,"time",miss.has("hora")?"missing short":"short")+'</td>'+
+      '<td>'+bulkFieldInput(i,"paciente",r.paciente,"text",(miss.has("paciente")?"missing ":"")+"med")+'</td>'+
+      '<td>'+bulkFieldInput(i,"documento",r.documento,"text",(miss.has("documento")?"missing ":"")+"med")+'</td>'+
+      '<td>'+bulkFieldInput(i,"edad",r.edad,"text","short")+'</td>'+
+      '<td>'+bulkFieldInput(i,"telefono",r.telefono,"text","med")+'</td>'+
+      '<td>'+bulkFieldInput(i,"sexo",r.sexo,"text","short")+'</td>'+
+      '<td>'+bulkFieldInput(i,"cups",r.cups,"text","med")+'</td>'+
+      '<td>'+bulkFieldInput(i,"procedimiento",r.procedimiento,"textarea",(miss.has("procedimiento")?"missing ":"")+"wide")+'</td>'+
+      '<td>'+bulkFieldInput(i,"especialidad",r.especialidad,"text","med")+'</td>'+
+      '<td>'+bulkFieldInput(i,"especialista",r.especialista,"text","med")+'</td>'+
+      '<td>'+bulkFieldInput(i,"tipoAtencion",r.tipoAtencion,"selectCare","med")+'</td>'+
+      '<td>'+bulkFieldInput(i,"cama",r.cama,"text","short")+'</td>'+
+      '<td>'+bulkFieldInput(i,"qno",r.qno,"selectQno","short")+'</td>'+
+      '<td>'+bulkFieldInput(i,"tiempoQx",r.tiempoQx,"text","short")+'</td>'+
+      '<td>'+bulkFieldInput(i,"observaciones",r.observaciones,"textarea","wide")+'</td>'+
+      '<td><div class="bulk-row-actions"><button class="btn red sm" type="button" onclick="removeBulkRow('+i+')">Quitar</button></div></td></tr>'}).join("")+
+    '</tbody></table>';
+  document.querySelectorAll("[data-bulk-row]").forEach(el=>{
+    const sync=()=>{const i=Number(el.dataset.bulkRow),k=el.dataset.bulkKey;if(state.bulk[i]){state.bulk[i][k]=el.value;if(["paciente","documento","procedimiento","fecha","hora"].includes(k))renderBulkQualityOnly()}};
+    el.addEventListener("input",sync);el.addEventListener("change",sync);
+  });
+}
+function renderBulkQualityOnly(){
+  const q=$("bulkQuality");if(!q)return;const missing=state.bulk.filter(r=>bulkRowMissing(r).length).length,review=state.bulk.filter(r=>r._review).length;
+  q.innerHTML='<span class="chip">'+state.bulk.length+' registros</span><span class="chip">'+missing+' con campos obligatorios incompletos</span><span class="chip">'+review+' requieren revisión del lector</span><span class="chip">Todos los campos pueden editarse antes de importar</span>';
+}
+function removeBulkRow(i){state.bulk.splice(i,1);$("bulkImport").disabled=!state.bulk.length;renderBulkPreview()}
 async function parseBulk(files){
-  state.bulkFiles=Array.from(files||[]);
-  state.bulk=[];
-  if(!state.bulkFiles.length){$("bulkStatus").textContent="Seleccione uno o más archivos.";return}
+  state.bulkFiles=Array.from(files||[]);state.bulk=[];
+  if(!state.bulkFiles.length){$("bulkStatus").textContent="Seleccione uno o más archivos.";renderBulkPreview();return}
   const batchId="BULK-"+Date.now()+"-"+Math.random().toString(36).slice(2,8).toUpperCase();
-  let parsedFiles=0,unsupported=0;
+  let parsedFiles=0,unsupported=0,errors=[];
   const all=[];
   for(const file of state.bulkFiles){
     try{
       const rows=await parseAnyBulkFile(file);
-      if(rows.length){parsedFiles++;rows.forEach(r=>all.push(r))}
-      else unsupported++;
-    }catch(e){unsupported++}
+      if(rows.length){parsedFiles++;rows.forEach(r=>all.push(Object.assign({_source:file.name},r)))}
+      else{unsupported++;errors.push(file.name+": sin datos estructurados detectados")}
+    }catch(e){unsupported++;errors.push(file.name+": "+e.message)}
   }
   state.bulk=all.filter(o=>o.fecha||o.paciente||o.documento||o.procedimiento);
   $("bulkFile").dataset.batchId=batchId;
-  $("bulkStatus").textContent=state.bulkFiles.length+" archivo(s) seleccionados · "+state.bulk.length+" fila(s) detectadas automáticamente · "+unsupported+" archivo(s) quedarán solo como soporte.";
-  $("bulkImport").disabled=!state.bulk.length;
-  $("bulkPreview").innerHTML=state.bulk.length?'<table><thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Documento</th><th>Procedimiento</th><th>Especialista</th><th>QNO</th></tr></thead><tbody>'+state.bulk.slice(0,100).map(o=>'<tr><td>'+esc(o.fecha)+'</td><td>'+esc(o.hora)+'</td><td>'+esc(o.paciente)+'</td><td>'+esc(o.documento)+'</td><td>'+esc(o.procedimiento)+'</td><td>'+esc(o.especialista)+'</td><td>'+esc(o.qno)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">Los archivos fueron aceptados como soportes, pero ninguno contiene datos tabulares reconocibles para importar automáticamente.</div>';
-  // Los archivos se suben al confirmar el cargue; así no se almacenan selecciones canceladas.
+  $("bulkStatus").textContent=state.bulkFiles.length+" archivo(s) seleccionados · "+state.bulk.length+" paciente(s) detectados · "+parsedFiles+" archivo(s) interpretados · "+unsupported+" solo como soporte."+(errors.length?" Revise: "+errors.slice(0,3).join(" | "):"");
+  $("bulkImport").disabled=!state.bulk.length;renderBulkPreview();
 }
-async function importBulk(){try{const batchId=$("bulkFile").dataset.batchId||("BULK-"+Date.now());const files=Array.from(state.bulkFiles||[]);if(files.length)await uploadMany(files,batchId,"BULK_IMPORT",{date:$("date").value,rowsDetected:state.bulk.length});let d={inserted:0,skipped:0};if(state.bulk.length)d=await api("/api/bulk",{method:"POST",body:JSON.stringify({rows:state.bulk,batchId,sourceFiles:files.map(f=>({name:f.name,type:f.type,size:f.size}))})});alert("Archivos guardados: "+files.length+" · Importadas: "+d.inserted+" · Omitidas: "+d.skipped);closeModal("bulkModal");await loadPatients()}catch(e){alert(e.message)}}
+async function importBulk(){
+  try{
+    const invalid=state.bulk.map((r,i)=>({i,missing:bulkRowMissing(r)})).filter(x=>x.missing.length);
+    if(invalid.length){alert("Corrija los campos obligatorios antes de importar. Filas: "+invalid.slice(0,10).map(x=>(x.i+1)+" ("+x.missing.join(", ")+")").join(" · "));return}
+    const batchId=$("bulkFile").dataset.batchId||("BULK-"+Date.now()),files=Array.from(state.bulkFiles||[]);
+    state.bulk.forEach(r=>{r.telefono=normalizePhone(r.telefono);r.tipoAtencion=normalizeCareType(r.tipoAtencion,"",r.cama);r.qno=normalizeQnoValue(r.qno)});
+    if(files.length)await uploadMany(files,batchId,"BULK_IMPORT",{date:$("date").value,rowsDetected:state.bulk.length});
+    let d={inserted:0,skipped:0};if(state.bulk.length)d=await api("/api/bulk",{method:"POST",body:JSON.stringify({rows:state.bulk,batchId,sourceFiles:files.map(f=>({name:f.name,type:f.type,size:f.size}))})});
+    alert("Archivos guardados: "+files.length+" · Importadas: "+d.inserted+" · Omitidas: "+d.skipped);
+    closeModal("bulkModal");await loadPatients()
+  }catch(e){alert(e.message)}
+}
 function hasUiPermission(p){const perms=state.session?.permissions||[];return perms.includes("*")||perms.includes(p)}
 function applyAccessUi(){
   const viewPerm={operativo:"OPERACION_VER",programacion:"PROGRAMACION_VER",profilaxis:"PROFILAXIS_PREQX",postop:"CUIDADOS_POSTOP",acompanantes:"OPERACION_VER",coordinacion:"COORDINACION_VER"};
