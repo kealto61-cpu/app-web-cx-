@@ -253,7 +253,7 @@ header .logo{
 <div class="field span2"><label>Recursos / alertas</label><textarea id="fRecursos"></textarea></div><div class="field span2"><label>Observaciones</label><textarea id="fObs"></textarea></div><div class="field span4"><label>Archivos / soportes del paciente</label><input id="patientFiles" type="file" multiple><div class="notice" id="patientFilesStatus" style="margin:6px 0 0">Puede adjuntar cualquier tipo de archivo. Los archivos se asocian al caso y no se ejecutan dentro de la aplicación.</div></div></div><div class="modal-actions"><button class="btn soft" data-close="patientModal">Cancelar</button><button class="btn" id="savePatient">Guardar paciente</button></div></div></div>
 <div class="modal" id="bulkModal"><div class="modal-card"><div class="modal-head"><div><span class="kicker">CARGA MASIVA</span><h3>Importar programación</h3></div><button class="btn soft sm" data-close="bulkModal">Cerrar</button></div><div class="field"><label>Archivos de programación / soportes</label><input id="bulkFile" type="file" multiple></div><div class="notice" id="bulkStatus">Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.</div><div class="preview" id="bulkPreview"></div><div class="modal-actions"><button class="btn soft" data-close="bulkModal">Cancelar</button><button class="btn" id="bulkImport" disabled>Importar filas</button></div></div></div>
 <script>
-const $=id=>document.getElementById(id);const state={view:"operativo",patients:[],session:null,bulk:[],bulkFiles:[],patientFiles:[]};
+const $=id=>document.getElementById(id);const state={view:"operativo",patients:[],session:null,bulk:[],bulkFiles:[],patientFiles:[],trackingRows:[]};
 function esc(v){const d=document.createElement("div");d.textContent=String(v==null?"":v);return d.innerHTML}
 function fileExt(name){const p=String(name||"").toLowerCase().split(".");return p.length>1?p.pop():""}
 async function uploadAttachment(file,caseId,context,metadata){
@@ -360,7 +360,7 @@ async function cancelCase(id){const reason=prompt("Motivo de cancelación:");if(
 async function finishCase(id,destino){const obs=prompt("Observación de egreso / hospitalización (opcional):")||"";try{await api("/api/case/finish",{method:"POST",body:JSON.stringify({id,destino,observacion:obs})});await loadPatients()}catch(e){alert(e.message)}}
 async function loadProfilaxis(){const d=await api("/api/profilaxis?date="+encodeURIComponent($("date").value));const m=d.metrics;$("profMetrics").innerHTML=metric("Casos",m.total)+metric("Registrada",m.registrada)+metric("No registrada",m.noRegistrada)+metric("Pendiente",m.pendiente)+metric("Con medicamento",m.conMedicamento)+metric("Con tiempo",m.conTiempo);$("profCards").innerHTML=d.rows.map(p=>'<div class="care"><h3>'+esc(p.paciente)+'</h3><p>'+esc(p.procedimiento)+'</p><div><b>Administrada</b>'+esc(p.administrada||"Pendiente")+'</div><div><b>Medicamento</b>'+esc(p.medicamento||"—")+'</div><div><b>Hora</b>'+esc(p.hora||"—")+'</div><div><b>Profilaxis → incisión</b>'+esc(p.minutos===""?"—":p.minutos+" min")+'</div><div><b>Clasificación</b>'+esc(p.clasificacion||"—")+'</div></div>').join("")||'<div class="empty">Sin registros</div>'}
 async function loadPostop(){const d=await api("/api/postop?date="+encodeURIComponent($("date").value));const m=d.metrics;$("popMetrics").innerHTML=metric("Casos POP",m.total)+metric("Alta",m.alta)+metric("Hospitalización",m.hospitalizacion)+metric("Recuperación",m.recuperacion)+metric("Con seguimiento",m.conSeguimiento)+metric("Pendientes",m.pendientes);$("popCards").innerHTML=d.rows.map(p=>'<div class="care"><h3>'+esc(p.paciente)+'</h3><p>'+esc(p.procedimiento)+'</p><div><b>Estado / destino</b>'+esc(p.estado)+' · '+esc(p.destino||"—")+'</div><div><b>Salida recuperación</b>'+esc(p.salida||"—")+'</div><div><b>Observación</b>'+esc(p.observacion||"—")+'</div><div><b>Código seguimiento</b>'+esc(p.codigo||"Pendiente")+'</div></div>').join("")||'<div class="empty">Sin casos POP</div>'}
-async function track(){const c=$("trackCode").value.trim();if(!c)return;$("trackResult").innerHTML="Consultando...";try{const d=await api("/api/tracking?code="+encodeURIComponent(c));$("trackResult").innerHTML='<div class="statusbox"><b>'+esc(d.estadoPublico)+'</b><br><small>'+esc(d.paciente)+' · '+esc(d.actualizado||"")+'</small></div>'}catch(e){$("trackResult").innerHTML='<div class="notice">'+esc(e.message)+'</div>'}}
+async function track(){const c=$("trackCode").value.trim();if(!c)return;$("trackResult").innerHTML="Consultando...";try{const d=await api("/api/tracking?code="+encodeURIComponent(c));$("trackResult").innerHTML='<div class="statusbox"><b>'+esc(d.estadoPublico)+'</b><br><small>Última actualización: '+esc(d.actualizado||"—")+'</small></div>'}catch(e){$("trackResult").innerHTML='<div class="notice">'+esc(e.message)+'</div>'}}
 function trackingPortalUrl(){
   return location.origin+location.pathname.replace(/\/+$/,"")+"?follow=1";
 }
@@ -370,21 +370,23 @@ async function renderTrackingQr(){
   if(!box)return;
   box.innerHTML="";
   try{
-    await QRCode.toCanvas(document.createElement("canvas"),url,{width:150,margin:1}).then(canvas=>box.appendChild(canvas));
+    const canvas=document.createElement("canvas");
+    await QRCode.toCanvas(canvas,url,{width:150,margin:1});
+    box.appendChild(canvas);
   }catch(e){
     box.innerHTML='<div class="empty">No fue posible generar el QR.</div>';
   }
 }
 function renderTrackingTable(){
   const body=$("trackingBody");if(!body)return;
-  const rows=(state.patients||[]).filter(p=>p.codigo||p.token);
+  const rows=state.trackingRows||[];
   body.innerHTML=rows.length?rows.map(p=>{
     const active=!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(p.estado);
-    return '<tr><td>'+esc(p.hora||"")+'</td><td><b>'+esc(p.paciente||"")+'</b></td><td>'+esc(p.documento||"")+'</td><td>'+(active?'<span class="tracking-code">'+esc(p.codigo||p.token||"—")+'</span>':'<span class="tracking-token">Inactivo</span>')+'</td><td>'+esc(p.estado||"")+'</td><td>'+(active?'<button class="btn soft sm" onclick="copyTrackingCode(\''+p.id+'\')">Copiar código</button>':'—')+'</td></tr>';
+    return '<tr><td>'+esc(p.hora||"")+'</td><td><b>'+esc(p.paciente||"")+'</b><div class="tracking-token">'+esc(p.documento||"")+'</div></td><td>'+esc(p.codigo||"—")+'</td><td>'+(active?'<span class="tracking-code">'+esc(p.token||"—")+'</span>':'<span class="tracking-token">Inactivo</span>')+'</td><td>'+esc(p.estado||"")+'</td><td>'+(active?'<button class="btn soft sm" onclick="copyTrackingCode(\''+p.id+'\')">Copiar token</button>':'—')+'</td></tr>';
   }).join(""):'<tr><td colspan="6">No hay códigos de seguimiento para la fecha seleccionada.</td></tr>';
 }
 async function copyTrackingCode(id){
-  const p=(state.patients||[]).find(x=>x.id===id),code=String(p?.codigo||p?.token||"");
+  const p=(state.trackingRows||[]).find(x=>x.id===id),code=String(p?.token||"");
   if(!code)return;
   try{await navigator.clipboard.writeText(code);alert("Código "+code+" copiado.");}
   catch(e){prompt("Código temporal:",code);}
@@ -416,38 +418,46 @@ async function printTrackingQr(){
 }
 async function downloadCompanionCards(){
   if(!state.session){alert("Debe iniciar sesión para descargar las fichas.");return;}
-  const rows=(state.patients||[]).filter(p=>(p.codigo||p.token)&&!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(p.estado));
+  const rows=(state.trackingRows||[]).filter(p=>/^\d{5}$/.test(String(p.token||""))&&!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(p.estado));
   if(!rows.length){alert("No hay fichas activas para descargar.");return;}
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
   const portal=trackingPortalUrl();
   const qr=await QRCode.toDataURL(portal,{width:320,margin:1});
+  const fechaTxt=$("date").value.split("-").reverse().join("-");
   const cardW=92,cardH=64,gapX=6,gapY=5,startX=10,startY=12;
   rows.forEach((p,i)=>{
     if(i>0&&i%8===0)doc.addPage();
     const pos=i%8,col=pos%2,row=Math.floor(pos/2);
     const x=startX+col*(cardW+gapX),y=startY+row*(cardH+gapY);
-    doc.setDrawColor(13,2,78);doc.roundedRect(x,y,cardW,cardH,3,3);
-    doc.setFillColor(13,2,78);doc.roundedRect(x,y,cardW,11,3,3,"F");
-    doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text("CLÍNICA AMA · SEGUIMIENTO QUIRÚRGICO",x+4,y+7);
-    doc.addImage(qr,"PNG",x+4,y+16,29,29);
-    doc.setTextColor(13,2,78);doc.setFontSize(8);doc.text("Paciente:",x+38,y+19);
-    doc.setTextColor(30,30,40);doc.setFont("helvetica","normal");doc.text(String(p.paciente||"Paciente").slice(0,35),x+38,y+24,{maxWidth:49});
-    doc.setTextColor(13,2,78);doc.setFont("helvetica","bold");doc.setFontSize(8);doc.text("Código temporal",x+38,y+34);
-    doc.setFontSize(18);doc.text(String(p.codigo||p.token||"—"),x+38,y+43);
-    doc.setTextColor(80,80,90);doc.setFont("helvetica","normal");doc.setFontSize(7);
-    doc.text("1. Escanee el QR.",x+4,y+51);
-    doc.text("2. Ingrese el código temporal.",x+4,y+55);
-    doc.text("3. Consulte únicamente el estado del proceso.",x+4,y+59);
+    doc.setDrawColor(200,220,235);doc.roundedRect(x,y,cardW,cardH,2,2);
+    doc.setFillColor(7,59,111);doc.roundedRect(x,y,cardW,10,2,2,"F");
+    doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text("CLÍNICA AMA",x+4,y+6.5);
+    doc.setTextColor(20,121,201);doc.setFontSize(7.5);doc.text("SEGUIMIENTO QUIRÚRGICO",x+4,y+14);
+    doc.setTextColor(113,137,156);doc.setFont("helvetica","normal");doc.setFontSize(6);
+    doc.text((p.codigo?p.codigo+" · ":"")+fechaTxt,x+4,y+18);
+    doc.setTextColor(23,50,74);doc.setFont("helvetica","bold");doc.setFontSize(8);
+    doc.text("Paciente: "+String(p.paciente||"Paciente").slice(0,34),x+4,y+23,{maxWidth:83});
+    doc.setFont("helvetica","normal");doc.setTextColor(73,101,123);doc.setFontSize(7);
+    doc.text("Documento: "+String(p.documento||"—")+"   ·   Edad: "+(p.edad?String(p.edad)+" años":"—"),x+4,y+28,{maxWidth:83});
+    doc.setTextColor(10,79,145);doc.setFont("helvetica","bold");doc.setFontSize(7.5);doc.text("TOKEN",x+40,y+35);
+    doc.setFontSize(17);doc.text(String(p.token),x+40,y+43);
+    doc.addImage(qr,"PNG",x+4,y+32,31,31);
+    doc.setTextColor(73,101,123);doc.setFont("helvetica","normal");doc.setFontSize(6);
+    doc.text("Escanee el QR general e ingrese",x+40,y+50);
+    doc.text("este token de 5 dígitos.",x+40,y+54);
+    doc.setTextColor(130,151,168);doc.setFont("helvetica","italic");doc.setFontSize(5.5);
+    doc.text("Uso exclusivo del acompañante.",x+40,y+60);
   });
-  doc.save("Fichas_seguimiento_acompanantes_"+$("date").value+".pdf");
+  doc.save("Fichas_seguimiento_acompanantes_"+$("date").value.replace(/-/g,"")+".pdf");
 }
 async function loadCompanionAdmin(){
   const admin=$("companionAdmin");
   if(!admin)return;
   admin.classList.toggle("hidden",!state.session);
   if(state.session){
-    if(!state.patients.length)await loadPatients();
+    const data=await api("/api/tracking-admin?date="+encodeURIComponent($("date").value));
+    state.trackingRows=data.rows||[];
     await renderTrackingQr();
     renderTrackingTable();
   }
