@@ -13,6 +13,80 @@ const VAPID_SUBJECT=String(Bun.env.VAPID_SUBJECT||(Bun.env.RAILWAY_PUBLIC_DOMAIN
 const PUSH_READY=Boolean(VAPID_PUBLIC_KEY&&VAPID_PRIVATE_KEY);
 if(PUSH_READY)webpush.setVapidDetails(VAPID_SUBJECT,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY);
 await sql.unsafe(`
+  create table if not exists qx_cases(
+    case_id text primary key,
+    surgery_date text not null default '',
+    surgery_time text not null default '',
+    document text not null default '',
+    procedure_name text not null default '',
+    tracking_token text unique,
+    payload jsonb not null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  );
+  create index if not exists qx_cases_date_idx on qx_cases(surgery_date,surgery_time);
+  create index if not exists qx_cases_document_idx on qx_cases(document,surgery_date);
+  create index if not exists qx_cases_tracking_idx on qx_cases(tracking_token);
+
+  create table if not exists qx_users(
+    user_id text primary key,
+    username text not null unique,
+    payload jsonb not null,
+    updated_at timestamptz not null default now()
+  );
+  create table if not exists qx_roles(
+    role_id text primary key,
+    payload jsonb not null,
+    updated_at timestamptz not null default now()
+  );
+  create table if not exists qx_system_config(
+    param text primary key,
+    payload jsonb not null,
+    updated_at timestamptz not null default now()
+  );
+  create table if not exists qx_audit_log(
+    id bigserial primary key,
+    legacy_row_number integer unique,
+    payload jsonb not null,
+    created_at timestamptz not null default now()
+  );
+  create table if not exists qx_movements(
+    id bigserial primary key,
+    legacy_row_number integer unique,
+    case_id text not null default '',
+    payload jsonb not null,
+    created_at timestamptz not null default now()
+  );
+  create index if not exists qx_movements_case_idx on qx_movements(case_id,created_at);
+  create table if not exists qx_cancellations(
+    id bigserial primary key,
+    legacy_row_number integer unique,
+    case_id text not null default '',
+    payload jsonb not null,
+    created_at timestamptz not null default now()
+  );
+  create index if not exists qx_cancellations_case_idx on qx_cancellations(case_id);
+  create table if not exists qx_prophylaxis_rules(
+    row_order integer primary key,
+    payload jsonb not null,
+    updated_at timestamptz not null default now()
+  );
+  create table if not exists qx_reporting_rows(
+    dataset text not null,
+    row_order integer not null,
+    payload jsonb not null,
+    updated_at timestamptz not null default now(),
+    primary key(dataset,row_order)
+  );
+  create index if not exists qx_reporting_dataset_idx on qx_reporting_rows(dataset);
+  create table if not exists qx_event_outbox(
+    id bigserial primary key,
+    entity_type text not null,
+    entity_id text not null default '',
+    action text not null,
+    payload jsonb not null,
+    created_at timestamptz not null default now()
+  );
   create table if not exists companion_push_subscriptions(
     id bigserial primary key,
     case_id text not null,
@@ -24,6 +98,88 @@ await sql.unsafe(`
   );
   create index if not exists companion_push_case_idx on companion_push_subscriptions(case_id) where active=true;
 `);
+async function migrateLegacyData(){
+  const legacy=await sql.unsafe("select to_regclass('public.source_sheets')::text as legacy");
+  if(!legacy[0]?.legacy)return;
+  await sql.unsafe(`
+    with src as (
+      select row_number,case when jsonb_typeof(payload)='string' then ((payload#>>'{}')::jsonb) else payload end p
+      from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN'
+    )
+    insert into qx_cases(case_id,surgery_date,surgery_time,document,procedure_name,tracking_token,payload)
+    select p->>'ID CASO',coalesce(p->>'FECHA CIRUGÍA',''),coalesce(p->>'HORA PROGRAMADA',''),coalesce(p->>'DOCUMENTO',''),coalesce(p->>'PROCEDIMIENTO',''),nullif(p->>'TOKEN SEGUIMIENTO',''),p
+    from src where jsonb_typeof(p)='object' and coalesce(p->>'ID CASO','')<>''
+    on conflict(case_id) do nothing;
+
+    with src as (
+      select row_number,case when jsonb_typeof(payload)='string' then ((payload#>>'{}')::jsonb) else payload end p
+      from source_sheets where source_key='MAIN' and sheet_name='USUARIOS'
+    )
+    insert into qx_users(user_id,username,payload)
+    select coalesce(nullif(p->>'ID USUARIO',''),'LEGACY-USR-'||row_number),lower(coalesce(p->>'USUARIO','legacy-'||row_number)),p
+    from src where jsonb_typeof(p)='object'
+    on conflict do nothing;
+
+    with src as (
+      select row_number,case when jsonb_typeof(payload)='string' then ((payload#>>'{}')::jsonb) else payload end p
+      from source_sheets where source_key='MAIN' and sheet_name='ROLES'
+    )
+    insert into qx_roles(role_id,payload)
+    select upper(coalesce(nullif(p->>'ID ROL',''),'LEGACY_ROLE_'||row_number)),p
+    from src where jsonb_typeof(p)='object'
+    on conflict do nothing;
+
+    with src as (
+      select row_number,case when jsonb_typeof(payload)='string' then ((payload#>>'{}')::jsonb) else payload end p
+      from source_sheets where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA'
+    )
+    insert into qx_system_config(param,payload)
+    select upper(coalesce(p->>'PARÁMETRO','')),p
+    from src where jsonb_typeof(p)='object' and coalesce(p->>'PARÁMETRO','')<>''
+    on conflict(param) do nothing;
+
+    with src as (
+      select row_number,case when jsonb_typeof(payload)='string' then ((payload#>>'{}')::jsonb) else payload end p
+      from source_sheets where source_key='MAIN' and sheet_name='LOG AUDITORÍA'
+    )
+    insert into qx_audit_log(legacy_row_number,payload)
+    select row_number,p from src where jsonb_typeof(p)='object'
+    on conflict(legacy_row_number) do nothing;
+
+    with src as (
+      select row_number,case when jsonb_typeof(payload)='string' then ((payload#>>'{}')::jsonb) else payload end p
+      from source_sheets where source_key='MAIN' and sheet_name='HISTORIAL MOVIMIENTOS'
+    )
+    insert into qx_movements(legacy_row_number,case_id,payload)
+    select row_number,coalesce(p->>'ID CASO',''),p from src where jsonb_typeof(p)='object'
+    on conflict(legacy_row_number) do nothing;
+
+    with src as (
+      select row_number,case when jsonb_typeof(payload)='string' then ((payload#>>'{}')::jsonb) else payload end p
+      from source_sheets where source_key='MAIN' and sheet_name='CANCELACIONES QX'
+    )
+    insert into qx_cancellations(legacy_row_number,case_id,payload)
+    select row_number,coalesce(p->>'ID CASO',''),p from src where jsonb_typeof(p)='object'
+    on conflict(legacy_row_number) do nothing;
+
+    with src as (
+      select row_number,case when jsonb_typeof(payload)='string' then ((payload#>>'{}')::jsonb) else payload end p
+      from source_sheets where source_key='MAIN' and sheet_name='BD PROFILAXIS QX'
+    )
+    insert into qx_prophylaxis_rules(row_order,payload)
+    select row_number,p from src where jsonb_typeof(p)='object'
+    on conflict(row_order) do nothing;
+
+    with src as (
+      select sheet_name,row_number,case when jsonb_typeof(payload)='string' then ((payload#>>'{}')::jsonb) else payload end p
+      from source_sheets where source_key='MAIN' and (sheet_name='RESUMEN ANUAL' or sheet_name like 'BASE ANUAL %')
+    )
+    insert into qx_reporting_rows(dataset,row_order,payload)
+    select sheet_name,row_number,p from src where jsonb_typeof(p)='object'
+    on conflict(dataset,row_order) do nothing;
+  `);
+}
+await migrateLegacyData();
 function json(data,status=200,headers={}){return new Response(JSON.stringify(data),{status,headers:Object.assign({"content-type":"application/json; charset=utf-8","cache-control":"no-store"},headers)})}
 function html(body,status=200){return new Response(body,{status,headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}})}
 function textResponse(body,type,status=200){return new Response(body,{status,headers:{"content-type":type,"cache-control":"no-cache"}})}
@@ -39,18 +195,25 @@ function nowBog(){return new Date().toLocaleString("sv-SE",{timeZone:"America/Bo
 function monthName(n){return ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][n-1]||""}
 async function body(req){try{return await req.json()}catch{return {}}}
 function mapCase(p){return {id:p["ID CASO"]||"",fecha:p["FECHA CIRUGÍA"]||"",hora:p["HORA PROGRAMADA"]||"",documento:p["DOCUMENTO"]||"",paciente:p["PACIENTE"]||"",edad:p["EDAD"]||"",telefono:p["TELÉFONO"]||"",sexo:p["SEXO"]||"",procedimiento:p["PROCEDIMIENTO"]||"",especialidad:p["ESPECIALIDAD"]||"",especialista:p["ESPECIALISTA"]||"",qno:p["SALA / QNO"]||"",estado:String(p["ESTADO ACTUAL"]||"PROGRAMADO").toUpperCase(),observaciones:p["OBSERVACIONES"]||"",tipoAtencion:p["TIPO DE ATENCIÓN"]||"",operado:["TRUE","SI","SÍ","1"].includes(norm(p["OPERADO"])),destino:p["DESTINO POSTOP"]||"",salida:p["HORA SALIDA RECUPERACIÓN"]||"",observacionEgreso:p["OBSERVACIÓN EGRESO / HOSPITALIZACIÓN"]||"",codigo:p["CÓDIGO SEGUIMIENTO"]||"",token:p["TOKEN SEGUIMIENTO"]||"",actualizado:p["ÚLTIMA ACTUALIZACIÓN WEB"]||p["FECHA/HORA ÚLTIMO MOVIMIENTO"]||"",tPrepa:Number(p["TIEMPO PREPA → QNO (MIN)"]||0)||0,tQnoRec:Number(p["TIEMPO QNO → RECUPERACIÓN (MIN)"]||0)||0,tMuerto:Number(p["INTERVALO ENTRE PACIENTES QNO (MIN)"]||0)||0,prof:p["PROFILAXIS ADMINISTRADA"]||"",profHora:p["HORA ADMINISTRACIÓN PROFILAXIS"]||"",profMin:p["PROFILAXIS → INCISIÓN (MIN)"]||"",clasif:p["CLASIFICACIÓN CIRUGÍA"]||"",antibiotico:p["PROFILAXIS ANTIBIÓTICA / MEDICAMENTO"]||"",cups:p["CUPS"]||"",uvr:p["UVR"]||"",tiempoQx:p["TIEMPO QX ESTIMADO (MIN)"]||"",recursos:p["RECURSOS / ALERTAS PREQUIRÚRGICAS"]||"",cama:p["CAMA / UBICACIÓN PROGRAMADA"]||"",enfermeroJefe:p["ENFERMERO JEFE"]||"",horaAnestesia:p["HORA INICIO ANESTESIA"]||"",horaFinAnestesia:p["HORA FIN ANESTESIA"]||"",horaInicioCirugia:p["HORA INICIO CIRUGÍA / INCISIÓN"]||"",horaFinCirugia:p["HORA FIN CIRUGÍA"]||"",aviso:p["AVISO ACOMPAÑANTE"]||"",avisoFecha:p["FECHA/HORA AVISO ACOMPAÑANTE"]||"",avisoOrigen:p["ORIGEN AVISO ACOMPAÑANTE"]||"",avisoId:p["ID MENSAJE ACOMPAÑANTE"]||""}}
-async function casesFor(date){const d=safeDate(date);const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'FECHA CIRUGÍA'=$1 order by payload->>'HORA PROGRAMADA'",[d]);return r.map(x=>mapCase(x.payload))}
+async function saveCasePayload(p){
+  const c=mapCase(p);if(!c.id)throw new Error("ID de caso requerido.");
+  await sql.unsafe(`insert into qx_cases(case_id,surgery_date,surgery_time,document,procedure_name,tracking_token,payload,updated_at)
+    values($1,$2,$3,$4,$5,nullif($6,''),$7::jsonb,now())
+    on conflict(case_id) do update set surgery_date=excluded.surgery_date,surgery_time=excluded.surgery_time,document=excluded.document,procedure_name=excluded.procedure_name,tracking_token=excluded.tracking_token,payload=excluded.payload,updated_at=now()`,
+    [c.id,c.fecha,c.hora,c.documento,c.procedimiento,c.token,JSON.stringify(p)]);
+  return p;
+}
+async function casesFor(date){const d=safeDate(date);const r=await sql.unsafe("select payload from qx_cases where surgery_date=$1 order by surgery_time",[d]);return r.map(x=>mapCase(x.payload))}
 function metrics(rows){const m={total:rows.length,programado:0,preparacion:0,quirofano:0,recuperacion:0,finalizados:0,cancelados:0,operados:0};rows.forEach(r=>{if(r.estado==="PROGRAMADO")m.programado++;if(r.estado==="PREPARACIÓN")m.preparacion++;if(r.estado==="QUIRÓFANO")m.quirofano++;if(r.estado==="RECUPERACIÓN")m.recuperacion++;if(["ALTA","HOSPITALIZACIÓN"].includes(r.estado)||["ALTA","HOSPITALIZACIÓN"].includes(norm(r.destino)))m.finalizados++;if(r.estado==="CANCELADO")m.cancelados++;if(r.operado)m.operados++});return m}
-async function nextRow(sheet){const r=await sql.unsafe("select coalesce(max(row_number),1)+1 as n from source_sheets where source_key='MAIN' and sheet_name=$1",[sheet]);return Number(r[0].n||2)}
-async function findCase(id){const r=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'ID CASO'=$1 limit 1",[id]);return r[0]||null}
-async function audit(s,action,module,id,detail,result="OK"){try{const rn=await nextRow("LOG AUDITORÍA");const p={"MARCA TEMPORAL":nowBog(),"USUARIO":s?.user||"SISTEMA","ROL":s?.role||"SISTEMA","ACCIÓN":action,"ID CASO":id||"","MÓDULO":module,"DETALLE":detail||"","RESULTADO":result,"VERSIÓN":"RAILWAY-5"};await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','LOG AUDITORÍA',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(p)])}catch{}}
-async function outbox(entity,id,action,payload){try{await sql.unsafe("insert into sync_outbox(entity_type,entity_id,action,payload) values($1,$2,$3,case when jsonb_typeof($4::jsonb)='string' then (($4::jsonb)#>>'{}')::jsonb else $4::jsonb end)",[entity,id||"",action,JSON.stringify(payload)])}catch{}}
-async function updateCase(s,id,patch,action){const hit=await findCase(id);if(!hit)throw new Error("Paciente no encontrado.");const old=hit.payload,p=Object.assign({},old,patch,{"FECHA/HORA ÚLTIMO MOVIMIENTO":nowBog(),"USUARIO ÚLTIMO MOVIMIENTO":s.user||"Railway","ÚLTIMA ACTUALIZACIÓN WEB":nowBog(),"ESTADO ANTERIOR":old["ESTADO ACTUAL"]||""});await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and row_number=$2",[JSON.stringify(p),hit.row_number]);await outbox("PACIENTE",id,action,p);await audit(s,action,"OPERACIÓN",id,JSON.stringify(patch));return mapCase(p)}
-async function addMovement(s,p,from,to){const rn=await nextRow("HISTORIAL MOVIMIENTOS");const row={"MARCA TEMPORAL":nowBog(),"ID CASO":p["ID CASO"]||"","DOCUMENTO":p["DOCUMENTO"]||"","PACIENTE":p["PACIENTE"]||"","ORIGEN":from||"","DESTINO":to||"","USUARIO":s.user||"","ROL":s.role||"","QNO":p["SALA / QNO"]||"","OBSERVACIÓN":"Railway"};await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','HISTORIAL MOVIMIENTOS',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(row)])}
+async function findCase(id){const r=await sql.unsafe("select case_id,payload from qx_cases where case_id=$1 limit 1",[String(id||"")]);return r[0]||null}
+async function audit(s,action,module,id,detail,result="OK"){try{const p={"MARCA TEMPORAL":nowBog(),"USUARIO":s?.user||"SISTEMA","ROL":s?.role||"SISTEMA","ACCIÓN":action,"ID CASO":id||"","MÓDULO":module,"DETALLE":detail||"","RESULTADO":result,"VERSIÓN":"RAILWAY-5.8"};await sql.unsafe("insert into qx_audit_log(payload) values($1::jsonb)",[JSON.stringify(p)])}catch{}}
+async function outbox(entity,id,action,payload){try{await sql.unsafe("insert into qx_event_outbox(entity_type,entity_id,action,payload) values($1,$2,$3,$4::jsonb)",[entity,id||"",action,JSON.stringify(payload)])}catch{}}
+async function updateCase(s,id,patch,action){const hit=await findCase(id);if(!hit)throw new Error("Paciente no encontrado.");const old=hit.payload,p=Object.assign({},old,patch,{"FECHA/HORA ÚLTIMO MOVIMIENTO":nowBog(),"USUARIO ÚLTIMO MOVIMIENTO":s.user||"Railway","ÚLTIMA ACTUALIZACIÓN WEB":nowBog(),"ESTADO ANTERIOR":old["ESTADO ACTUAL"]||""});await saveCasePayload(p);await outbox("PACIENTE",id,action,p);await audit(s,action,"OPERACIÓN",id,JSON.stringify(patch));return mapCase(p)}
+async function addMovement(s,p,from,to){const row={"MARCA TEMPORAL":nowBog(),"ID CASO":p["ID CASO"]||"","DOCUMENTO":p["DOCUMENTO"]||"","PACIENTE":p["PACIENTE"]||"","ORIGEN":from||"","DESTINO":to||"","USUARIO":s.user||"","ROL":s.role||"","QNO":p["SALA / QNO"]||"","OBSERVACIÓN":"Railway"};await sql.unsafe("insert into qx_movements(case_id,payload) values($1,$2::jsonb)",[String(p["ID CASO"]||""),JSON.stringify(row)])}
 async function uniqueTrackingToken(){
   for(let i=0;i<60;i++){
     const token=String(Math.floor(10000+Math.random()*90000));
-    const exists=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'TOKEN SEGUIMIENTO'=$1 limit 1",[token]);
+    const exists=await sql.unsafe("select 1 from qx_cases where tracking_token=$1 limit 1",[token]);
     if(!exists.length)return token;
   }
   throw new Error("No fue posible generar un token de seguimiento único.");
@@ -60,7 +223,7 @@ function trackingActiveState(estado){
 }
 async function ensureTrackingForDate(session,date){
   const d=safeDate(date);
-  const records=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'FECHA CIRUGÍA'=$1 order by payload->>'HORA PROGRAMADA'",[d]);
+  const records=await sql.unsafe("select case_id,payload from qx_cases where surgery_date=$1 order by surgery_time",[d]);
   const out=[];
   for(const rec of records){
     const p=Object.assign({},rec.payload);
@@ -77,7 +240,7 @@ async function ensureTrackingForDate(session,date){
     if(!p["CREADO SEGUIMIENTO"]){p["CREADO SEGUIMIENTO"]=nowBog();changed=true;}
     if(changed){
       p["ÚLTIMA ACTUALIZACIÓN WEB"]=nowBog();
-      await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and row_number=$2",[JSON.stringify(p),rec.row_number]);
+      await saveCasePayload(p);
       await outbox("PACIENTE",String(p["ID CASO"]||""),"SEGUIMIENTO_GENERADO",p);
       await audit(session,"GENERAR SEGUIMIENTO","ACOMPAÑANTES",String(p["ID CASO"]||""),"Identificador/token temporal creado");
     }
@@ -88,7 +251,7 @@ async function ensureTrackingForDate(session,date){
 function hhmmMinutes(v){const m=String(v||"").match(/^([01]\d|2[0-3]):([0-5]\d)$/);return m?Number(m[1])*60+Number(m[2]):null}
 function elapsedMinutes(a,b){const x=hhmmMinutes(a),y=hhmmMinutes(b);if(x===null||y===null)return null;let d=y-x;if(d<0)d+=1440;return d}
 async function insertCancellation(session,old,b){
-  const rn=await nextRow("CANCELACIONES QX"),now=nowBog(),date=String(old["FECHA CIRUGÍA"]||"");
+  const now=nowBog(),date=String(old["FECHA CIRUGÍA"]||"");
   const row={
     "ID CASO":old["ID CASO"]||"","CÓDIGO":"CAN-"+String(old["ID CASO"]||"").slice(-8),"MARCA TEMPORAL":now,
     "FECHA CIRUGÍA CANCELADA":date,"HORA PROGRAMADA":old["HORA PROGRAMADA"]||"","PACIENTE":old["PACIENTE"]||"",
@@ -102,7 +265,7 @@ async function insertCancellation(session,old,b){
     "OPORTUNIDAD DEL REGISTRO":"","PREVENIBLE":String(b.prevenible||""),"OBSERVACIONES":String(b.observaciones||""),
     "CUMPLIMIENTO DEL REGISTRO":"COMPLETO","MES":date?date.slice(5,7):"","AÑO":date?date.slice(0,4):"","ATRIBUIBLE A":String(b.atribuible||"")
   };
-  await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','CANCELACIONES QX',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(row)]);
+  await sql.unsafe("insert into qx_cancellations(case_id,payload) values($1,$2::jsonb)",[String(old["ID CASO"]||""),JSON.stringify(row)]);
   await outbox("CANCELACION",String(old["ID CASO"]||""),"CREAR",row);
 }
 function pct(a,b){return b?Math.round(a*1000/b)/10:0}function avg(a){const x=a.filter(n=>Number.isFinite(n)&&n>0);return x.length?Math.round(x.reduce((s,n)=>s+n,0)*10/x.length)/10:0}
@@ -129,7 +292,7 @@ function isAdminSession(s){return ["SUPERADMIN","ADMIN"].includes(String(s?.role
 async function getRolePermissions(roleCode){
   const role=String(roleCode||"").toUpperCase();
   if(role==="SUPERADMIN")return ["*"];
-  const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES'");
+  const r=await sql.unsafe("select payload from qx_roles");
   const found=r.map(x=>objectPayload(x.payload)).find(p=>String(p["ID ROL"]||"").toUpperCase()===role&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO");
   if(!found)return [];
   try{const p=JSON.parse(String(found["PERMISOS JSON"]||"[]"));return Array.isArray(p)?p:[]}catch{return []}
@@ -157,7 +320,8 @@ const DEFAULT_COMPANION_MESSAGES=[
   {id:"HOSPITALIZACION",name:"Paso a hospitalización",trigger:"HOSPITALIZACIÓN",text:"Su familiar pasó a hospitalización. {{CAMA_FRASE}}",automatic:true,enabled:true,terminal:true}
 ];
 async function readSystemConfig(param,fallback){
-  const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA' and upper(payload->>'PARÁMETRO')=$1 order by row_number desc limit 1",[String(param||"").toUpperCase()]);
+  const key=String(param||"").toUpperCase();
+  const r=await sql.unsafe("select payload from qx_system_config where param=$1 limit 1",[key]);
   if(!r.length)return fallback;
   const raw=r[0].payload["VALOR"];
   if(typeof fallback==="string")return String(raw??fallback);
@@ -165,15 +329,10 @@ async function readSystemConfig(param,fallback){
 }
 async function writeSystemConfig(session,param,value){
   const p=String(param||"").toUpperCase(),serialized=typeof value==="string"?value:JSON.stringify(value),now=nowBog();
-  const hit=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA' and upper(payload->>'PARÁMETRO')=$1 order by row_number desc limit 1",[p]);
-  const payload={"PARÁMETRO":p,"VALOR":serialized,"ACTUALIZADO EN":now,"ACTUALIZADO POR":session.user||""};
-  if(hit.length){
-    const merged=Object.assign({},hit[0].payload,payload);
-    await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='CONFIGURACIÓN SISTEMA' and row_number=$2",[JSON.stringify(merged),hit[0].row_number]);
-  }else{
-    const rn=await nextRow("CONFIGURACIÓN SISTEMA");
-    await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','CONFIGURACIÓN SISTEMA',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(payload)]);
-  }
+  const existing=await sql.unsafe("select payload from qx_system_config where param=$1 limit 1",[p]);
+  const payload=Object.assign({},existing[0]?.payload||{},{"PARÁMETRO":p,"VALOR":serialized,"ACTUALIZADO EN":now,"ACTUALIZADO POR":session.user||""});
+  await sql.unsafe(`insert into qx_system_config(param,payload,updated_at) values($1,$2::jsonb,now())
+    on conflict(param) do update set payload=excluded.payload,updated_at=now()`,[p,JSON.stringify(payload)]);
   await outbox("CONFIGURACION",p,"ACTUALIZAR",payload);
   await audit(session,"ACTUALIZAR CONFIGURACIÓN","CONFIGURACIÓN",p,serialized);
 }
@@ -233,7 +392,7 @@ function trackingRateAllowed(req){
   x.count++;return x.count<=limit;
 }
 async function findTrackingByCode(code){
-  const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'TOKEN SEGUIMIENTO'=$1 limit 1",[String(code||"")]);
+  const r=await sql.unsafe("select payload from qx_cases where tracking_token=$1 limit 1",[String(code||"")]);
   return r[0]?.payload||null;
 }
 async function sendCompanionPush(caseId,payload,message,messageId){
@@ -296,11 +455,14 @@ function profSearchScore(q,row){
   return score;
 }
 async function findUserById(id){
-  const r=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='USUARIOS' and payload->>'ID USUARIO'=$1 limit 1",[String(id||"")]);
+  const r=await sql.unsafe("select user_id,payload from qx_users where user_id=$1 limit 1",[String(id||"")]);
   return r[0]||null;
 }
-async function patchUserRow(rowNumber,payload){
-  await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='USUARIOS' and row_number=$2",[JSON.stringify(payload),rowNumber]);
+async function patchUserRow(userId,payload){
+  const id=String(payload?.["ID USUARIO"]||userId||""),username=String(payload?.["USUARIO"]||"").trim().toLowerCase();
+  if(!id||!username)throw new Error("Usuario inválido.");
+  await sql.unsafe(`insert into qx_users(user_id,username,payload,updated_at) values($1,$2,$3::jsonb,now())
+    on conflict(user_id) do update set username=excluded.username,payload=excluded.payload,updated_at=now()`,[id,username,JSON.stringify(payload)]);
 }
 function csvCell(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 Bun.serve({port:PORT,async fetch(req){
@@ -330,7 +492,7 @@ Bun.serve({port:PORT,async fetch(req){
    const c=mapCase(payload),terminal=["ALTA","HOSPITALIZACIÓN"].includes(c.estado)||["ALTA","HOSPITALIZACIÓN"].includes(String(c.destino||"").toUpperCase());
    return json({ok:true,paciente:c.paciente,documento:c.documento,estadoPublico:terminal?"":publicState(c.estado,c.destino),actualizado:c.avisoFecha||c.actualizado,active:!terminal&&trackingActiveState(c.estado),terminal,aviso:c.aviso||"",avisoFecha:c.avisoFecha||""});
  }
- if(url.pathname==="/api/login"&&req.method==="POST"){const b=await body(req),u=String(b.user||"").trim().toLowerCase(),pin=String(b.pin||"");const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='USUARIOS' and lower(payload->>'USUARIO')=$1 limit 1",[u]);if(!r.length)return json({error:"Usuario o PIN incorrectos."},401);const x=r[0].payload;if(norm(x["ESTADO"])!=="ACTIVO")return json({error:"Cuenta inactiva."},403);const salt=String(x["SALT PIN"]||""),algo=String(x["ALGORITMO PIN"]||"");if(salt&&algo!=="RAILWAY_V1"&&!Bun.env.QX_AUTH_PEPPER_V1)return json({error:"Esta cuenta antigua requiere migración de autenticación. Un SUPERADMIN puede asignar un nuevo PIN desde Usuarios."},409);const ok=verifyUserPinPayload(x,pin);if(!ok)return json({error:"Usuario o PIN incorrectos."},401);const p={uid:x["ID USUARIO"],user:x["USUARIO"],name:x["NOMBRE"],role:x["ROL"],exp:Date.now()+SESSION_TTL},t=sign(p),permissions=await getRolePermissions(p.role);return json({ok:true,user:p.user,name:p.name,role:p.role,permissions},200,{"set-cookie":"qx_session="+encodeURIComponent(t)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=21600"})}
+ if(url.pathname==="/api/login"&&req.method==="POST"){const b=await body(req),u=String(b.user||"").trim().toLowerCase(),pin=String(b.pin||"");const r=await sql.unsafe("select payload from qx_users where username=$1 limit 1",[u]);if(!r.length)return json({error:"Usuario o PIN incorrectos."},401);const x=r[0].payload;if(norm(x["ESTADO"])!=="ACTIVO")return json({error:"Cuenta inactiva."},403);const salt=String(x["SALT PIN"]||""),algo=String(x["ALGORITMO PIN"]||"");if(salt&&algo!=="RAILWAY_V1"&&!Bun.env.QX_AUTH_PEPPER_V1)return json({error:"Esta cuenta antigua requiere migración de autenticación. Un SUPERADMIN puede asignar un nuevo PIN desde Usuarios."},409);const ok=verifyUserPinPayload(x,pin);if(!ok)return json({error:"Usuario o PIN incorrectos."},401);const p={uid:x["ID USUARIO"],user:x["USUARIO"],name:x["NOMBRE"],role:x["ROL"],exp:Date.now()+SESSION_TTL},t=sign(p),permissions=await getRolePermissions(p.role);return json({ok:true,user:p.user,name:p.name,role:p.role,permissions},200,{"set-cookie":"qx_session="+encodeURIComponent(t)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=21600"})}
  if(url.pathname==="/api/logout"&&req.method==="POST")return json({ok:true},200,{"set-cookie":"qx_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"});
  if(url.pathname==="/api/attachment"&&req.method==="POST"){
    const s=sess(req);if(!s)return json({error:"Sesión no autorizada o vencida."},401);
@@ -399,22 +561,22 @@ Bun.serve({port:PORT,async fetch(req){
    const u=Object.assign({},hit.payload);if(!verifyUserPinPayload(u,current))return json({error:"PIN actual incorrecto."},401);
    const salt=randomUUID().replace(/-/g,""),version=Number(u["VERSIÓN SESIÓN"]||1)+1;
    u["HASH PIN"]=hashRailwayPin(next,salt);u["SALT PIN"]=salt;u["ALGORITMO PIN"]="RAILWAY_V1";u["PIN ACTUALIZADO EN"]=nowBog();u["CAMBIO PIN REQUERIDO"]="NO";u["VERSIÓN SESIÓN"]=String(version);u["ACTUALIZADO EN"]=nowBog();
-   await patchUserRow(hit.row_number,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"CAMBIO_PIN",{"ID USUARIO":u["ID USUARIO"],"USUARIO":u["USUARIO"],"ACTUALIZADO EN":u["ACTUALIZADO EN"]});await audit(s,"CAMBIO PIN","USUARIOS",String(u["ID USUARIO"]||""),"Cambio de PIN propio");
+   await patchUserRow(hit.user_id,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"CAMBIO_PIN",{"ID USUARIO":u["ID USUARIO"],"USUARIO":u["USUARIO"],"ACTUALIZADO EN":u["ACTUALIZADO EN"]});await audit(s,"CAMBIO PIN","USUARIOS",String(u["ID USUARIO"]||""),"Cambio de PIN propio");
    return json({ok:true});
  }
  if(url.pathname==="/api/users"&&req.method==="GET"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
-   const r=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='USUARIOS' order by lower(coalesce(payload->>'NOMBRE',payload->>'USUARIO',''))");
+   const r=await sql.unsafe("select user_id,payload from qx_users order by lower(coalesce(payload->>'NOMBRE',payload->>'USUARIO',''))");
    return json({rows:r.map(x=>({id:x.payload["ID USUARIO"]||"",usuario:x.payload["USUARIO"]||"",nombre:x.payload["NOMBRE"]||"",rol:x.payload["ROL"]||"",estado:x.payload["ESTADO"]||"",ultimoIngreso:x.payload["ÚLTIMO INGRESO"]||"",cambioPin:String(x.payload["CAMBIO PIN REQUERIDO"]||"").toUpperCase()==="SI"||String(x.payload["CAMBIO PIN REQUERIDO"]||"").toUpperCase()==="SÍ"}))});
  }
  if(url.pathname==="/api/roles"&&req.method==="GET"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
-   const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' order by row_number");
+   const r=await sql.unsafe("select payload from qx_roles order by role_id");
    return json({rows:r.map(x=>objectPayload(x.payload)).filter(p=>String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO").sort((a,b)=>String(a["NOMBRE"]||"").localeCompare(String(b["NOMBRE"]||""))).map(p=>{let perms=[];try{perms=JSON.parse(String(p["PERMISOS JSON"]||"[]"))}catch{}return{id:p["ID ROL"]||"",nombre:p["NOMBRE"]||"",descripcion:p["DESCRIPCIÓN"]||"",permisos:perms,estado:p["ESTADO"]||"ACTIVO",sistema:String(p["SISTEMA"]||"").toUpperCase()==="SI"}})});
  }
  if(url.pathname==="/api/roles-admin"&&req.method==="GET"){
    if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede editar roles."},403);
-   const r=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' order by row_number");
-   const catalog=["OPERACION_VER","OPERACION_GESTIONAR","PROGRAMACION_VER","PROGRAMACION_EDITAR","CARGUE_MASIVO","COORDINACION_VER","INDICADORES_VER","DESCARGAS","REPORTES_PDF","USUARIOS_GESTIONAR","REINTERVENCIONES_REVISAR","REINTERVENCIONES_CERRAR","PROFILAXIS_PREQX","CUIDADOS_POSTOP","SINCRONIZAR"];
-   const rows=r.map(x=>{const p=objectPayload(x.payload);let permisos=[];try{permisos=JSON.parse(String(p["PERMISOS JSON"]||"[]"))}catch{}return{rowNumber:x.row_number,id:p["ID ROL"]||"",nombre:p["NOMBRE"]||"",descripcion:p["DESCRIPCIÓN"]||"",permisos,estado:p["ESTADO"]||"ACTIVO",sistema:String(p["SISTEMA"]||"").toUpperCase()==="SI"}}).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+   const r=await sql.unsafe("select role_id,payload from qx_roles order by role_id");
+   const catalog=["OPERACION_VER","OPERACION_GESTIONAR","PROGRAMACION_VER","PROGRAMACION_EDITAR","CARGUE_MASIVO","COORDINACION_VER","INDICADORES_VER","DESCARGAS","REPORTES_PDF","USUARIOS_GESTIONAR","REINTERVENCIONES_REVISAR","REINTERVENCIONES_CERRAR","PROFILAXIS_PREQX","CUIDADOS_POSTOP" ];
+   const rows=r.map(x=>{const p=objectPayload(x.payload);let permisos=[];try{permisos=JSON.parse(String(p["PERMISOS JSON"]||"[]"))}catch{}return{id:p["ID ROL"]||x.role_id||"",nombre:p["NOMBRE"]||"",descripcion:p["DESCRIPCIÓN"]||"",permisos,estado:p["ESTADO"]||"ACTIVO",sistema:String(p["SISTEMA"]||"").toUpperCase()==="SI"}}).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
    return json({rows,catalog});
  }
  if(url.pathname==="/api/roles"&&req.method==="POST"){
@@ -422,16 +584,16 @@ Bun.serve({port:PORT,async fetch(req){
    const b=await body(req),id=String(b.id||"").trim().toUpperCase(),nombre=String(b.nombre||"").trim(),descripcion=String(b.descripcion||"").trim(),permisos=Array.isArray(b.permisos)?b.permisos.map(x=>String(x).trim()).filter(Boolean):[];
    if(!/^[A-Z0-9_]{2,40}$/.test(id))return json({error:"El código del rol debe usar letras mayúsculas, números o guion bajo."},400);
    if(!nombre)return json({error:"El nombre del rol es obligatorio."},400);
-   const allRoles=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES'");if(allRoles.some(x=>String(objectPayload(x.payload)["ID ROL"]||"").toUpperCase()===id))return json({error:"Ese código de rol ya existe."},409);
-   const rn=await nextRow("ROLES"),now=nowBog(),row={"ID ROL":id,"NOMBRE":nombre,"DESCRIPCIÓN":descripcion,"PERMISOS JSON":JSON.stringify(permisos),"ESTADO":"ACTIVO","SISTEMA":"NO","CREADO EN":now,"CREADO POR":s.user,"ACTUALIZADO EN":now,"ACTUALIZADO POR":s.user};
-   await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','ROLES',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(row)]);
+   const allRoles=await sql.unsafe("select payload from qx_roles");if(allRoles.some(x=>String(objectPayload(x.payload)["ID ROL"]||"").toUpperCase()===id))return json({error:"Ese código de rol ya existe."},409);
+   const now=nowBog(),row={"ID ROL":id,"NOMBRE":nombre,"DESCRIPCIÓN":descripcion,"PERMISOS JSON":JSON.stringify(permisos),"ESTADO":"ACTIVO","SISTEMA":"NO","CREADO EN":now,"CREADO POR":s.user,"ACTUALIZADO EN":now,"ACTUALIZADO POR":s.user};
+   await sql.unsafe("insert into qx_roles(role_id,payload,updated_at) values($1,$2::jsonb,now())",[id,JSON.stringify(row)]);
    await outbox("ROL",id,"CREAR",row);await audit(s,"CREAR ROL","USUARIOS",id,nombre);
    return json({ok:true,id});
  }
  if(url.pathname==="/api/roles/update"&&req.method==="POST"){
    if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede editar roles."},403);
    const b=await body(req),id=String(b.id||"").trim().toUpperCase();
-   const roleRows=await sql.unsafe("select row_number,payload from source_sheets where source_key='MAIN' and sheet_name='ROLES' order by row_number");const hit=roleRows.map(x=>({row_number:x.row_number,payload:objectPayload(x.payload)})).find(x=>String(x.payload["ID ROL"]||"").toUpperCase()===id);if(!hit)return json({error:"Rol no encontrado."},404);
+   const roleRows=await sql.unsafe("select role_id,payload from qx_roles order by role_id");const hit=roleRows.map(x=>({role_id:x.role_id,payload:objectPayload(x.payload)})).find(x=>String(x.payload["ID ROL"]||x.role_id||"").toUpperCase()===id);if(!hit)return json({error:"Rol no encontrado."},404);
    const row=Object.assign({},hit.payload),nombre=String(b.nombre??row["NOMBRE"]??"").trim(),descripcion=String(b.descripcion??row["DESCRIPCIÓN"]??"").trim(),estado=String(b.estado??row["ESTADO"]??"ACTIVO").trim().toUpperCase(),permisos=Array.isArray(b.permisos)?b.permisos.map(x=>String(x).trim()).filter(Boolean):[];
    if(id==="SUPERADMIN"){
      row["NOMBRE"]=nombre||"Superadministrador";row["DESCRIPCIÓN"]=descripcion;row["PERMISOS JSON"]=JSON.stringify(["*"]);row["ESTADO"]="ACTIVO";
@@ -440,7 +602,7 @@ Bun.serve({port:PORT,async fetch(req){
      row["NOMBRE"]=nombre;row["DESCRIPCIÓN"]=descripcion;row["PERMISOS JSON"]=JSON.stringify(permisos);row["ESTADO"]=estado;
    }
    row["ACTUALIZADO EN"]=nowBog();row["ACTUALIZADO POR"]=s.user;
-   await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='ROLES' and row_number=$2",[JSON.stringify(row),hit.row_number]);
+   await sql.unsafe("update qx_roles set payload=$1::jsonb,updated_at=now() where role_id=$2",[JSON.stringify(row),hit.role_id]);
    await outbox("ROL",id,"EDITAR",row);await audit(s,"EDITAR ROL","USUARIOS",id,row["NOMBRE"]+" · "+row["ESTADO"]);
    return json({ok:true});
  }
@@ -449,20 +611,20 @@ Bun.serve({port:PORT,async fetch(req){
    if(!/^[a-z0-9._-]{3,40}$/.test(usuario))return json({error:"Usuario inválido. Use 3–40 caracteres: letras, números, punto, guion o guion bajo."},400);
    if(!nombre)return json({error:"El nombre es obligatorio."},400);
    if(!validPin(pin))return json({error:"El PIN debe tener 6–8 dígitos y no puede ser una secuencia simple o repetida."},400);
-   const dup=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='USUARIOS' and lower(payload->>'USUARIO')=$1 limit 1",[usuario]);if(dup.length)return json({error:"Ese usuario ya existe."},409);
-   const validRoles=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES'");if(!validRoles.some(x=>{const p=objectPayload(x.payload);return String(p["ID ROL"]||"").toUpperCase()===rol&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO"}))return json({error:"Rol no válido."},400);
-   const salt=randomUUID().replace(/-/g,""),id="USR-"+randomUUID().slice(0,8).toUpperCase(),rn=await nextRow("USUARIOS"),created=nowBog();
+   const dup=await sql.unsafe("select 1 from qx_users where username=$1 limit 1",[usuario]);if(dup.length)return json({error:"Ese usuario ya existe."},409);
+   const validRoles=await sql.unsafe("select payload from qx_roles");if(!validRoles.some(x=>{const p=objectPayload(x.payload);return String(p["ID ROL"]||"").toUpperCase()===rol&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO"}))return json({error:"Rol no válido."},400);
+   const salt=randomUUID().replace(/-/g,""),id="USR-"+randomUUID().slice(0,8).toUpperCase(),created=nowBog();
    const u={"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"HASH PIN":hashRailwayPin(pin,salt),"ESTADO":"ACTIVO","CREADO EN":created,"CREADO POR":s.user,"ÚLTIMO INGRESO":"","ACTUALIZADO EN":created,"CAMBIO PIN REQUERIDO":b.forceChange?"SI":"NO","SALT PIN":salt,"PIN ACTUALIZADO EN":created,"INTENTOS FALLIDOS":"0","BLOQUEADO HASTA":"","VERSIÓN SESIÓN":"1","ALGORITMO PIN":"RAILWAY_V1"};
-   await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','USUARIOS',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(u)]);await outbox("USUARIO",id,"CREAR",{"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"ESTADO":"ACTIVO"});await audit(s,"CREAR USUARIO","USUARIOS",id,usuario+" · "+rol);
+   await sql.unsafe("insert into qx_users(user_id,username,payload,updated_at) values($1,$2,$3::jsonb,now())",[id,usuario,JSON.stringify(u)]);await outbox("USUARIO",id,"CREAR",{"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"ESTADO":"ACTIVO"});await audit(s,"CREAR USUARIO","USUARIOS",id,usuario+" · "+rol);
    return json({ok:true,id});
  }
  if(url.pathname==="/api/users/update"&&req.method==="POST"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
    const b=await body(req),hit=await findUserById(b.id);if(!hit)return json({error:"Usuario no encontrado."},404);
    const u=Object.assign({},hit.payload),nombre=String(b.nombre??u["NOMBRE"]??"").trim(),rol=String(b.rol??u["ROL"]??"").trim().toUpperCase(),estado=String(b.estado??u["ESTADO"]??"ACTIVO").trim().toUpperCase();
    if(!["ACTIVO","INACTIVO"].includes(estado))return json({error:"Estado inválido."},400);
-   const roleList=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='ROLES'");if(!roleList.some(x=>{const p=objectPayload(x.payload);return String(p["ID ROL"]||"").toUpperCase()===rol&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO"}))return json({error:"Rol no válido o inactivo."},400);
+   const roleList=await sql.unsafe("select payload from qx_roles");if(!roleList.some(x=>{const p=objectPayload(x.payload);return String(p["ID ROL"]||"").toUpperCase()===rol&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO"}))return json({error:"Rol no válido o inactivo."},400);
    u["NOMBRE"]=nombre;u["ROL"]=rol;u["ESTADO"]=estado;u["ACTUALIZADO EN"]=nowBog();
-   await patchUserRow(hit.row_number,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"EDITAR",{"ID USUARIO":u["ID USUARIO"],"NOMBRE":nombre,"ROL":rol,"ESTADO":estado});await audit(s,"EDITAR USUARIO","USUARIOS",String(u["ID USUARIO"]||""),nombre+" · "+rol+" · "+estado);
+   await patchUserRow(hit.user_id,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"EDITAR",{"ID USUARIO":u["ID USUARIO"],"NOMBRE":nombre,"ROL":rol,"ESTADO":estado});await audit(s,"EDITAR USUARIO","USUARIOS",String(u["ID USUARIO"]||""),nombre+" · "+rol+" · "+estado);
    return json({ok:true});
  }
  if(url.pathname==="/api/users/reset-pin"&&req.method==="POST"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
@@ -470,7 +632,7 @@ Bun.serve({port:PORT,async fetch(req){
    const hit=await findUserById(b.id);if(!hit)return json({error:"Usuario no encontrado."},404);
    const u=Object.assign({},hit.payload),salt=randomUUID().replace(/-/g,""),version=Number(u["VERSIÓN SESIÓN"]||1)+1;
    u["HASH PIN"]=hashRailwayPin(pin,salt);u["SALT PIN"]=salt;u["ALGORITMO PIN"]="RAILWAY_V1";u["PIN ACTUALIZADO EN"]=nowBog();u["CAMBIO PIN REQUERIDO"]=b.forceChange?"SI":"NO";u["VERSIÓN SESIÓN"]=String(version);u["ACTUALIZADO EN"]=nowBog();u["INTENTOS FALLIDOS"]="0";u["BLOQUEADO HASTA"]="";
-   await patchUserRow(hit.row_number,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"REINICIAR_PIN",{"ID USUARIO":u["ID USUARIO"],"USUARIO":u["USUARIO"]});await audit(s,"REINICIAR PIN","USUARIOS",String(u["ID USUARIO"]||""),String(u["USUARIO"]||""));
+   await patchUserRow(hit.user_id,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"REINICIAR_PIN",{"ID USUARIO":u["ID USUARIO"],"USUARIO":u["USUARIO"]});await audit(s,"REINICIAR PIN","USUARIOS",String(u["ID USUARIO"]||""),String(u["USUARIO"]||""));
    return json({ok:true});
  }
 
@@ -524,11 +686,11 @@ Bun.serve({port:PORT,async fetch(req){
    Object.entries(mapping).forEach(([k,h])=>{if(Object.prototype.hasOwnProperty.call(b,k))p[h]=String(b[k]??"").trim()});
    if(!p["FECHA CIRUGÍA"]||!p["HORA PROGRAMADA"]||!p["DOCUMENTO"]||!p["PACIENTE"]||!p["PROCEDIMIENTO"])return json({error:"Fecha, hora, documento, paciente y procedimiento son obligatorios."},400);
    p["FECHA CIRUGÍA"]=safeDate(p["FECHA CIRUGÍA"]);p["PACIENTE"]=String(p["PACIENTE"]).toUpperCase();p["PROCEDIMIENTO"]=String(p["PROCEDIMIENTO"]).toUpperCase();p["ESPECIALIDAD"]=String(p["ESPECIALIDAD"]||"").toUpperCase();p["ESPECIALISTA"]=String(p["ESPECIALISTA"]||"").toUpperCase();p["SALA / QNO"]=String(p["SALA / QNO"]||"").toUpperCase();p["ÚLTIMA ACTUALIZACIÓN WEB"]=nowBog();p["USUARIO ÚLTIMO MOVIMIENTO"]=s.user;
-   await sql.unsafe("update source_sheets set payload=case when jsonb_typeof($1::jsonb)='string' then (($1::jsonb)#>>'{}')::jsonb else $1::jsonb end,imported_at=now() where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and row_number=$2",[JSON.stringify(p),hit.row_number]);
+   await saveCasePayload(p);
    await outbox("PACIENTE",String(p["ID CASO"]||""),"EDITAR",p);await audit(s,"EDITAR PACIENTE","PROGRAMACIÓN",String(p["ID CASO"]||""),"Actualización desde Programación");
    return json({ok:true,case:mapCase(p)});
  }
- if(url.pathname==="/api/patient"&&req.method==="POST"){if(!hasPermission(permissions,"PROGRAMACION_EDITAR"))return permissionDenied("PROGRAMACION_EDITAR");const b=await body(req);const pcfg=await operationalConfig();if(b.qno&&!pcfg.qnos.includes(String(b.qno).trim().toUpperCase()))return json({error:"QNO no habilitado."},400);if(!b.fecha||!b.hora||!b.documento||!b.paciente||!b.procedimiento)return json({error:"Fecha, hora, documento, paciente y procedimiento son obligatorios."},400);const id="QX-"+String(b.fecha).replace(/-/g,"")+"-"+randomBytes(4).toString("hex").toUpperCase(),track="SEG-"+String(b.fecha).replace(/-/g,"")+"-"+randomBytes(3).toString("hex").toUpperCase(),token=await uniqueTrackingToken();const p={"ID CASO":id,"FECHA CIRUGÍA":safeDate(b.fecha),"HORA PROGRAMADA":String(b.hora).slice(0,5),"DOCUMENTO":String(b.documento).trim(),"TELÉFONO":String(b.telefono||"").trim(),"PACIENTE":String(b.paciente).trim().toUpperCase(),"EDAD":b.edad||"","SEXO":b.sexo||"","PROCEDIMIENTO":String(b.procedimiento).trim().toUpperCase(),"ESPECIALIDAD":String(b.especialidad||"").trim().toUpperCase(),"ESPECIALISTA":String(b.especialista||"").trim().toUpperCase(),"SALA / QNO":String(b.qno||"").toUpperCase(),"ESTADO ACTUAL":"PROGRAMADO","OBSERVACIONES":b.observaciones||"","TIPO DE ATENCIÓN":b.tipoAtencion||"","CAMA / UBICACIÓN PROGRAMADA":b.cama||"","CUPS":b.cups||"","UVR":b.uvr||"","TIEMPO QX ESTIMADO (MIN)":b.tiempoQx||"","RECURSOS / ALERTAS PREQUIRÚRGICAS":b.recursos||"","CÓDIGO SEGUIMIENTO":track,"TOKEN SEGUIMIENTO":token,"CREADO SEGUIMIENTO":nowBog(),"FUENTE DE PROGRAMACIÓN":"RAILWAY","ÚLTIMA ACTUALIZACIÓN WEB":nowBog()};const rn=await nextRow("BD PROGRAMACIÓN");await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','BD PROGRAMACIÓN',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(p)]);await outbox("PACIENTE",id,"CREAR",p);await audit(s,"CREAR PACIENTE","PROGRAMACIÓN",id,"Nuevo paciente");const notice=await autoNotifyCompanion(s,id,"PROGRAMADO");return json({ok:true,id,trackingCode:track,case:notice||mapCase(p)})}
+ if(url.pathname==="/api/patient"&&req.method==="POST"){if(!hasPermission(permissions,"PROGRAMACION_EDITAR"))return permissionDenied("PROGRAMACION_EDITAR");const b=await body(req);const pcfg=await operationalConfig();if(b.qno&&!pcfg.qnos.includes(String(b.qno).trim().toUpperCase()))return json({error:"QNO no habilitado."},400);if(!b.fecha||!b.hora||!b.documento||!b.paciente||!b.procedimiento)return json({error:"Fecha, hora, documento, paciente y procedimiento son obligatorios."},400);const id="QX-"+String(b.fecha).replace(/-/g,"")+"-"+randomBytes(4).toString("hex").toUpperCase(),track="SEG-"+String(b.fecha).replace(/-/g,"")+"-"+randomBytes(3).toString("hex").toUpperCase(),token=await uniqueTrackingToken();const p={"ID CASO":id,"FECHA CIRUGÍA":safeDate(b.fecha),"HORA PROGRAMADA":String(b.hora).slice(0,5),"DOCUMENTO":String(b.documento).trim(),"TELÉFONO":String(b.telefono||"").trim(),"PACIENTE":String(b.paciente).trim().toUpperCase(),"EDAD":b.edad||"","SEXO":b.sexo||"","PROCEDIMIENTO":String(b.procedimiento).trim().toUpperCase(),"ESPECIALIDAD":String(b.especialidad||"").trim().toUpperCase(),"ESPECIALISTA":String(b.especialista||"").trim().toUpperCase(),"SALA / QNO":String(b.qno||"").toUpperCase(),"ESTADO ACTUAL":"PROGRAMADO","OBSERVACIONES":b.observaciones||"","TIPO DE ATENCIÓN":b.tipoAtencion||"","CAMA / UBICACIÓN PROGRAMADA":b.cama||"","CUPS":b.cups||"","UVR":b.uvr||"","TIEMPO QX ESTIMADO (MIN)":b.tiempoQx||"","RECURSOS / ALERTAS PREQUIRÚRGICAS":b.recursos||"","CÓDIGO SEGUIMIENTO":track,"TOKEN SEGUIMIENTO":token,"CREADO SEGUIMIENTO":nowBog(),"FUENTE DE PROGRAMACIÓN":"RAILWAY","ÚLTIMA ACTUALIZACIÓN WEB":nowBog()};await saveCasePayload(p);await outbox("PACIENTE",id,"CREAR",p);await audit(s,"CREAR PACIENTE","PROGRAMACIÓN",id,"Nuevo paciente");const notice=await autoNotifyCompanion(s,id,"PROGRAMADO");return json({ok:true,id,trackingCode:track,case:notice||mapCase(p)})}
  if(url.pathname==="/api/bulk"&&req.method==="POST"){
   if(!hasPermission(permissions,"CARGUE_MASIVO"))return permissionDenied("CARGUE_MASIVO");
   const b=await body(req),rows=Array.isArray(b.rows)?b.rows:[];if(rows.length>1000)return json({error:"Máximo 1000 filas por cargue."},400);
@@ -538,7 +700,7 @@ Bun.serve({port:PORT,async fetch(req){
     if(!r.fecha||!r.hora||!r.paciente||!r.documento||!r.procedimiento){skipped++;errors.push({row:idx+1,error:"Campos obligatorios incompletos"});continue}
     const date=safeDate(r.fecha),qno=String(r.qno||"").trim().toUpperCase();
     if(qno&&!cfg.qnos.includes(qno)){skipped++;errors.push({row:idx+1,error:"QNO no habilitado: "+qno});continue}
-    const dup=await sql.unsafe("select 1 from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'FECHA CIRUGÍA'=$1 and payload->>'DOCUMENTO'=$2 and upper(payload->>'PROCEDIMIENTO')=$3 limit 1",[date,String(r.documento||""),String(r.procedimiento||"").toUpperCase()]);
+    const dup=await sql.unsafe("select 1 from qx_cases where surgery_date=$1 and document=$2 and upper(procedure_name)=$3 limit 1",[date,String(r.documento||""),String(r.procedimiento||"").toUpperCase()]);
     if(dup.length){skipped++;errors.push({row:idx+1,error:"Duplicado"});continue}
     const care=String(r.tipoAtencion||"").trim().toUpperCase(),tipo=care.includes("AMB")?"AMBULATORIO":care.includes("HOSP")?"HOSPITALIZADO":care;
     const id="QX-"+date.replace(/-/g,"")+"-"+randomBytes(4).toString("hex").toUpperCase(),p={
@@ -553,8 +715,7 @@ Bun.serve({port:PORT,async fetch(req){
       "CÓDIGO SEGUIMIENTO":"SEG-"+date.replace(/-/g,"")+"-"+randomBytes(3).toString("hex").toUpperCase(),
       "TOKEN SEGUIMIENTO":await uniqueTrackingToken(),"CREADO SEGUIMIENTO":nowBog(),"ÚLTIMA ACTUALIZACIÓN WEB":nowBog()
     };
-    const rn=await nextRow("BD PROGRAMACIÓN");
-    await sql.unsafe("insert into source_sheets(source_key,spreadsheet_id,spreadsheet_title,sheet_name,row_number,payload) values('MAIN','RAILWAY','Railway operational','BD PROGRAMACIÓN',$1,case when jsonb_typeof($2::jsonb)='string' then (($2::jsonb)#>>'{}')::jsonb else $2::jsonb end)",[rn,JSON.stringify(p)]);
+    await saveCasePayload(p);
     await outbox("PACIENTE",id,"CARGUE_MASIVO",p);await autoNotifyCompanion(s,id,"PROGRAMADO");inserted++;
   }
   await audit(s,"CARGUE MASIVO","PROGRAMACIÓN","",inserted+" insertados; "+skipped+" omitidos");
@@ -563,7 +724,7 @@ Bun.serve({port:PORT,async fetch(req){
  if(url.pathname==="/api/profilaxis-catalog"){
     if(!hasPermission(permissions,"PROFILAXIS_PREQX"))return permissionDenied("PROFILAXIS_PREQX");
     const q=norm(url.searchParams.get("q")||""),esp=norm(url.searchParams.get("especialidad")||"");
-    const rr=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROFILAXIS QX' and upper(coalesce(payload->>'ESTADO',''))='ACTIVO' order by row_number");
+    const rr=await sql.unsafe("select payload from qx_prophylaxis_rules where upper(coalesce(payload->>'ESTADO',''))='ACTIVO' order by row_order");
     let rows=rr.map(x=>x.payload);
     if(esp)rows=rows.filter(r=>norm(r["ESPECIALIDAD"])===esp);
     rows=rows.map(r=>({r,score:profSearchScore(q,r)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).map(x=>x.r);
@@ -572,10 +733,10 @@ Bun.serve({port:PORT,async fetch(req){
  if(url.pathname==="/api/profilaxis"){if(!hasPermission(permissions,"PROFILAXIS_PREQX"))return permissionDenied("PROFILAXIS_PREQX");const rows=(await casesFor(url.searchParams.get("date")||"")).filter(x=>x.prof||x.profHora||x.clasif||x.antibiotico),m={total:rows.length,registrada:0,noRegistrada:0,pendiente:0,conMedicamento:0,conTiempo:0};const out=rows.map(x=>({paciente:x.paciente,procedimiento:x.procedimiento,administrada:x.prof,medicamento:x.antibiotico,hora:x.profHora,minutos:x.profMin,clasificacion:x.clasif}));out.forEach(r=>{const a=norm(r.administrada);if(["SI","SÍ"].includes(a))m.registrada++;else if(a==="NO")m.noRegistrada++;else m.pendiente++;if(r.medicamento)m.conMedicamento++;if(String(r.minutos)!=="")m.conTiempo++});return json({rows:out,metrics:m})}
  if(url.pathname==="/api/postop"){if(!hasPermission(permissions,"CUIDADOS_POSTOP"))return permissionDenied("CUIDADOS_POSTOP");const base=(await casesFor(url.searchParams.get("date")||"")).filter(r=>r.operado||["RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"].includes(r.estado)||r.destino),rows=base.map(r=>({paciente:r.paciente,procedimiento:r.procedimiento,estado:r.estado,destino:r.destino,salida:r.salida,observacion:r.observacionEgreso,codigo:r.codigo})),m={total:rows.length,alta:0,hospitalizacion:0,recuperacion:0,conSeguimiento:0,pendientes:0};rows.forEach(r=>{const d=norm(r.destino||r.estado);if(d==="ALTA")m.alta++;if(d==="HOSPITALIZACION")m.hospitalizacion++;if(r.estado==="RECUPERACIÓN")m.recuperacion++;if(r.codigo)m.conSeguimiento++;else m.pendientes++});return json({rows,metrics:m})}
  if(url.pathname==="/api/coord"){if(!hasPermission(permissions,"COORDINACION_VER"))return permissionDenied("COORDINACION_VER");const rows=await casesFor(url.searchParams.get("date")||""),m=metrics(rows),by={};rows.forEach(r=>{const k=r.especialidad||"SIN ESPECIALIDAD";if(!by[k])by[k]={especialidad:k,total:0,operados:0,cancelados:0};by[k].total++;if(r.operado)by[k].operados++;if(r.estado==="CANCELADO")by[k].cancelados++});return json({metrics:m,specialties:Object.values(by).sort((a,b)=>b.total-a.total)})}
- if(url.pathname==="/api/kpi"){if(!hasPermission(permissions,"INDICADORES_VER"))return permissionDenied("INDICADORES_VER");const date=safeDate(url.searchParams.get("date")||""),period=String(url.searchParams.get("period")||"MES").toUpperCase();let data;if(period==="DIA")data=await casesFor(date);else{const ym=date.slice(0,7);const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and left(payload->>'FECHA CIRUGÍA',7)=$1",[ym]);data=r.map(x=>mapCase(x.payload))}const brutas=data.length,canceladas=data.filter(x=>x.estado==="CANCELADO").length,netas=brutas-canceladas,ejecutadas=data.filter(x=>x.operado).length,esp={};data.forEach(r=>{const k=r.especialidad||"SIN ESPECIALIDAD";if(!esp[k])esp[k]={especialidad:k,programadasBrutas:0,canceladas:0,programadasNetas:0,ejecutadas:0,prepa:[],qnoRec:[],muertos:[]};const g=esp[k];g.programadasBrutas++;if(r.estado==="CANCELADO")g.canceladas++;else g.programadasNetas++;if(r.operado)g.ejecutadas++;if(r.tPrepa)g.prepa.push(r.tPrepa);if(r.tQnoRec)g.qnoRec.push(r.tQnoRec);if(r.tMuerto)g.muertos.push(r.tMuerto)});const especialidades=Object.values(esp).map(g=>({especialidad:g.especialidad,programadasBrutas:g.programadasBrutas,canceladas:g.canceladas,programadasNetas:g.programadasNetas,ejecutadas:g.ejecutadas,tasaRealizacion:pct(g.ejecutadas,g.programadasNetas),tasaCancelacion:pct(g.canceladas,g.programadasBrutas),tiempoPrepaQno:avg(g.prepa),tiempoQnoRec:avg(g.qnoRec),tiempoMuerto:avg(g.muertos)})).sort((a,b)=>b.programadasBrutas-a.programadasBrutas);const qs={};data.forEach(r=>{const q=r.qno||"SIN QNO";if(!qs[q])qs[q]={qno:q,t:[],m:[]};if(r.tQnoRec)qs[q].t.push(r.tQnoRec);if(r.tMuerto)qs[q].m.push(r.tMuerto)});const qnos=Object.values(qs).map(q=>({qno:q.qno,tiempoQnoRec:avg(q.t),tiempoMuerto:avg(q.m)}));const causas={};data.filter(x=>x.estado==="CANCELADO").forEach(x=>{const k=x.observaciones||"SIN MOTIVO";causas[k]=(causas[k]||0)+1});return json({summary:{programadasBrutas:brutas,canceladas,programadasNetas:netas,ejecutadas,tasaCancelacion:pct(canceladas,brutas),tasaRealizacion:pct(ejecutadas,netas),tiempoPrepaQno:avg(data.map(x=>x.tPrepa)),tiempoQnoRec:avg(data.map(x=>x.tQnoRec)),tiempoMuerto:avg(data.map(x=>x.tMuerto))},especialidades,qnos,flujo:[{label:"PROGRAMADO",value:data.filter(x=>x.estado==="PROGRAMADO").length},{label:"PREPARACIÓN",value:data.filter(x=>x.estado==="PREPARACIÓN").length},{label:"QUIRÓFANO",value:data.filter(x=>x.estado==="QUIRÓFANO").length},{label:"RECUPERACIÓN",value:data.filter(x=>x.estado==="RECUPERACIÓN").length},{label:"FINALIZADOS",value:data.filter(x=>["ALTA","HOSPITALIZACIÓN"].includes(x.estado)).length},{label:"CANCELADOS",value:canceladas}],cancelaciones:{causas:Object.entries(causas).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value)}})}
- if(url.pathname==="/api/mci"){if(!hasPermission(permissions,"INDICADORES_VER"))return permissionDenied("INDICADORES_VER");const date=safeDate(url.searchParams.get("date")||""),y=Number(date.slice(0,4)),m=Number(date.slice(5,7)),mes=monthName(m);const sum=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='RESUMEN ANUAL' and payload->>'Mes'=$1 limit 1",[mes]);const base=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name=$1 and payload->>'Mes'=$2 order by row_number",["BASE ANUAL "+y,mes]);const x=sum[0]?.payload||{};return json({metrics:{mes,meta:x["Meta"]||"0",programadas:x["Programadas netas"]||"0",ejecutadas:x["Ejecutadas"]||"0",cumplimiento:x["Cumplimiento"]||"—",tasaRealizacion:x["Tasa realización"]||"—",brecha:x["Brecha"]||"0",proyeccion:x["Proyección"]||"—",estado:x["Estado"]||"SIN DATOS"},daily:base.map(z=>{const p=z.payload;return{fecha:p["Fecha"]||"",dia:p["Día"]||"",qxDisponibles:p["Qx disponibles"]||"",metaDiaria:p["Meta diaria"]||"",programadas:p["Cirugías programadas netas"]||"",ejecutadas:p["Cirugías ejecutadas"]||"",cumple:p["Cumple meta diaria"]||"",diferencia:p["Diferencia vs meta diaria"]||"",acumulado:p["Acumulado mensual"]||""}})})}
- if(url.pathname==="/api/reinterventions"){if(!hasPermission(permissions,"REINTERVENCIONES_REVISAR"))return permissionDenied("REINTERVENCIONES_REVISAR");const date=safeDate(url.searchParams.get("date")||""),end=new Date(date+"T12:00:00Z"),start=new Date(end.getTime()-30*86400000),a=start.toISOString().slice(0,10);const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'FECHA CIRUGÍA'>=$1 and payload->>'FECHA CIRUGÍA'<=$2 order by payload->>'DOCUMENTO',payload->>'FECHA CIRUGÍA'",[a,date]);const list=r.map(x=>mapCase(x.payload)),by={};list.forEach(x=>{if(x.documento)(by[x.documento]||(by[x.documento]=[])).push(x)});const rows=[];Object.values(by).forEach(arr=>{for(let i=1;i<arr.length;i++){const p=arr[i-1],n=arr[i],d=Math.round((new Date(n.fecha)-new Date(p.fecha))/86400000);if(d>=0&&d<30)rows.push({paciente:n.paciente,documento:n.documento,fechaPrevia:p.fecha,fechaNueva:n.fecha,dias:d,especialidad:n.especialidad})}});return json({total:rows.length,reviewed:0,pending:rows.length,rows})}
- if(url.pathname==="/api/download"){if(!hasPermission(permissions,"DESCARGAS"))return permissionDenied("DESCARGAS");const date=safeDate(url.searchParams.get("date")||""),period=String(url.searchParams.get("period")||"DIA").toUpperCase(),type=String(url.searchParams.get("type")||"PROGRAMACION").toUpperCase();let rows;if(period==="MES"){const ym=date.slice(0,7),r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and left(payload->>'FECHA CIRUGÍA',7)=$1 order by payload->>'FECHA CIRUGÍA',payload->>'HORA PROGRAMADA'",[ym]);rows=r.map(x=>mapCase(x.payload))}else rows=await casesFor(date);if(type==="ACTIVOS")rows=rows.filter(x=>!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(x.estado));if(type==="EJECUTADAS")rows=rows.filter(x=>x.operado);if(type==="FINALIZADOS")rows=rows.filter(x=>["ALTA","HOSPITALIZACIÓN"].includes(x.estado));if(type==="CANCELADOS")rows=rows.filter(x=>x.estado==="CANCELADO");const dlCfg=await operationalConfig();if(dlCfg.qnos.includes(type))rows=rows.filter(x=>norm(x.qno)===norm(type));let headers=["Fecha","Hora","Paciente","Documento","Procedimiento","Especialidad","Especialista","QNO","Estado","Tipo atención","Observaciones"],data=rows.map(x=>[x.fecha,x.hora,x.paciente,x.documento,x.procedimiento,x.especialidad,x.especialista,x.qno,x.estado,x.tipoAtencion,x.observaciones]);if(type==="TIEMPOS_QNO"){headers=["Fecha","Hora","Paciente","QNO","Prepa→QNO (min)","QNO→Recuperación (min)","Tiempo muerto QNO (min)"];data=rows.map(x=>[x.fecha,x.hora,x.paciente,x.qno,x.tPrepa,x.tQnoRec,x.tMuerto])}if(type==="PROFILAXIS"){headers=["Fecha","Hora","Paciente","Documento","QNO","Administrada","Medicamento","Hora profilaxis","Minutos a incisión","Clasificación"];data=rows.map(x=>[x.fecha,x.hora,x.paciente,x.documento,x.qno,x.prof,x.antibiotico,x.profHora,x.profMin,x.clasif])}const csv=[headers,...data].map(r=>r.map(csvCell).join(",")).join("\n"),name="Cirugia_"+type.replace(/\s+/g,"_")+"_"+date+".csv";await audit(s,"DESCARGA","REPORTES","",type+" "+period);return new Response("\ufeff"+csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":"attachment; filename=\""+name+"\"","x-filename":name,"cache-control":"no-store"}})}
+ if(url.pathname==="/api/kpi"){if(!hasPermission(permissions,"INDICADORES_VER"))return permissionDenied("INDICADORES_VER");const date=safeDate(url.searchParams.get("date")||""),period=String(url.searchParams.get("period")||"MES").toUpperCase();let data;if(period==="DIA")data=await casesFor(date);else{const ym=date.slice(0,7);const r=await sql.unsafe("select payload from qx_cases where left(surgery_date,7)=$1",[ym]);data=r.map(x=>mapCase(x.payload))}const brutas=data.length,canceladas=data.filter(x=>x.estado==="CANCELADO").length,netas=brutas-canceladas,ejecutadas=data.filter(x=>x.operado).length,esp={};data.forEach(r=>{const k=r.especialidad||"SIN ESPECIALIDAD";if(!esp[k])esp[k]={especialidad:k,programadasBrutas:0,canceladas:0,programadasNetas:0,ejecutadas:0,prepa:[],qnoRec:[],muertos:[]};const g=esp[k];g.programadasBrutas++;if(r.estado==="CANCELADO")g.canceladas++;else g.programadasNetas++;if(r.operado)g.ejecutadas++;if(r.tPrepa)g.prepa.push(r.tPrepa);if(r.tQnoRec)g.qnoRec.push(r.tQnoRec);if(r.tMuerto)g.muertos.push(r.tMuerto)});const especialidades=Object.values(esp).map(g=>({especialidad:g.especialidad,programadasBrutas:g.programadasBrutas,canceladas:g.canceladas,programadasNetas:g.programadasNetas,ejecutadas:g.ejecutadas,tasaRealizacion:pct(g.ejecutadas,g.programadasNetas),tasaCancelacion:pct(g.canceladas,g.programadasBrutas),tiempoPrepaQno:avg(g.prepa),tiempoQnoRec:avg(g.qnoRec),tiempoMuerto:avg(g.muertos)})).sort((a,b)=>b.programadasBrutas-a.programadasBrutas);const qs={};data.forEach(r=>{const q=r.qno||"SIN QNO";if(!qs[q])qs[q]={qno:q,t:[],m:[]};if(r.tQnoRec)qs[q].t.push(r.tQnoRec);if(r.tMuerto)qs[q].m.push(r.tMuerto)});const qnos=Object.values(qs).map(q=>({qno:q.qno,tiempoQnoRec:avg(q.t),tiempoMuerto:avg(q.m)}));const causas={};data.filter(x=>x.estado==="CANCELADO").forEach(x=>{const k=x.observaciones||"SIN MOTIVO";causas[k]=(causas[k]||0)+1});return json({summary:{programadasBrutas:brutas,canceladas,programadasNetas:netas,ejecutadas,tasaCancelacion:pct(canceladas,brutas),tasaRealizacion:pct(ejecutadas,netas),tiempoPrepaQno:avg(data.map(x=>x.tPrepa)),tiempoQnoRec:avg(data.map(x=>x.tQnoRec)),tiempoMuerto:avg(data.map(x=>x.tMuerto))},especialidades,qnos,flujo:[{label:"PROGRAMADO",value:data.filter(x=>x.estado==="PROGRAMADO").length},{label:"PREPARACIÓN",value:data.filter(x=>x.estado==="PREPARACIÓN").length},{label:"QUIRÓFANO",value:data.filter(x=>x.estado==="QUIRÓFANO").length},{label:"RECUPERACIÓN",value:data.filter(x=>x.estado==="RECUPERACIÓN").length},{label:"FINALIZADOS",value:data.filter(x=>["ALTA","HOSPITALIZACIÓN"].includes(x.estado)).length},{label:"CANCELADOS",value:canceladas}],cancelaciones:{causas:Object.entries(causas).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value)}})}
+ if(url.pathname==="/api/mci"){if(!hasPermission(permissions,"INDICADORES_VER"))return permissionDenied("INDICADORES_VER");const date=safeDate(url.searchParams.get("date")||""),y=Number(date.slice(0,4)),m=Number(date.slice(5,7)),mes=monthName(m);const sum=await sql.unsafe("select payload from qx_reporting_rows where dataset='RESUMEN ANUAL' and payload->>'Mes'=$1 order by row_order limit 1",[mes]);const base=await sql.unsafe("select payload from qx_reporting_rows where dataset=$1 and payload->>'Mes'=$2 order by row_order",["BASE ANUAL "+y,mes]);const x=sum[0]?.payload||{};return json({metrics:{mes,meta:x["Meta"]||"0",programadas:x["Programadas netas"]||"0",ejecutadas:x["Ejecutadas"]||"0",cumplimiento:x["Cumplimiento"]||"—",tasaRealizacion:x["Tasa realización"]||"—",brecha:x["Brecha"]||"0",proyeccion:x["Proyección"]||"—",estado:x["Estado"]||"SIN DATOS"},daily:base.map(z=>{const p=z.payload;return{fecha:p["Fecha"]||"",dia:p["Día"]||"",qxDisponibles:p["Qx disponibles"]||"",metaDiaria:p["Meta diaria"]||"",programadas:p["Cirugías programadas netas"]||"",ejecutadas:p["Cirugías ejecutadas"]||"",cumple:p["Cumple meta diaria"]||"",diferencia:p["Diferencia vs meta diaria"]||"",acumulado:p["Acumulado mensual"]||""}})})}
+ if(url.pathname==="/api/reinterventions"){if(!hasPermission(permissions,"REINTERVENCIONES_REVISAR"))return permissionDenied("REINTERVENCIONES_REVISAR");const date=safeDate(url.searchParams.get("date")||""),end=new Date(date+"T12:00:00Z"),start=new Date(end.getTime()-30*86400000),a=start.toISOString().slice(0,10);const r=await sql.unsafe("select payload from qx_cases where surgery_date>=$1 and surgery_date<=$2 order by document,surgery_date",[a,date]);const list=r.map(x=>mapCase(x.payload)),by={};list.forEach(x=>{if(x.documento)(by[x.documento]||(by[x.documento]=[])).push(x)});const rows=[];Object.values(by).forEach(arr=>{for(let i=1;i<arr.length;i++){const p=arr[i-1],n=arr[i],d=Math.round((new Date(n.fecha)-new Date(p.fecha))/86400000);if(d>=0&&d<30)rows.push({paciente:n.paciente,documento:n.documento,fechaPrevia:p.fecha,fechaNueva:n.fecha,dias:d,especialidad:n.especialidad})}});return json({total:rows.length,reviewed:0,pending:rows.length,rows})}
+ if(url.pathname==="/api/download"){if(!hasPermission(permissions,"DESCARGAS"))return permissionDenied("DESCARGAS");const date=safeDate(url.searchParams.get("date")||""),period=String(url.searchParams.get("period")||"DIA").toUpperCase(),type=String(url.searchParams.get("type")||"PROGRAMACION").toUpperCase();let rows;if(period==="MES"){const ym=date.slice(0,7),r=await sql.unsafe("select payload from qx_cases where left(surgery_date,7)=$1 order by surgery_date,surgery_time",[ym]);rows=r.map(x=>mapCase(x.payload))}else rows=await casesFor(date);if(type==="ACTIVOS")rows=rows.filter(x=>!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(x.estado));if(type==="EJECUTADAS")rows=rows.filter(x=>x.operado);if(type==="FINALIZADOS")rows=rows.filter(x=>["ALTA","HOSPITALIZACIÓN"].includes(x.estado));if(type==="CANCELADOS")rows=rows.filter(x=>x.estado==="CANCELADO");const dlCfg=await operationalConfig();if(dlCfg.qnos.includes(type))rows=rows.filter(x=>norm(x.qno)===norm(type));let headers=["Fecha","Hora","Paciente","Documento","Procedimiento","Especialidad","Especialista","QNO","Estado","Tipo atención","Observaciones"],data=rows.map(x=>[x.fecha,x.hora,x.paciente,x.documento,x.procedimiento,x.especialidad,x.especialista,x.qno,x.estado,x.tipoAtencion,x.observaciones]);if(type==="TIEMPOS_QNO"){headers=["Fecha","Hora","Paciente","QNO","Prepa→QNO (min)","QNO→Recuperación (min)","Tiempo muerto QNO (min)"];data=rows.map(x=>[x.fecha,x.hora,x.paciente,x.qno,x.tPrepa,x.tQnoRec,x.tMuerto])}if(type==="PROFILAXIS"){headers=["Fecha","Hora","Paciente","Documento","QNO","Administrada","Medicamento","Hora profilaxis","Minutos a incisión","Clasificación"];data=rows.map(x=>[x.fecha,x.hora,x.paciente,x.documento,x.qno,x.prof,x.antibiotico,x.profHora,x.profMin,x.clasif])}const csv=[headers,...data].map(r=>r.map(csvCell).join(",")).join("\n"),name="Cirugia_"+type.replace(/\s+/g,"_")+"_"+date+".csv";await audit(s,"DESCARGA","REPORTES","",type+" "+period);return new Response("\ufeff"+csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":"attachment; filename=\""+name+"\"","x-filename":name,"cache-control":"no-store"}})}
  return json({error:"Not found"},404);
 }});
-console.log("APP WEB CX Railway 5.7 operational",PORT,"push",PUSH_READY?"enabled":"disabled");
+console.log("APP WEB CX Railway 5.8 operational",PORT,"push",PUSH_READY?"enabled":"disabled","storage","domain-separated");
