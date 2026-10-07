@@ -1,12 +1,13 @@
 {
   "name": "app-web-cx-railway",
-  "version": "5.1.0",
+  "version": "5.7.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "bun run server.ts"
   },
   "dependencies": {
-    "postgres": "^3.4.7"
+    "postgres": "^3.4.7",
+    "web-push": "^3.6.7"
   }
 }
