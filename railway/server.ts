@@ -1,10 +1,32 @@
 import postgres from "postgres";
+import webpush from "web-push";
 import { createHash, createHmac, timingSafeEqual, randomUUID, randomBytes } from "node:crypto";
 const dbUrl=Bun.env.DATABASE_URL;if(!dbUrl)throw new Error("DATABASE_URL missing");
 const sql=postgres(dbUrl,{ssl:"require",max:8});const PORT=Number(Bun.env.PORT||3000),SESSION_TTL=21600000;
-const sessionKey=createHash("sha256").update(dbUrl+"|APP_WEB_CX_SESSION").digest();const PAGE=await Bun.file("./public/index.html").text();
+const sessionKey=createHash("sha256").update(dbUrl+"|APP_WEB_CX_SESSION").digest();
+const PAGE=await Bun.file("./public/index.html").text();
+const SW=await Bun.file("./public/sw.js").text();
+const MANIFEST=await Bun.file("./public/manifest.webmanifest").text();
+const VAPID_PUBLIC_KEY=String(Bun.env.VAPID_PUBLIC_KEY||"").trim();
+const VAPID_PRIVATE_KEY=String(Bun.env.VAPID_PRIVATE_KEY||"").trim();
+const VAPID_SUBJECT=String(Bun.env.VAPID_SUBJECT||(Bun.env.RAILWAY_PUBLIC_DOMAIN?("https://"+Bun.env.RAILWAY_PUBLIC_DOMAIN):"https://railway.app")).trim();
+const PUSH_READY=Boolean(VAPID_PUBLIC_KEY&&VAPID_PRIVATE_KEY);
+if(PUSH_READY)webpush.setVapidDetails(VAPID_SUBJECT,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY);
+await sql.unsafe(`
+  create table if not exists companion_push_subscriptions(
+    id bigserial primary key,
+    case_id text not null,
+    endpoint text not null unique,
+    subscription jsonb not null,
+    active boolean not null default true,
+    created_at timestamptz not null default now(),
+    last_seen_at timestamptz not null default now()
+  );
+  create index if not exists companion_push_case_idx on companion_push_subscriptions(case_id) where active=true;
+`);
 function json(data,status=200,headers={}){return new Response(JSON.stringify(data),{status,headers:Object.assign({"content-type":"application/json; charset=utf-8","cache-control":"no-store"},headers)})}
 function html(body,status=200){return new Response(body,{status,headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}})}
+function textResponse(body,type,status=200){return new Response(body,{status,headers:{"content-type":type,"cache-control":"no-cache"}})}
 function b64(v){return Buffer.from(v).toString("base64url")}function sign(p){const b=b64(JSON.stringify(p));return b+"."+createHmac("sha256",sessionKey).update(b).digest("base64url")}
 function verify(t){try{const [b,s]=String(t||"").split(".");if(!b||!s)return null;const e=createHmac("sha256",sessionKey).update(b).digest(),g=Buffer.from(s,"base64url");if(e.length!==g.length||!timingSafeEqual(e,g))return null;const p=JSON.parse(Buffer.from(b,"base64url").toString("utf8"));return p.exp&&Date.now()<p.exp?p:null}catch{return null}}
 function cookies(req){const o={};(req.headers.get("cookie")||"").split(";").forEach(x=>{const i=x.indexOf("=");if(i>0)o[x.slice(0,i).trim()]=decodeURIComponent(x.slice(i+1).trim())});return o}
@@ -201,6 +223,43 @@ function renderCompanionMessage(template,payload){
     .replace(/\s+([.,;:])/g,"$1")
     .trim();
 }
+const trackingAttempts=new Map();
+function trackingRateAllowed(req){
+  const forwarded=String(req.headers.get("x-forwarded-for")||"").split(",")[0].trim();
+  const key=forwarded||String(req.headers.get("cf-connecting-ip")||"unknown");
+  const now=Date.now(),windowMs=10*60*1000,limit=30;
+  const x=trackingAttempts.get(key);
+  if(!x||now-x.started>windowMs){trackingAttempts.set(key,{started:now,count:1});return true}
+  x.count++;return x.count<=limit;
+}
+async function findTrackingByCode(code){
+  const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'TOKEN SEGUIMIENTO'=$1 limit 1",[String(code||"")]);
+  return r[0]?.payload||null;
+}
+async function sendCompanionPush(caseId,payload,message,messageId){
+  if(!PUSH_READY)return {sent:0,disabled:true};
+  const rows=await sql.unsafe("select id,subscription from companion_push_subscriptions where case_id=$1 and active=true",[String(caseId||"")]);
+  let sent=0;
+  const notice=JSON.stringify({
+    title:"Clínica AMA · Seguimiento quirúrgico",
+    body:"Paciente: "+String(payload?.["PACIENTE"]||"Paciente")+". "+String(message||""),
+    tag:"cx-"+String(caseId||""),
+    data:{url:"/?follow=1",caseId:String(caseId||""),messageId:String(messageId||"")}
+  });
+  for(const row of rows){
+    try{
+      const sub=objectPayload(row.subscription);
+      await webpush.sendNotification(sub,notice,{TTL:3600,urgency:"high"});
+      sent++;
+      await sql.unsafe("update companion_push_subscriptions set last_seen_at=now() where id=$1",[row.id]);
+    }catch(e){
+      const status=Number(e?.statusCode||0);
+      if(status===404||status===410)await sql.unsafe("update companion_push_subscriptions set active=false where id=$1",[row.id]);
+      else console.error("PUSH_SEND_ERROR",String(e?.message||e));
+    }
+  }
+  return {sent};
+}
 async function setCompanionNotice(session,id,messageId,origin="MANUAL"){
   const hit=await findCase(id);if(!hit)throw new Error("Paciente no encontrado.");
   const cfg=await companionMessagesConfig(),msg=cfg.find(x=>x.id===String(messageId||"").toUpperCase()&&x.enabled);
@@ -215,6 +274,7 @@ async function setCompanionNotice(session,id,messageId,origin="MANUAL"){
   };
   const c=await updateCase(session,id,patch,"AVISO ACOMPAÑANTE");
   await audit(session,"NOTIFICAR ACOMPAÑANTE","ACOMPAÑANTES",id,msg.id+" · "+patch["ORIGEN AVISO ACOMPAÑANTE"]);
+  await sendCompanionPush(id,hit.payload,text,msg.id);
   return {...c,aviso:text,avisoFecha:patch["FECHA/HORA AVISO ACOMPAÑANTE"],avisoId:msg.id};
 }
 async function autoNotifyCompanion(session,id,stateName){
@@ -244,8 +304,32 @@ async function patchUserRow(rowNumber,payload){
 }
 function csvCell(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 Bun.serve({port:PORT,async fetch(req){
- const url=new URL(req.url);if(url.pathname==="/health")return json({ok:true});if(url.pathname==="/")return html(PAGE);
- if(url.pathname==="/api/tracking"){const code=String(url.searchParams.get("code")||"").replace(/\D/g,"").slice(0,5);if(!/^\d{5}$/.test(code))return json({error:"Ingrese el código temporal de 5 dígitos."},400);const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and payload->>'TOKEN SEGUIMIENTO'=$1 limit 1",[code]);if(!r.length)return json({error:"No se encontró un seguimiento asociado a ese código."},404);const c=mapCase(r[0].payload),terminal=["ALTA","HOSPITALIZACIÓN"].includes(c.estado)||["ALTA","HOSPITALIZACIÓN"].includes(String(c.destino||"").toUpperCase());return json({ok:true,estadoPublico:terminal?"":publicState(c.estado,c.destino),actualizado:c.avisoFecha||c.actualizado,active:!terminal&&trackingActiveState(c.estado),terminal,aviso:c.aviso||"",avisoFecha:c.avisoFecha||""})}
+ const url=new URL(req.url);if(url.pathname==="/health")return json({ok:true,push:PUSH_READY});if(url.pathname==="/")return html(PAGE);
+ if(url.pathname==="/sw.js")return textResponse(SW,"application/javascript; charset=utf-8");
+ if(url.pathname==="/manifest.webmanifest")return textResponse(MANIFEST,"application/manifest+json; charset=utf-8");
+ if(url.pathname==="/api/push/config")return json({enabled:PUSH_READY,publicKey:PUSH_READY?VAPID_PUBLIC_KEY:""});
+ if(url.pathname==="/api/push/subscribe"&&req.method==="POST"){
+   if(!PUSH_READY)return json({error:"Las notificaciones push no están configuradas."},503);
+   if(!trackingRateAllowed(req))return json({error:"Demasiados intentos. Intente nuevamente más tarde."},429);
+   const b=await body(req),code=String(b.code||"").replace(/\D/g,"").slice(0,5),subscription=b.subscription;
+   if(!/^\d{5}$/.test(code))return json({error:"Código temporal inválido."},400);
+   if(!subscription||typeof subscription!=="object"||!String(subscription.endpoint||"").startsWith("https://"))return json({error:"Suscripción push inválida."},400);
+   const payload=await findTrackingByCode(code);if(!payload)return json({error:"No se encontró un seguimiento asociado a ese código."},404);
+   const c=mapCase(payload),terminal=["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(c.estado)||["ALTA","HOSPITALIZACIÓN"].includes(String(c.destino||"").toUpperCase());
+   if(terminal)return json({error:"El seguimiento de este paciente ya finalizó."},409);
+   await sql.unsafe(`insert into companion_push_subscriptions(case_id,endpoint,subscription,active,last_seen_at)
+     values($1,$2,$3::jsonb,true,now())
+     on conflict(endpoint) do update set case_id=excluded.case_id,subscription=excluded.subscription,active=true,last_seen_at=now()`,
+     [c.id,String(subscription.endpoint),JSON.stringify(subscription)]);
+   return json({ok:true,patient:c.paciente});
+ }
+ if(url.pathname==="/api/tracking"){
+   if(!trackingRateAllowed(req))return json({error:"Demasiados intentos. Intente nuevamente más tarde."},429);
+   const code=String(url.searchParams.get("code")||"").replace(/\D/g,"").slice(0,5);if(!/^\d{5}$/.test(code))return json({error:"Ingrese el código temporal de 5 dígitos."},400);
+   const payload=await findTrackingByCode(code);if(!payload)return json({error:"No se encontró un seguimiento asociado a ese código."},404);
+   const c=mapCase(payload),terminal=["ALTA","HOSPITALIZACIÓN"].includes(c.estado)||["ALTA","HOSPITALIZACIÓN"].includes(String(c.destino||"").toUpperCase());
+   return json({ok:true,paciente:c.paciente,documento:c.documento,estadoPublico:terminal?"":publicState(c.estado,c.destino),actualizado:c.avisoFecha||c.actualizado,active:!terminal&&trackingActiveState(c.estado),terminal,aviso:c.aviso||"",avisoFecha:c.avisoFecha||""});
+ }
  if(url.pathname==="/api/login"&&req.method==="POST"){const b=await body(req),u=String(b.user||"").trim().toLowerCase(),pin=String(b.pin||"");const r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='USUARIOS' and lower(payload->>'USUARIO')=$1 limit 1",[u]);if(!r.length)return json({error:"Usuario o PIN incorrectos."},401);const x=r[0].payload;if(norm(x["ESTADO"])!=="ACTIVO")return json({error:"Cuenta inactiva."},403);const salt=String(x["SALT PIN"]||""),algo=String(x["ALGORITMO PIN"]||"");if(salt&&algo!=="RAILWAY_V1"&&!Bun.env.QX_AUTH_PEPPER_V1)return json({error:"Esta cuenta antigua requiere migración de autenticación. Un SUPERADMIN puede asignar un nuevo PIN desde Usuarios."},409);const ok=verifyUserPinPayload(x,pin);if(!ok)return json({error:"Usuario o PIN incorrectos."},401);const p={uid:x["ID USUARIO"],user:x["USUARIO"],name:x["NOMBRE"],role:x["ROL"],exp:Date.now()+SESSION_TTL},t=sign(p),permissions=await getRolePermissions(p.role);return json({ok:true,user:p.user,name:p.name,role:p.role,permissions},200,{"set-cookie":"qx_session="+encodeURIComponent(t)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=21600"})}
  if(url.pathname==="/api/logout"&&req.method==="POST")return json({ok:true},200,{"set-cookie":"qx_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"});
  if(url.pathname==="/api/attachment"&&req.method==="POST"){
@@ -494,4 +578,4 @@ Bun.serve({port:PORT,async fetch(req){
  if(url.pathname==="/api/download"){if(!hasPermission(permissions,"DESCARGAS"))return permissionDenied("DESCARGAS");const date=safeDate(url.searchParams.get("date")||""),period=String(url.searchParams.get("period")||"DIA").toUpperCase(),type=String(url.searchParams.get("type")||"PROGRAMACION").toUpperCase();let rows;if(period==="MES"){const ym=date.slice(0,7),r=await sql.unsafe("select payload from source_sheets where source_key='MAIN' and sheet_name='BD PROGRAMACIÓN' and left(payload->>'FECHA CIRUGÍA',7)=$1 order by payload->>'FECHA CIRUGÍA',payload->>'HORA PROGRAMADA'",[ym]);rows=r.map(x=>mapCase(x.payload))}else rows=await casesFor(date);if(type==="ACTIVOS")rows=rows.filter(x=>!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(x.estado));if(type==="EJECUTADAS")rows=rows.filter(x=>x.operado);if(type==="FINALIZADOS")rows=rows.filter(x=>["ALTA","HOSPITALIZACIÓN"].includes(x.estado));if(type==="CANCELADOS")rows=rows.filter(x=>x.estado==="CANCELADO");const dlCfg=await operationalConfig();if(dlCfg.qnos.includes(type))rows=rows.filter(x=>norm(x.qno)===norm(type));let headers=["Fecha","Hora","Paciente","Documento","Procedimiento","Especialidad","Especialista","QNO","Estado","Tipo atención","Observaciones"],data=rows.map(x=>[x.fecha,x.hora,x.paciente,x.documento,x.procedimiento,x.especialidad,x.especialista,x.qno,x.estado,x.tipoAtencion,x.observaciones]);if(type==="TIEMPOS_QNO"){headers=["Fecha","Hora","Paciente","QNO","Prepa→QNO (min)","QNO→Recuperación (min)","Tiempo muerto QNO (min)"];data=rows.map(x=>[x.fecha,x.hora,x.paciente,x.qno,x.tPrepa,x.tQnoRec,x.tMuerto])}if(type==="PROFILAXIS"){headers=["Fecha","Hora","Paciente","Documento","QNO","Administrada","Medicamento","Hora profilaxis","Minutos a incisión","Clasificación"];data=rows.map(x=>[x.fecha,x.hora,x.paciente,x.documento,x.qno,x.prof,x.antibiotico,x.profHora,x.profMin,x.clasif])}const csv=[headers,...data].map(r=>r.map(csvCell).join(",")).join("\n"),name="Cirugia_"+type.replace(/\s+/g,"_")+"_"+date+".csv";await audit(s,"DESCARGA","REPORTES","",type+" "+period);return new Response("\ufeff"+csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":"attachment; filename=\""+name+"\"","x-filename":name,"cache-control":"no-store"}})}
  return json({error:"Not found"},404);
 }});
-console.log("APP WEB CX Railway 5 operational",PORT);
+console.log("APP WEB CX Railway 5.7 operational",PORT,"push",PUSH_READY?"enabled":"disabled");
