@@ -1,0 +1,10 @@
+{
+  "name": "Seguimiento Quirúrgico Clínica AMA",
+  "short_name": "Seguimiento AMA",
+  "start_url": "/?follow=1",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F4F9FD",
+  "theme_color": "#0D024E",
+  "description": "Seguimiento del proceso quirúrgico para acompañantes."
+}
