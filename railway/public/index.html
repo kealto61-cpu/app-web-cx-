@@ -3,9 +3,14 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Control de Pacientes Quirúrgicos</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0D024E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Seguimiento AMA">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.4/qrcode.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
 <style>
-:root{--navy:#0D024E;--navy2:#1A0965;--purple:#49358E;--soft:#F7F5FC;--line:#D9D2EB;--line2:#E8E4F0;--text:#241C3A;--muted:#716986;--green:#207A40;--amber:#B98517;--red:#B74444;--blue:#2D6CDF;--shadow:0 4px 14px rgba(13,2,78,.06)}
+:root{--navy:#0D024E;--navy2:#1A0965;--purple:#49358E;--soft:#F7F5FC;--line:#D9D2EB;--line2:#E8E4F0;--text:#241C3A;--muted:#716986;--green:#207A40;--amber:#B98517;--red:#B74444;--blue:#2D6CDF;--shadow:none}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--soft);color:var(--text)}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
 header{position:sticky;top:0;z-index:40;background:white;border-bottom:1px solid var(--line);box-shadow:0 2px 10px rgba(13,2,78,.05)}.head{min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px}.brand{display:flex;align-items:center;gap:10px}.logo{width:44px;height:40px;border-radius:10px;background:linear-gradient(145deg,var(--navy),var(--purple));color:#fff;display:grid;place-items:center;font-weight:900}.brand strong{color:var(--navy);font-size:19px;display:block}.brand small{font-size:12px;color:var(--muted)}
 .head-actions{display:flex;align-items:center;gap:7px}.session,.datebox{height:40px;border:1px solid var(--line);border-radius:9px;padding:5px 9px;background:#fff}.session b,.session small{display:block}.session b{font-size:10px;color:var(--navy)}.session small,.datebox small{font-size:8px;color:var(--muted)}.datebox input{border:0;outline:0;font-weight:800;color:var(--navy);max-width:125px}
@@ -91,6 +96,13 @@ main{max-width:1750px;margin:auto;padding:14px 16px 30px}.view{display:none}.vie
 .companion-message-table select{min-width:150px}
 .companion-message-table input[type="text"]{min-width:170px}
 .notify-badge{background:#EAF3FA!important;color:#0A4F91!important}
+.companion-patient-card{margin-top:16px;padding:14px 15px;border:1px solid #D8E7F2;border-radius:12px;background:#F8FCFF;text-align:left}
+.companion-patient-card small{display:block;color:#688298;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.companion-patient-card strong{display:block;color:#073B6F;font-size:17px;line-height:1.3;margin:2px 0 8px;overflow-wrap:anywhere}
+.companion-patient-card .doc{font-size:13px;color:#294B67;font-weight:850}
+.companion-push-box{margin-top:12px;padding:12px;border:1px solid #CDE5F5;border-radius:11px;background:#F2F9FE;text-align:left}
+.companion-push-box p{margin:0 0 9px;font-size:11px;color:#4F6D83}
+.companion-push-box .btn{width:100%}
 </style>
 
 <style>
@@ -651,7 +663,7 @@ function parseOrderTextBulk(text,fileName){
     _source:fileName||"PDF",_review:(!paciente||!documento||!procedimiento||!especialidad||!especialista||!cups||!fecha||!hora)
   };
 }
-async function pdfTextContent(file){
+async function pdfPagesText(file){
   if(!window.pdfjsLib)throw new Error("No se pudo cargar el lector PDF.");
   pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   const data=new Uint8Array(await file.arrayBuffer()),pdf=await pdfjsLib.getDocument({data}).promise;
@@ -669,14 +681,57 @@ async function pdfTextContent(file){
     lines.sort((a,b)=>b.y-a.y);
     pages.push(lines.map(l=>l.items.sort((a,b)=>a.x-b.x).map(x=>x.s).join(" ")).join("\n"));
   }
-  return pages.join("\n");
+  return pages;
 }
-async function parsePdfBulk(file){
+async function pdfTextContent(file){return (await pdfPagesText(file)).join("\n\n");}
+function splitScheduleBlocks(text){
+  const t=String(text||"").replace(/\r/g,"\n");
+  const marker=/(?:^|\n)(?=(?:N[º°]?\.?\s*H\.?C\.?|HISTORIA\s+CL[IÍ]NICA|NOMBRE\s+DEL\s+PACIENTE|NOMBRE\s+PACIENTE)\s*[:#]?)/gim;
+  const idx=[...t.matchAll(marker)].map(m=>m.index+(m[0].startsWith("\n")?1:0));
+  if(idx.length<2)return [t];
+  const out=[];
+  for(let i=0;i<idx.length;i++){
+    const a=idx[i],b=i+1<idx.length?idx[i+1]:t.length,block=t.slice(a,b).trim();
+    if(block.length>80)out.push(block);
+  }
+  return out.length?out:[t];
+}
+function scheduleRowKey(r){
+  return [r.documento,r.fecha,r.hora,String(r.procedimiento||"").slice(0,80)].join("|").toUpperCase();
+}
+function scheduleRowUsable(r){return Boolean(r&&(r.paciente||r.documento)&&(r.procedimiento||r.cups||r.especialidad));}
+async function parsePdfSchedule(file){
+  const pages=await pdfPagesText(file),rows=[],seen=new Set();
+  if(!pages.some(x=>x.replace(/\s+/g," ").trim().length>=30))throw new Error("El PDF no contiene texto legible. Requiere OCR.");
+  const add=(row,pageNo)=>{
+    if(!scheduleRowUsable(row))return;
+    row._source=(file.name||"PDF")+" · pág. "+pageNo;
+    row._review=Boolean(row._review||!row.paciente||!row.documento||!row.procedimiento||!row.fecha||!row.hora);
+    const key=scheduleRowKey(row);if(seen.has(key))return;seen.add(key);rows.push(row);
+  };
+  for(let i=0;i<pages.length;i++){
+    const page=pages[i],blocks=splitScheduleBlocks(page);
+    let added=0;
+    if(blocks.length>1){
+      for(const block of blocks){
+        const row=parseOrderTextBulk(block,file.name);
+        if(scheduleRowUsable(row)){add(row,i+1);added++}
+      }
+    }
+    if(!added){
+      const row=parseOrderTextBulk(page,file.name);
+      add(row,i+1);
+    }
+  }
+  return rows;
+}
+async function parsePdfIndividualOrder(file){
   const text=await pdfTextContent(file);
   if(text.replace(/\s+/g," ").trim().length<30)throw new Error("El PDF no contiene texto legible. Requiere OCR.");
   const row=parseOrderTextBulk(text,file.name);
-  return (row.paciente||row.documento||row.procedimiento)?[row]:[];
+  return scheduleRowUsable(row)?row:null;
 }
+async function parsePdfBulk(file){return await parsePdfSchedule(file);}
 async function parseTextLikeBulk(file){
   const text=await file.text();
   if(!text.trim())return [];
@@ -853,18 +908,50 @@ async function searchProfilaxisCatalog(){
   }catch(e){$("profCatalog").innerHTML='<div class="notice">'+esc(e.message)+'</div>'}
 }
 async function loadPostop(){const d=await api("/api/postop?date="+encodeURIComponent($("date").value));const m=d.metrics;$("popMetrics").innerHTML=metric("Casos POP",m.total)+metric("Alta",m.alta)+metric("Hospitalización",m.hospitalizacion)+metric("Recuperación",m.recuperacion)+metric("Con seguimiento",m.conSeguimiento)+metric("Pendientes",m.pendientes);$("popCards").innerHTML=d.rows.map(p=>'<div class="care"><h3>'+esc(p.paciente)+'</h3><p>'+esc(p.procedimiento)+'</p><div><b>Estado / destino</b>'+esc(p.estado)+' · '+esc(p.destino||"—")+'</div><div><b>Salida recuperación</b>'+esc(p.salida||"—")+'</div><div><b>Observación</b>'+esc(p.observacion||"—")+'</div><div><b>Código seguimiento</b>'+esc(p.codigo||"Pendiente")+'</div></div>').join("")||'<div class="empty">Sin casos POP</div>'}
+function companionIdentityHtml(d){
+  return '<div class="companion-patient-card"><small>Paciente</small><strong>'+esc(d.paciente||"Paciente")+'</strong><small>Documento de identidad</small><div class="doc">'+esc(d.documento||"—")+'</div></div>';
+}
+function urlBase64ToUint8Array(base64String){
+  const padding="=".repeat((4-base64String.length%4)%4),base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;
+}
+async function registerCompanionServiceWorker(){
+  if(!("serviceWorker" in navigator))throw new Error("Este navegador no admite notificaciones web.");
+  return await navigator.serviceWorker.register("/sw.js",{scope:"/"});
+}
+async function enableCompanionNotifications(){
+  const code=$("trackCode").value.replace(/\D/g,"").slice(0,5);
+  if(!/^\d{5}$/.test(code)){alert("Primero consulte un paciente con un token válido.");return}
+  try{
+    const reg=await registerCompanionServiceWorker();
+    if(!("PushManager" in window)||!reg.pushManager)throw new Error("Este navegador no admite notificaciones push. En iPhone, agregue este portal a la pantalla de inicio y ábralo desde allí.");
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted")throw new Error("Debe autorizar las notificaciones del navegador para recibir avisos.");
+    const cfg=await api("/api/push/config");
+    if(!cfg.enabled||!cfg.publicKey)throw new Error("El servicio de notificaciones aún no está habilitado.");
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(cfg.publicKey)});
+    await api("/api/push/subscribe",{method:"POST",body:JSON.stringify({code,subscription:sub.toJSON()})});
+    const box=$("companionPushStatus");if(box)box.textContent="Notificaciones activadas en este dispositivo para este paciente.";
+  }catch(e){
+    const box=$("companionPushStatus");if(box)box.textContent=e.message||"No fue posible activar las notificaciones.";
+  }
+}
 async function track(){
   const c=$("trackCode").value.replace(/\D/g,"").slice(0,5);$("trackCode").value=c;
   if(!/^\d{5}$/.test(c)){$("trackResult").innerHTML='<div class="notice">Ingrese un token válido de 5 dígitos.</div>';return}
   $("trackResult").innerHTML="Consultando...";
   try{
     const d=await api("/api/tracking?code="+encodeURIComponent(c));
+    localStorage.setItem("companionTrackCode",c);
+    const identity=companionIdentityHtml(d);
     if(d.terminal){
-      $("trackResult").innerHTML='<div class="companion-final-notice">'+esc(d.aviso||"El seguimiento ha finalizado.")+'</div>';
+      $("trackResult").innerHTML=identity+'<div class="companion-final-notice">'+esc(d.aviso||"El seguimiento ha finalizado.")+'</div>';
       return;
     }
-    let html='<div class="statusbox"><b>'+esc(d.estadoPublico||"Seguimiento activo")+'</b><br><small>Última actualización: '+esc(d.actualizado||"—")+'</small></div>';
+    let html=identity+'<div class="statusbox"><b>'+esc(d.estadoPublico||"Seguimiento activo")+'</b><br><small>Última actualización: '+esc(d.actualizado||"—")+'</small></div>';
     if(d.aviso)html+='<span class="companion-notice-tag">'+esc(d.aviso)+'</span>';
+    html+='<div class="companion-push-box"><p>Active las notificaciones para recibir en este celular los nuevos avisos del equipo quirúrgico, incluso cuando no esté mirando esta pantalla.</p><button class="btn" type="button" onclick="enableCompanionNotifications()">Activar notificaciones en este celular</button><p id="companionPushStatus" style="margin-top:8px;margin-bottom:0"></p></div>';
     $("trackResult").innerHTML=html;
   }catch(e){$("trackResult").innerHTML='<div class="notice">'+esc(e.message)+'</div>'}
 }
@@ -1012,7 +1099,7 @@ async function readPatientFileIntoForm(file){
   if(!(ext==="pdf"||mime==="application/pdf"))return;
   $("patientFilesStatus").textContent="Leyendo PDF y prellenando datos...";
   try{
-    const rows=await parsePdfBulk(file),r=rows[0];
+    const r=await parsePdfIndividualOrder(file);
     if(!r){$("patientFilesStatus").textContent="El PDF se adjuntará, pero no se detectaron datos estructurados.";return}
     const set=(id,v,force=false)=>{if(v&&(force||!String($(id).value||"").trim()))$(id).value=v};
     set("fFecha",r.fecha);set("fHora",r.hora);set("fDoc",r.documento);set("fTel",r.telefono);set("fPaciente",r.paciente);set("fEdad",r.edad);set("fSexo",r.sexo);
@@ -1260,6 +1347,6 @@ async function showView(v){state.view=v;document.querySelectorAll(".view").forEa
 async function login(){try{const d=await api("/api/login",{method:"POST",body:JSON.stringify({user:$("lu").value,pin:$("lp").value})});state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";updateAdminUi();$("login").classList.add("hidden");const first=document.querySelector(".nav button[data-view]:not(.hidden)");await showView(first?.dataset.view||"operativo")}catch(e){$("le").textContent=e.message}}
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closeModal(b.dataset.close)));document.querySelectorAll("[data-coord]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-coord]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".coord-panel").forEach(x=>x.classList.toggle("active",x.id==="coord-"+b.dataset.coord));if(b.dataset.coord==="kpi")await loadKpi();if(b.dataset.coord==="mci")await loadMci();if(b.dataset.coord==="seguridad")await loadSecurity();}));document.querySelectorAll("[data-config]").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("[data-config]").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".config-panel").forEach(x=>x.classList.toggle("active",x.id==="config-"+b.dataset.config));if(b.dataset.config==="usuarios")await loadUsersAdmin();if(b.dataset.config==="roles")await loadRolesAdmin();if(b.dataset.config==="operacion")await loadConfiguration();if(b.dataset.config==="acompanantes")await loadCompanionMessagesConfig()}));
 
-$("lb").addEventListener("click",login);$("sendCompanionNotifyBtn")?.addEventListener("click",sendCompanionNotify);$("addCompanionMessageBtn")?.addEventListener("click",addCompanionMessage);$("saveCompanionMessagesBtn")?.addEventListener("click",saveCompanionMessages);$("addQnoBtn")?.addEventListener("click",addConfigQno);$("newQnoName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addConfigQno()});$("saveOperationalConfigBtn")?.addEventListener("click",saveOperationalConfig);$("newRoleBtn")?.addEventListener("click",openNewRole);$("saveRoleBtn")?.addEventListener("click",saveRole);$("changePinBtn")?.addEventListener("click",()=>openModal("changePinModal"));$("saveOwnPinBtn")?.addEventListener("click",saveOwnPin);$("newUserBtn")?.addEventListener("click",openNewUser);$("saveUserBtn")?.addEventListener("click",saveUser);$("saveResetPinBtn")?.addEventListener("click",saveResetPin);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",async()=>{try{await api("/api/logout",{method:"POST"})}catch{}location.reload()});$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackBtn").addEventListener("click",track);$("trackCode")?.addEventListener("keydown",e=>{if(e.key==="Enter")track()});$("copyTrackingPortalBtn")?.addEventListener("click",copyTrackingPortal);$("openTrackingPortalBtn")?.addEventListener("click",openTrackingPortal);$("printTrackingQrBtn")?.addEventListener("click",()=>printTrackingQr().catch(e=>alert(e.message)));$("downloadCompanionCardsBtn")?.addEventListener("click",()=>downloadCompanionCards().catch(e=>alert(e.message)));$("companionLogin").addEventListener("click",()=>{location.href=trackingPortalUrl()});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>alert(x.message))});$("patientFiles").addEventListener("change",async e=>{state.patientFiles=Array.from(e.target.files||[]);if(!state.patientFiles.length){$("patientFilesStatus").textContent="Sin archivos seleccionados.";return}const pdf=state.patientFiles.find(f=>fileExt(f.name)==="pdf"||String(f.type||"").toLowerCase()==="application/pdf");if(pdf&&!state.editPatientId)await readPatientFileIntoForm(pdf);else $("patientFilesStatus").textContent=state.patientFiles.length+" archivo(s) seleccionados. Se guardarán con el paciente.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);$("confirmCancel")?.addEventListener("click",submitCancel);$("confirmIntraop")?.addEventListener("click",submitIntraop);$("profSearchBtn")?.addEventListener("click",searchProfilaxisCatalog);$("profSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchProfilaxisCatalog()});document.querySelectorAll("[data-prof]").forEach(b=>b.addEventListener("click",()=>chooseProf(b.dataset.prof)));document.querySelectorAll("[data-clasif]").forEach(b=>b.addEventListener("click",()=>chooseClasif(b.dataset.clasif)));["ioAnestIni","ioAnestFin","ioQxIni","ioQxFin","ioProfHora"].forEach(id=>$(id)?.addEventListener("input",updateIntraopCalc));
-(async()=>{$("date").value=new Date().toLocaleDateString("en-CA",{timeZone:"America/Bogota"});if(new URLSearchParams(location.search).get("follow")==="1"){document.body.classList.add("companion-public-mode");$("login").classList.add("hidden");document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));$("view-acompanantes").classList.add("active");$("trackCode")?.focus();return;}try{const d=await api("/api/me");state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";updateAdminUi();$("login").classList.add("hidden");const first=document.querySelector(".nav button[data-view]:not(.hidden)");await showView(first?.dataset.view||"operativo")}catch{}})();
+$("lb").addEventListener("click",login);$("sendCompanionNotifyBtn")?.addEventListener("click",sendCompanionNotify);$("addCompanionMessageBtn")?.addEventListener("click",addCompanionMessage);$("saveCompanionMessagesBtn")?.addEventListener("click",saveCompanionMessages);$("addQnoBtn")?.addEventListener("click",addConfigQno);$("newQnoName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addConfigQno()});$("saveOperationalConfigBtn")?.addEventListener("click",saveOperationalConfig);$("newRoleBtn")?.addEventListener("click",openNewRole);$("saveRoleBtn")?.addEventListener("click",saveRole);$("changePinBtn")?.addEventListener("click",()=>openModal("changePinModal"));$("saveOwnPinBtn")?.addEventListener("click",saveOwnPin);$("newUserBtn")?.addEventListener("click",openNewUser);$("saveUserBtn")?.addEventListener("click",saveUser);$("saveResetPinBtn")?.addEventListener("click",saveResetPin);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",async()=>{try{await api("/api/logout",{method:"POST"})}catch{}location.reload()});$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackBtn").addEventListener("click",track);$("trackCode")?.addEventListener("keydown",e=>{if(e.key==="Enter")track()});$("copyTrackingPortalBtn")?.addEventListener("click",copyTrackingPortal);$("openTrackingPortalBtn")?.addEventListener("click",openTrackingPortal);$("printTrackingQrBtn")?.addEventListener("click",()=>printTrackingQr().catch(e=>alert(e.message)));$("downloadCompanionCardsBtn")?.addEventListener("click",()=>downloadCompanionCards().catch(e=>alert(e.message)));$("companionLogin").addEventListener("click",()=>{location.href=trackingPortalUrl()});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Seleccione la programación completa. El lector masivo procesa todas las páginas y pacientes detectados en PDF, Excel o CSV; podrá corregir cada registro antes de importar.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>alert(x.message))});$("patientFiles").addEventListener("change",async e=>{state.patientFiles=Array.from(e.target.files||[]);if(!state.patientFiles.length){$("patientFilesStatus").textContent="Sin archivos seleccionados.";return}const pdf=state.patientFiles.find(f=>fileExt(f.name)==="pdf"||String(f.type||"").toLowerCase()==="application/pdf");if(pdf&&!state.editPatientId)await readPatientFileIntoForm(pdf);else $("patientFilesStatus").textContent=state.patientFiles.length+" archivo(s) seleccionados. Se guardarán con el paciente.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);$("confirmCancel")?.addEventListener("click",submitCancel);$("confirmIntraop")?.addEventListener("click",submitIntraop);$("profSearchBtn")?.addEventListener("click",searchProfilaxisCatalog);$("profSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchProfilaxisCatalog()});document.querySelectorAll("[data-prof]").forEach(b=>b.addEventListener("click",()=>chooseProf(b.dataset.prof)));document.querySelectorAll("[data-clasif]").forEach(b=>b.addEventListener("click",()=>chooseClasif(b.dataset.clasif)));["ioAnestIni","ioAnestFin","ioQxIni","ioQxFin","ioProfHora"].forEach(id=>$(id)?.addEventListener("input",updateIntraopCalc));
+(async()=>{$("date").value=new Date().toLocaleDateString("en-CA",{timeZone:"America/Bogota"});if(new URLSearchParams(location.search).get("follow")==="1"){document.body.classList.add("companion-public-mode");$("login").classList.add("hidden");document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));$("view-acompanantes").classList.add("active");registerCompanionServiceWorker().catch(()=>{});const saved=localStorage.getItem("companionTrackCode")||"";if(/^\\d{5}$/.test(saved)){$("trackCode").value=saved;await track();}$("trackCode")?.focus();return;}try{const d=await api("/api/me");state.session=d;$("sn").textContent=d.name||d.user;$("sr").textContent=d.role||"";updateAdminUi();$("login").classList.add("hidden");const first=document.querySelector(".nav button[data-view]:not(.hidden)");await showView(first?.dataset.view||"operativo")}catch{}})();
 </script></body></html>
