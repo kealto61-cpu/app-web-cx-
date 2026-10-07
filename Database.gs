@@ -229,8 +229,32 @@ function appendRecord_(sheetName, record, source) {
       : '';
   });
 
-  sheet.appendRow(row);
-  return sheet.getLastRow();
+  /*
+   * No usar appendRow()/getLastRow() para decidir la fila de inserción.
+   * Una ARRAYFORMULA o contenido auxiliar en columnas lejanas puede inflar
+   * artificialmente getLastRow() y enviar los registros al final de la hoja.
+   * La columna A es la clave primaria operativa de las tablas gestionadas
+   * por esta función, por lo que la siguiente fila se determina únicamente
+   * con los valores reales existentes en esa columna.
+   */
+  var maxRows = Math.max(sheet.getMaxRows(), 2);
+  var firstCol = sheet.getRange(2, 1, maxRows - 1, 1).getDisplayValues();
+  var lastDataOffset = -1;
+
+  for (var i = firstCol.length - 1; i >= 0; i--) {
+    if (normalizeText_(firstCol[i][0])) {
+      lastDataOffset = i;
+      break;
+    }
+  }
+
+  var targetRow = lastDataOffset === -1 ? 2 : lastDataOffset + 3;
+  if (targetRow > sheet.getMaxRows()) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), Math.max(100, targetRow - sheet.getMaxRows()));
+  }
+
+  sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+  return targetRow;
 }
 
 function getSystemParameter_(name, fallback) {
