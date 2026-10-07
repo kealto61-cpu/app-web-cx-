@@ -264,7 +264,7 @@ header .logo{
     </section>
   </div>
 </div>
-<header><div class="head"><div class="brand"><div class="logo">AMA</div><div><strong>Control de Pacientes Quirúrgicos</strong><small style="display:inline-block;margin-top:3px;padding:3px 7px;border-radius:999px;background:#E8F3FF;color:#0A4F91;font-weight:900;font-size:10px">CX 5.5 · OPERATIVO ACTUALIZADO</small><small id="subtitle">Flujo quirúrgico del servicio</small></div></div><div class="head-actions"><div class="datebox"><small>Fecha</small><input id="date" type="date"></div><div class="session"><b id="sn">Sin sesión</b><small id="sr">—</small></div><button class="btn soft sm" id="changePinBtn">Cambiar PIN</button><button class="btn soft sm" id="logout">Cerrar sesión</button></div></div><div class="nav">
+<header><div class="head"><div class="brand"><div class="logo">AMA</div><div><strong>Control de Pacientes Quirúrgicos</strong><small style="display:inline-block;margin-top:3px;padding:3px 7px;border-radius:999px;background:#E8F3FF;color:#0A4F91;font-weight:900;font-size:10px">CX 5.8 · DATOS INDEPENDIENTES</small><small id="subtitle">Flujo quirúrgico del servicio</small></div></div><div class="head-actions"><div class="datebox"><small>Fecha</small><input id="date" type="date"></div><div class="session"><b id="sn">Sin sesión</b><small id="sr">—</small></div><button class="btn soft sm" id="changePinBtn">Cambiar PIN</button><button class="btn soft sm" id="logout">Cerrar sesión</button></div></div><div class="nav">
 <button class="active" data-view="operativo"><b>Operativo</b></button>
 <button data-view="programacion"><b>Programación</b></button>
 <button data-view="profilaxis"><b>Profilaxis</b><small>Prequirúrgica</small></button>
@@ -341,7 +341,7 @@ header .logo{
 <div class="coord-panel" id="coord-kpi"><div class="toolbar"><select id="kpiPeriod"><option value="MES">Mes</option><option value="DIA">Día</option></select><select id="kpiView"><option value="general">General</option><option value="productividad">Productividad</option><option value="tiempos">Tiempos</option><option value="muertos">Tiempos muertos</option><option value="especialidades">Especialidades</option><option value="cancelaciones">Cancelaciones</option><option value="flujo">Flujo</option></select><button class="btn soft" id="kpiRefresh">Actualizar KPI</button><div></div></div><div class="metrics" id="kpiMetrics"></div><div class="panel"><div class="chartbars" id="kpiChart"></div></div><div class="panel table-wrap" style="margin-top:8px"><table style="min-width:760px"><thead id="kpiHead"></thead><tbody id="kpiBody"></tbody></table></div></div>
 <div class="coord-panel" id="coord-mci"><div class="metrics" id="mciMetrics"></div><div class="panel"><div class="chartbars" id="mciChart"></div></div><div class="panel table-wrap" style="margin-top:8px"><table style="min-width:900px"><thead><tr><th>Fecha</th><th>Día</th><th>QNO disponibles</th><th>Meta</th><th>Programadas</th><th>Ejecutadas</th><th>Diferencia</th><th>Cumple</th><th>Acumulado</th></tr></thead><tbody id="mciBody"></tbody></table></div></div>
 <div class="coord-panel" id="coord-seguridad"><div class="metrics" id="secMetrics"></div><div class="panel table-wrap"><table style="min-width:900px"><thead><tr><th>Paciente</th><th>Documento</th><th>Cirugía previa</th><th>Nueva cirugía</th><th>Días</th><th>Especialidad</th></tr></thead><tbody id="reintBody"></tbody></table></div></div>
-<div class="coord-panel" id="coord-descargas"><div class="panel"><div class="formgrid"><div class="field"><label>Periodo</label><select id="dlPeriod"><option value="DIA">Día</option><option value="MES">Mes</option></select></div><div class="field"><label>Información</label><select id="dlType"><option value="PROGRAMACION">Programación</option><option value="ACTIVOS">Activos</option><option value="EJECUTADAS">Ejecutadas</option><option value="FINALIZADOS">Finalizados</option><option value="CANCELADOS">Cancelados</option><option value="TIEMPOS_QNO">Tiempos QNO</option><option value="PROFILAXIS">Profilaxis</option></select></div><div class="field"><label>Formato</label><select id="dlFormat"><option value="CSV">CSV</option><option value="XLSX">Excel XLSX</option><option value="PDF">PDF ejecutivo</option></select></div><div class="field" style="display:flex;align-items:end"><button class="btn" id="downloadBtn" style="width:100%">Descargar</button></div></div><div class="notice" style="margin-top:10px">La descarga se genera desde la réplica PostgreSQL. Toda modificación operativa queda en cola de sincronización con Drive.</div></div></div>
+<div class="coord-panel" id="coord-descargas"><div class="panel"><div class="formgrid"><div class="field"><label>Periodo</label><select id="dlPeriod"><option value="DIA">Día</option><option value="MES">Mes</option></select></div><div class="field"><label>Información</label><select id="dlType"><option value="PROGRAMACION">Programación</option><option value="ACTIVOS">Activos</option><option value="EJECUTADAS">Ejecutadas</option><option value="FINALIZADOS">Finalizados</option><option value="CANCELADOS">Cancelados</option><option value="TIEMPOS_QNO">Tiempos QNO</option><option value="PROFILAXIS">Profilaxis</option></select></div><div class="field"><label>Formato</label><select id="dlFormat"><option value="CSV">CSV</option><option value="XLSX">Excel XLSX</option><option value="PDF">PDF ejecutivo</option></select></div><div class="field" style="display:flex;align-items:end"><button class="btn" id="downloadBtn" style="width:100%">Descargar</button></div></div><div class="notice" style="margin-top:10px">La descarga se genera directamente desde la base operativa PostgreSQL. Los módulos ya no dependen de sincronización con Google Sheets o Drive.</div></div></div>
 </section>
 <section class="view" id="view-configuracion">
   <div class="hero">
@@ -453,7 +453,7 @@ header .logo{
 <div class="field span2"><label>Procedimiento *</label><input id="fProc"></div><div class="field"><label>Especialidad</label><input id="fEsp"></div><div class="field"><label>Especialista</label><input id="fMed"></div>
 <div class="field"><label>Tipo atención</label><select id="fTipo"><option value=""></option><option>AMBULATORIO</option><option>HOSPITALIZADO</option></select></div><div class="field"><label>Cama / ubicación</label><input id="fCama"></div><div class="field"><label>UVR</label><input id="fUvr"></div><div class="field"><label>Tiempo estimado (min)</label><input id="fTiempo" type="number"></div>
 <div class="field span2"><label>Recursos / alertas</label><textarea id="fRecursos"></textarea></div><div class="field span2"><label>Observaciones</label><textarea id="fObs"></textarea></div><div class="field span4"><label>Archivos / soportes del paciente</label><input id="patientFiles" type="file" multiple><div class="notice" id="patientFilesStatus" style="margin:6px 0 0">Puede adjuntar cualquier tipo de archivo. Los archivos se asocian al caso y no se ejecutan dentro de la aplicación.</div></div></div><div class="modal-actions"><button class="btn soft" data-close="patientModal">Cancelar</button><button class="btn" id="savePatient">Guardar paciente</button></div></div></div>
-<div class="modal" id="bulkModal"><div class="modal-card"><div class="modal-head"><div><span class="kicker">CARGA MASIVA</span><h3>Importar programación</h3></div><button class="btn soft sm" data-close="bulkModal">Cerrar</button></div><div class="field"><label>Archivos de programación / soportes</label><input id="bulkFile" type="file" multiple></div><div class="notice" id="bulkStatus">Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF y archivos de texto compatibles intentarán procesarse automáticamente; los demás se conservarán como soporte del cargue.</div><div class="bulk-quality" id="bulkQuality"></div><div class="preview bulk-preview-wrap" id="bulkPreview"></div><div class="modal-actions"><button class="btn soft" data-close="bulkModal">Cancelar</button><button class="btn" id="bulkImport" disabled>Importar filas</button></div></div></div>
+<div class="modal" id="bulkModal"><div class="modal-card"><div class="modal-head"><div><span class="kicker">CARGA MASIVA</span><h3>Importar programación</h3></div><button class="btn soft sm" data-close="bulkModal">Cerrar</button></div><div class="field"><label>Archivos de programación / soportes</label><input id="bulkFile" type="file" multiple></div><div class="notice" id="bulkStatus">Seleccione la programación completa. PDF, Excel y CSV se analizan para detectar todos los pacientes; cada registro puede corregirse antes de importar. Otros archivos se conservarán como soporte.</div><div class="bulk-quality" id="bulkQuality"></div><div class="preview bulk-preview-wrap" id="bulkPreview"></div><div class="modal-actions"><button class="btn soft" data-close="bulkModal">Cancelar</button><button class="btn" id="bulkImport" disabled>Importar filas</button></div></div></div>
 <script>
 const $=id=>document.getElementById(id);const state={view:"operativo",patients:[],session:null,bulk:[],bulkFiles:[],patientFiles:[],trackingRows:[],editPatientId:null,users:[],roles:[],config:{qnos:["QNO 1","QNO 2","QNO 3"],flow:{},states:["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"]},rolesAdmin:[],rolePermissionCatalog:[],companionMessages:[]};
 function esc(v){const d=document.createElement("div");d.textContent=String(v==null?"":v);return d.innerHTML}
@@ -700,28 +700,41 @@ function scheduleRowKey(r){
   return [r.documento,r.fecha,r.hora,String(r.procedimiento||"").slice(0,80)].join("|").toUpperCase();
 }
 function scheduleRowUsable(r){return Boolean(r&&(r.paciente||r.documento)&&(r.procedimiento||r.cups||r.especialidad));}
+function groupPdfPagesIntoOrders(pages){
+  const groups=[];
+  for(let i=0;i<pages.length;){
+    const page=pages[i]||"",m=page.match(/P[ÁA]G\.?\s*(\d+)\s+DE\s+(\d+)/i);
+    const current=m?Number(m[1]):1,total=m?Math.max(1,Number(m[2])):1;
+    if(current===1&&total>1){
+      const slice=pages.slice(i,Math.min(pages.length,i+total));
+      groups.push({text:slice.join("\n\n"),from:i+1,to:i+slice.length});
+      i+=slice.length;
+    }else{
+      groups.push({text:page,from:i+1,to:i+1});i++;
+    }
+  }
+  return groups;
+}
 async function parsePdfSchedule(file){
   const pages=await pdfPagesText(file),rows=[],seen=new Set();
   if(!pages.some(x=>x.replace(/\s+/g," ").trim().length>=30))throw new Error("El PDF no contiene texto legible. Requiere OCR.");
-  const add=(row,pageNo)=>{
+  const groups=groupPdfPagesIntoOrders(pages);
+  const add=(row,label)=>{
     if(!scheduleRowUsable(row))return;
-    row._source=(file.name||"PDF")+" · pág. "+pageNo;
+    row._source=(file.name||"PDF")+" · "+label;
     row._review=Boolean(row._review||!row.paciente||!row.documento||!row.procedimiento||!row.fecha||!row.hora);
     const key=scheduleRowKey(row);if(seen.has(key))return;seen.add(key);rows.push(row);
   };
-  for(let i=0;i<pages.length;i++){
-    const page=pages[i],blocks=splitScheduleBlocks(page);
+  for(const group of groups){
+    const blocks=splitScheduleBlocks(group.text),label=group.from===group.to?("pág. "+group.from):("págs. "+group.from+"-"+group.to);
     let added=0;
     if(blocks.length>1){
       for(const block of blocks){
         const row=parseOrderTextBulk(block,file.name);
-        if(scheduleRowUsable(row)){add(row,i+1);added++}
+        if(scheduleRowUsable(row)){add(row,label);added++}
       }
     }
-    if(!added){
-      const row=parseOrderTextBulk(page,file.name);
-      add(row,i+1);
-    }
+    if(!added)add(parseOrderTextBulk(group.text,file.name),label);
   }
   return rows;
 }
