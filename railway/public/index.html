@@ -1070,7 +1070,7 @@ header .logo{
     <div class="field span2"><label>Paciente</label><input id="cPaciente" disabled></div><div class="field"><label>QNO</label><input id="cQno" disabled></div>
     <div class="field"><label>Jefe que registra</label><input id="cJefe" disabled></div>
     <div class="field"><label>Momento de cancelación *</label><select id="cMomento"><option></option><option>Antes del día de la cirugía</option><option>Día de cirugía, antes del ingreso</option><option>Después del ingreso a la institución</option><option>En preparación prequirúrgica</option><option>En sala de cirugía</option></select></div>
-    <div class="field"><label>Causa principal *</label><select id="cCausa"><option></option><option>Disponibilidad de quirófano o tiempo quirúrgico</option><option>Insumos, medicamentos o dispositivos</option><option>Instrumental o esterilización</option><option>Equipo biomédico o tecnología</option><option>Talento humano asistencial</option><option>Especialista o equipo médico</option><option>Anestesia</option><option>Condición o decisión del paciente</option><option>Programación, autorización o asegurador</option><option>Condición clínica</option><option>Otra</option></select></div>
+    <div class="field"><label>Motivo seleccionado *</label><select id="cCausa"><option></option><option>Disponibilidad de quirófano o tiempo quirúrgico</option><option>Insumos, medicamentos o dispositivos</option><option>Instrumental o esterilización</option><option>Equipo biomédico o tecnología</option><option>Talento humano asistencial</option><option>Especialista o equipo médico</option><option>Anestesia</option><option>Condición o decisión del paciente</option><option>Programación, autorización o asegurador</option><option>Condición clínica</option><option>Otra</option></select></div>
     <div class="field span2"><label>Motivo específico *</label><textarea id="cMotivo"></textarea></div>
     <div class="field"><label>Gestión realizada</label><select id="cGestion"><option></option><option>Se consiguió sala alternativa</option><option>Se consiguió insumo, medicamento o equipo</option><option>Se reorganizó la programación</option><option>Se escaló a Coordinación de Cirugía</option><option>Se contactó al especialista o anestesia</option><option>Se contactó al paciente o familiar</option><option>Se gestionó con asegurador o autorizaciones</option><option>Se intentó reprogramar el mismo día</option><option>No fue posible aplicar contingencia</option><option>Otra</option></select></div>
     <div class="field"><label>Atribuible a *</label><select id="cAtribuible"><option></option><option>PACIENTE</option><option>ESPECIALISTA</option><option>INSTITUCIÓN</option></select></div>
@@ -2072,7 +2072,7 @@ function openCancel(id){
 }
 async function submitCancel(){
   const p={id:$("cId").value,jefeTurno:$("cJefe").value,momento:$("cMomento").value,causa:$("cCausa").value,motivo:$("cMotivo").value,gestion:$("cGestion").value,atribuible:$("cAtribuible").value,prevenible:$("cPrevenible").value,hallazgo:$("cHallazgo").value,clasificacionRecurso:$("cRecurso").value,observaciones:$("cObs").value};
-  if(!p.momento||!p.causa||!p.motivo||!p.atribuible){appAlert("Complete momento, causa, motivo y atribuibilidad.");return}
+  if(!p.momento||!p.causa||!p.motivo||!p.atribuible){appAlert("Complete momento, motivo seleccionado, motivo específico y atribuibilidad.");return}
   await performPatientFormAction(p.id,"cancelModal",{url:"/api/case/cancel",body:p},"Cancelación registrada.");
 }
 function timeMin(v){const m=String(v||"").match(/^(\d{2}):(\d{2})$/);return m?Number(m[1])*60+Number(m[2]):null}
@@ -2423,7 +2423,7 @@ async function loadKpi(){
     body=d.qnos.map(x=>'<tr><td>'+esc(x.qno)+'</td><td>'+x.tiempoMuerto+'</td><td>'+x.tiempoQnoRec+'</td></tr>').join("");
   }else if(view==="cancelaciones"){
     metrics=metric("Canceladas",s.canceladas)+metric("Tasa cancelación",s.tasaCancelacion+"%")+metric("Programadas brutas",s.programadasBrutas)+metric("Netas",s.programadasNetas)+metric("Ejecutadas",s.ejecutadas)+metric("Periodo",$("kpiPeriod").value);
-    items=d.cancelaciones.causas;head='<tr><th>Causa / motivo registrado</th><th>Casos</th></tr>';body=items.map(x=>'<tr><td>'+esc(x.label)+'</td><td>'+x.value+'</td></tr>').join("");
+    items=d.cancelaciones.causas;head='<tr><th>Motivo seleccionado</th><th>Motivo específico asociado</th><th>Casos</th></tr>';body=d.cancelaciones.motivos.map(x=>'<tr><td>'+esc(x.motivoSeleccionado)+'</td><td>'+esc(x.motivoEspecifico)+'</td><td>'+x.value+'</td></tr>').join("");
   }else if(view==="flujo"){
     metrics=d.flujo.slice(0,6).map(x=>metric(x.label,x.value)).join("");
     items=d.flujo;head='<tr><th>Etapa</th><th>Pacientes</th></tr>';body=items.map(x=>'<tr><td>'+esc(x.label)+'</td><td>'+x.value+'</td></tr>').join("");

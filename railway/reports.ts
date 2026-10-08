@@ -1,7 +1,8 @@
 // Reporting calculations preserved from Apps Script; inputs come from the isolated database.
 import {calculateSurgicalProductivity} from './nursing-productivity.ts';
 import {calculateSpecialistProductivity,specialistReportSection} from './specialist-productivity.ts';
-export function createReports({cases,reporting,permissions,session,config,boardMetrics,reportRange=null,indicatorMetadata={}}){
+import {cancellationSummary} from './cancellation-summary.ts';
+export function createReports({cases,reporting,permissions,session,config,boardMetrics,reportRange=null,indicatorMetadata={},cancellations=[]}){
 const normalizeText_=value=>String(value??'').trim();
 const normalizeHeader_=value=>normalizeText_(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
 const parseIsoDate_=value=>new Date(String(value).slice(0,10)+'T12:00:00Z');
@@ -322,13 +323,6 @@ function kpiApp_(token, dateIso, period) {
     };
   });
 
-  var causes = {};
-  rows.filter(function(x) { return x.estado === 'CANCELADO'; })
-    .forEach(function(x) {
-      var key = x.observaciones || 'SIN MOTIVO';
-      causes[key] = (causes[key] || 0) + 1;
-    });
-
   return {
     summary: {
       programadasBrutas: gross,
@@ -355,11 +349,7 @@ function kpiApp_(token, dateIso, period) {
       }).length },
       { label: 'CANCELADOS', value: cancelled }
     ],
-    cancelaciones: {
-      causas: Object.keys(causes).map(function(label) {
-        return { label: label, value: causes[label] };
-      }).sort(function(a, b) { return b.value - a.value; })
-    }
+    cancelaciones: cancellationSummary(rows, cancellations)
   };
 }
 
@@ -584,7 +574,10 @@ function downloadIndicatorApp_(token, date, period, type, session) {
         section('Definiciones por especialista',['Criterio'],kpi.especialistas.notes.map(note=>[note]));
       }
       if (['KPI_TIEMPOS','KPI_MUERTOS_QNO'].indexOf(type) !== -1) section('Detalle por QNO', ['QNO', 'QNO → Recuperación promedio (min)', 'Tiempo muerto promedio (min)'], kpi.qnos.map(function(row) { return [row.qno, row.tiempoQnoRec, row.tiempoMuerto]; }));
-      if (type === 'KPI_CANCELACIONES') section('Causas de cancelación', ['Causa / motivo registrado', 'Casos'], kpi.cancelaciones.causas.map(function(row) { return [row.label, row.value]; }));
+      if (type === 'KPI_CANCELACIONES') {
+        section('Cancelaciones por motivo seleccionado', ['Motivo seleccionado', 'Casos'], kpi.cancelaciones.causas.map(function(row) { return [row.label, row.value]; }));
+        section('Motivos específicos asociados', ['Motivo seleccionado', 'Motivo específico', 'Casos'], kpi.cancelaciones.motivos.map(function(row) { return [row.motivoSeleccionado, row.motivoEspecifico, row.value]; }));
+      }
       if (type === 'KPI_FLUJO') section('Flujo por etapa', ['Etapa', 'Pacientes'], kpi.flujo.map(function(row) { return [row.label, row.value]; }));
     }
   } else if (option.family === 'mci') {

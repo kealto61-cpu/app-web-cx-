@@ -1,4 +1,4 @@
-# Railway · 5.9.3-pasp
+# Railway · 5.9.5-pasp
 
 El servicio existente publica este directorio desde GitHub `main`, con `Dockerfile`, Bun 1.3.6 y PostgreSQL. No necesita Apps Script ni una conexión a Google Drive.
 
@@ -50,3 +50,5 @@ Productividad por enfermero jefe: KPI y descarga KPI_ENFERMERIA desglosan cirug�
 KPI incorpora productividad, cancelaciones y tasas por especialista registrado. Realización = realizadas / programadas netas; cancelación = canceladas / programadas brutas. Denominador cero e inconsistencias operado/cancelado se muestran como No evaluable según corresponda. Cada medida por especialista tiene su descarga por período.
 
 La tarjeta intraoperatoria se configura en **Configuración → Operativo**: ingreso a QNO, salida de QNO y cierre de Recuperación. El selector permite diligenciamiento Electivo u Obligatorio (inicialmente Electivo). En modo Obligatorio se exige el registro completo antes de salir de QNO o cerrar Recuperación. En modo Electivo, «Continuar sin completar» permite avanzar y «Registro QX» guarda observaciones parciales sin trasladar al paciente. Los datos ausentes no equivalen a respuestas negativas. Los mensajes para acompañantes son editables y ninguno es obligatorio, incluidos Alta y Hospitalización. «Habilitar todos» activa la lista antes de guardar; los borradores sin texto no se envían.
+
+El indicador de cancelaciones agrupa exclusivamente por el motivo seleccionado en la lista. La tabla y la descarga KPI_CANCELACIONES asocian ese motivo a cada motivo específico y su conteo. Las observaciones generales se conservan como notas y no crean categorías. Los registros históricos se consultan desde qx_cancellations; si no existe selección verificable, se informa SIN MOTIVO SELECCIONADO sin inferirla del texto libre.
