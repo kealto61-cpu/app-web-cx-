@@ -1,6 +1,6 @@
 # Fichas técnicas de indicadores · APP WEB CX 5.9 PASP
 
-Catálogo de 71 medidas individuales (23 de la matriz PASP, 14 ampliaciones de seguimiento y 34 del módulo quirúrgico) y 12 reportes agregados. Dos contadores heredados de revisión de reintervenciones se presentan como **No evaluables**, porque no tienen registro de revisión verificable. Los candidatos son alertas para análisis profesional; no confirman una reintervención ni un evento adverso.
+Catálogo de 71 medidas individuales (23 de la matriz PASP, 14 ampliaciones de seguimiento y 34 del módulo quirúrgico) y 19 reportes agregados. Dos contadores heredados de revisión de reintervenciones se presentan como **No evaluables**, porque no tienen registro de revisión verificable. Los candidatos son alertas para análisis profesional; no confirman una reintervención ni un evento adverso.
 
 ## Periodo y fuentes
 
@@ -770,17 +770,18 @@ El despliegue Railway utiliza únicamente datos ficticios, en una base aislada d
 - **Interpretación y límites:** Sin denominador: No evaluable. Denominador por episodio, no por número de fichas.
 - **Descarga individual:** PASP_CONTACT_EPISODE_COVERAGE (CSV, Excel o PDF; rango, mes o año).
 
-### 63. Fichas con alerta urgente
+### 63. Llamadas con al menos una alerta urgente
 
 - **Código:** PASP_URGENT_ALARMS
-- **Qué mide:** No asigna categoría de triage ni confirma eventos adversos.
-- **Fórmula:** Fichas con señal urgente registrada
-- **Unidad:** llamadas
-- **Meta inicial:** Informativo
-- **Periodicidad:** Según cohorte por fecha de cirugía
-- **Responsable:** Coordinación de Cirugía
-- **Interpretación y límites:** Sin denominador: No evaluable. No asigna categoría de triage ni confirma eventos adversos.
-- **Descarga individual:** PASP_URGENT_ALARMS (CSV, Excel o PDF; rango, mes o año).
+- **Qué mide:** Número de fichas originales de llamada que registraron al menos una señal urgente (`urgentSafety = verdadero`).
+- **Fórmula:** Conteo de fichas originales con alerta urgente; cada ficha cuenta una vez.
+- **Ejemplo:** Tres señales urgentes en la llamada de Ana cuentan una ficha. Si Ana registra una alerta en dos llamadas diferentes, cuentan dos fichas.
+- **Unidad:** fichas de llamada; no pacientes únicos.
+- **Meta:** Informativo. No se interpreta un mayor o menor conteo como mejor desempeño del profesional.
+- **Período:** Cohorte por fecha de cirugía, igual que los demás indicadores PASP; incluye todas las llamadas asociadas a los episodios de esa cohorte.
+- **Responsable:** Coordinación de Cirugía.
+- **Interpretación:** No confirma diagnósticos, eventos adversos ni categoría de triage. Cero significa que no hay fichas con alerta en los registros incluidos, no que se haya demostrado ausencia de riesgo.
+- **Descarga:** PASP_URGENT_ALARMS (CSV, Excel o PDF; rango, mes o año).
 
 ### 64. Escalamientos registrados
 
@@ -880,7 +881,7 @@ El despliegue Railway utiliza únicamente datos ficticios, en una base aislada d
 
 ## Reportes agregados
 
-Estos 12 reportes reúnen varias medidas o el detalle de los casos; no son 12 indicadores adicionales.
+Estos 19 reportes reúnen varias medidas o desglosan las existentes por responsable; no son 19 indicadores adicionales.
 
 - **KPI general** (`KPI_GENERAL`): reporte del periodo seleccionado.
 - **Productividad quirúrgica** (`KPI_PRODUCTIVIDAD`): reporte del periodo seleccionado.
@@ -894,6 +895,54 @@ Estos 12 reportes reúnen varias medidas o el detalle de los casos; no son 12 in
 - **Profilaxis: todos los indicadores** (`PROF_INDICADORES`): reporte del periodo seleccionado.
 - **Cuidados POP: todos los indicadores** (`POP_INDICADORES`): reporte del periodo seleccionado.
 - **Detalle de candidatos a reintervención** (`SEG_DETALLE`): reporte del periodo seleccionado.
+
+- **Productividad quirúrgica por enfermero jefe** (`KPI_ENFERMERIA`): cirugías realizadas y estado/destino por responsable registrado en cada caso.
+- **Productividad de llamadas por enfermero jefe** (`PASP_PRODUCTIVIDAD_ENFERMERIA`): fichas, contactos efectivos y pacientes contactados por autor de la llamada.
+
+## Productividad por enfermero jefe
+
+**Cirugía — Coordinación → KPI → Productividad por enfermero jefe.** Se agrupan los casos por **ENFERMERO JEFE CIRUGÍA**, conservado al registrar por primera vez la cirugía realizada, o por evidencia histórica de ese mismo registro en Auditoría. El campo ENFERMERO JEFE del último movimiento no se usa para asignar producción. Cirugías realizadas = casos distintos con `OPERADO = verdadero`. Guardar o mover de nuevo un caso no incrementa el conteo. Los casos registrados sin cirugía realizada se muestran aparte del volumen realizado. Alta, Hospitalización y Recuperación desglosan el estado/destino al consultar. La fecha del período es la fecha de cirugía. Los casos sin jefe aparecen en **SIN RESPONSABLE HISTÓRICO VERIFICABLE**; nunca se asignan al jefe del turno actual. Los registros anteriores sin evidencia histórica verificable quedan sin atribuir. El texto del responsable debe ser consistente; no identifica por sí solo a todos los integrantes del equipo ni toda la carga de enfermería.
+
+**Llamadas — Seguimiento postoperatorio → Productividad de llamadas por enfermero jefe / profesional.** El período corresponde a la **fecha real de llamada**, incluyendo cirugías de meses anteriores. Se agrupa por la cuenta que registró cada ficha, con nombre y usuario; las nuevas fichas guardan también el identificador estable de la cuenta, tomado de la sesión. No se acepta un autor enviado desde el formulario. Los registros sin autor verificable quedan en una fila separada.
+
+| Medida por profesional | Cálculo e interpretación |
+|---|---|
+| Fichas / intentos registrados | Fichas originales distintas por ID en el período de actividad. No suma adendas ni el mismo guardado repetido. |
+| Contactos efectivos | Fichas cuyo resultado del contacto es Sí. |
+| Sin contacto efectivo | Fichas / intentos menos contactos efectivos. |
+| Pacientes contactados distintos | Documentos distintos con al menos un contacto efectivo por ese profesional. El mismo paciente con dos cirugías cuenta una persona; puede aparecer con más de un profesional. No sumar estas filas para obtener pacientes únicos institucionales. |
+| Episodios trabajados | Episodios quirúrgicos distintos con una ficha del profesional, haya o no contacto efectivo. |
+| Primera, segunda y adicionales | Fichas con número 1, número 2 y los demás números; cada llamada mantiene su ficha independiente. |
+| Contacto efectivo (%) | Contactos efectivos / fichas registradas por el mismo profesional × 100. Sin fichas: No evaluable; no se inventa 0 %. |
+| Actividad por hora trabajada | **No evaluable** hasta disponer de horas trabajadas verificables. No se usa el tiempo de cirugía, la sesión abierta ni los días calendario como horas laborales. |
+
+Ejemplo: un jefe registra 10 fichas y logra 6 contactos efectivos en 4 pacientes: productividad documentada **10 fichas**, **6 contactos efectivos**, **4 pacientes contactados**, con efectividad de contacto **60 %**. Esto mide volumen registrado; no constituye una evaluación de calidad clínica ni comparación ajustada por jornada, complejidad y carga.
+
+Ambos reportes se descargan por rango, mes o año en **Coordinación → Descargas**, en CSV, Excel o PDF. El reporte **Productividad quirúrgica** también incorpora el detalle por enfermero jefe. Se mantienen las 71 medidas originales y su numeración: estos reportes desglosan medidas existentes por responsable.
+
+## Productividad, cancelaciones y tasas por especialista
+
+Vista en **Coordinación → KPI**. Descargas por **rango, mes o año** en CSV, Excel y PDF, con reporte completo y cuatro descargas separadas. Se usa **ESPECIALISTA registrado en el caso**, agrupando nombres equivalentes por mayúsculas, acentos y espacios; los nombres deben ser consistentes. Se cuenta cada caso quirúrgico distinto una vez, dentro de la fecha de cirugía del período seleccionado. Los casos sin especialista se muestran en una fila explícita.
+
+| Medida por especialista | Fórmula |
+|---|---|
+| Programadas brutas | Casos distintos programados en el período. |
+| Cancelaciones | Casos con estado CANCELADO. |
+| Programadas netas | Programadas brutas − canceladas. |
+| Productividad | Cirugías registradas como realizadas: OPERADO verdadero. |
+| Pendientes de realización | Programadas netas − realizadas, salvo inconsistencia operado/cancelado. |
+| Tasa de realización | Realizadas / programadas netas × 100. Si netas = 0: No evaluable. |
+| Tasa de cancelación | Canceladas / programadas brutas × 100. Si brutas = 0: No evaluable. |
+
+Ejemplo: un especialista tiene **20 programadas, 2 canceladas y 15 realizadas**: netas = **18**; tasa de realización = **83,33 %**; tasa de cancelación = **10 %**; pendientes = **3**. No se promedian porcentajes diarios o mensuales para el rango: se calcula sobre los conteos completos del especialista.
+
+Una cancelación vinculada con la programación de un especialista **no demuestra que él sea su causa**; el análisis causal conserva el motivo y la clasificación del caso. Un registro marcado simultáneamente operado y cancelado se señala para revisión, conservando los conteos originales; su tasa de realización y sus pendientes son No evaluables. La productividad por hora requiere horas verificables y no se calcula a partir de la duración de la cirugía.
+
+- **Especialistas: productividad y tasas** (`KPI_ESPECIALISTAS`): desglose por especialista del período seleccionado.
+- **Productividad por especialista** (`KPI_PRODUCTIVIDAD_ESPECIALISTA`): desglose por especialista del período seleccionado.
+- **Cancelaciones por especialista** (`KPI_CANCELACIONES_ESPECIALISTA`): desglose por especialista del período seleccionado.
+- **Tasa de realización por especialista** (`KPI_TASA_REALIZACION_ESPECIALISTA`): desglose por especialista del período seleccionado.
+- **Tasa de cancelación por especialista** (`KPI_TASA_CANCELACION_ESPECIALISTA`): desglose por especialista del período seleccionado.
 
 ## Configuración sin editar código
 

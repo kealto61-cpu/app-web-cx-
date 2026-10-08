@@ -1,4 +1,4 @@
-# Railway · 5.9.0-pasp
+# Railway · 5.9.1-pasp
 
 El servicio existente publica este directorio desde GitHub `main`, con `Dockerfile`, Bun 1.3.6 y PostgreSQL. No necesita Apps Script ni una conexión a Google Drive.
 
@@ -40,3 +40,7 @@ La exportación de matriz mantiene los 70 campos originales para las primeras do
 El seguimiento admite únicamente cirugías realizadas. Al crear el episodio puede seleccionar un caso operado de la fecha de cirugía visible o registrar manualmente una cirugía ya realizada. La carga masiva y el formulario de paciente conservan `FECHA CITA POP` y `HORA CITA POP`, editables antes de importar; los campos se trasladan al seleccionar el caso operado. Los datos ausentes permanecen vacíos. Un caso quirúrgico tiene un episodio y cada llamada o intento tiene su propia ficha.
 
 Las descargas admiten `RANGO` (`from` y `to` inclusivos), `MES` (`month=AAAA-MM`), `ANIO` (`year=AAAA`) y `DIA`. Los indicadores se calculan sobre el periodo completo; MCI usa los registros diarios, muestra desglose mensual y no promedia porcentajes. Las fuentes faltantes y revisiones heredadas sin registro verificable se presentan como no evaluables. Configuración incorpora listas, fichas técnicas/metas, presentación, actualización del portal y criterio de cita POP, con revisión concurrente y trazabilidad.
+
+Productividad por enfermero jefe: KPI y descarga KPI_ENFERMERIA desglosan cirugías realizadas por responsable preservado al registrar OPERADO. La evidencia histórica de Auditoría puede identificar registros anteriores; los que no tienen evidencia quedan sin atribuir. PASP_PRODUCTIVIDAD_ENFERMERIA mide fichas e intentos, contactos efectivos y pacientes contactados por autor autenticado y por fecha real de llamada. Adendas y guardados repetidos no suman actividad; sin horas trabajadas verificables la productividad por hora es No evaluable. Se mantienen 71 medidas originales y 19 reportes agregados.
+
+KPI incorpora productividad, cancelaciones y tasas por especialista registrado. Realización = realizadas / programadas netas; cancelación = canceladas / programadas brutas. Denominador cero e inconsistencias operado/cancelado se muestran como No evaluable según corresponda. Cada medida por especialista tiene su descarga por período.

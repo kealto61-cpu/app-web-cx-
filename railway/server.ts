@@ -6,6 +6,7 @@ import {searchCare} from "./care-search.ts";
 import {initApplicationSettings,readApplicationSettings,handleApplicationSettings,handleProphylaxisConfiguration} from "./settings.ts";
 import {validateProgrammingAppointment} from "./programming.ts";
 import {createReports} from "./reports.ts";
+import {resolveSurgeryNurses,surgicalNurseSnapshot} from "./nursing-productivity.ts";
 import webpush from "web-push";
 import { createHash, createHmac, timingSafeEqual, randomUUID, randomBytes } from "node:crypto";
 const dbUrl=Bun.env.DATABASE_URL;if(!dbUrl)throw new Error("DATABASE_URL missing");
@@ -426,7 +427,7 @@ async function seedSimulation(){
 function csvCell(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 await seedSimulation();
 Bun.serve({port:PORT,async fetch(req){try{
- const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'5.9.0-pasp',dataMode:DATA_MODE,push:false,educationalCards:count[0].n});}if(url.pathname==="/")return html(PAGE);
+ const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'5.9.1-pasp',dataMode:DATA_MODE,push:false,educationalCards:count[0].n});}if(url.pathname==="/")return html(PAGE);
  if(['/postop.js','/postop.css','/settings.js'].includes(url.pathname))return textResponse(await Bun.file('./public'+url.pathname).text(),url.pathname.endsWith('.js')?'application/javascript; charset=utf-8':'text/css; charset=utf-8');
  if(url.pathname==='/api/care-guides-public'&&req.method==='GET'){const catalog=await sql.unsafe('select payload from qx_pasp_care_catalog'),dictionary=await sql.unsafe('select payload from qx_pasp_dictionary');return json(searchCare(catalog.map(r=>r.payload),dictionary.map(r=>r.payload),Object.fromEntries(url.searchParams),true));}
  if(url.pathname==='/api/application-settings/public'){const response=await handleApplicationSettings(req,url,{sql,session:null,json});if(response)return response;}
@@ -486,7 +487,9 @@ Bun.serve({port:PORT,async fetch(req){try{
    const caseRows=await sql.unsafe('select payload from qx_cases where surgery_date>=$1 and surgery_date<=$2 order by surgery_date,surgery_time',[reportRange?lookback:(lookback<monthStart?lookback:monthStart),end]);
    const reporting=await sql.unsafe('select dataset,payload from qx_reporting_rows where dataset=$1 or (dataset like $2 and dataset>=$3 and dataset<=$4) order by dataset,row_order',['RESUMEN ANUAL','BASE ANUAL %','BASE ANUAL '+baseFrom.slice(0,4),'BASE ANUAL '+end.slice(0,4)]);
    const settings=isDownload?await readApplicationSettings(sql):null;
-   const reports=createReports({cases:caseRows.map(r=>mapCase(r.payload)),reporting,permissions,session:s,config:await operationalConfig(),boardMetrics:metrics,reportRange,indicatorMetadata:settings?.config.indicatorMetadata||{}});
+   const mappedCases=caseRows.map(r=>({...mapCase(r.payload),enfermeroJefeCirugia:String(r.payload['ENFERMERO JEFE CIRUGÍA']||'')}));
+   const nursingAudit=(url.pathname==='/api/kpi'||(isDownload&&['KPI_ENFERMERIA','KPI_PRODUCTIVIDAD'].includes(url.searchParams.get('type'))))&&mappedCases.length?await sql.unsafe(`select payload from qx_audit_log where payload->>'ACCIÓN'='MOVER PACIENTE' and payload->>'ID CASO'=any($1::text[]) order by created_at`,[mappedCases.map(c=>c.id)]):[];
+   const reports=createReports({cases:resolveSurgeryNurses(mappedCases,nursingAudit.map(r=>r.payload)),reporting,permissions,session:s,config:await operationalConfig(),boardMetrics:metrics,reportRange,indicatorMetadata:settings?.config.indicatorMetadata||{}});
    const key={'/api/mci':'mci','/api/kpi':'kpi','/api/download':'download','/api/reinterventions':'reinterventions'}[url.pathname];
    const result=reports[key]('',reportRange?.from||date,reportRange?.period||url.searchParams.get('period')||'MES',url.searchParams.get('type')||'PROGRAMACION');if(key==='download')await audit(s,'DESCARGA','INDICADORES','',String(url.searchParams.get('type')||'PROGRAMACION')+' '+reportRange.from+' a '+reportRange.to);return json(result);
  }
@@ -651,6 +654,7 @@ Bun.serve({port:PORT,async fetch(req){try{
       "HORA ADMINISTRACIÓN PROFILAXIS":prof==="SÍ"?b.horaProfilaxis:"","PROFILAXIS → INCISIÓN (MIN)":profMin,
       "CLASIFICACIÓN CIRUGÍA":clas,"OPERADO":"TRUE"
     });
+    Object.assign(patch,surgicalNurseSnapshot(hit.payload,jefe));
     if(to==="RECUPERACIÓN")patch["RECUPERACIÓN"]="TRUE";
     if(["ALTA","HOSPITALIZACIÓN"].includes(to)){patch["DESTINO POSTOP"]=to;patch["OBSERVACIÓN EGRESO / HOSPITALIZACIÓN"]=String(b.observacion||"");}
   }

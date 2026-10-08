@@ -1,5 +1,5 @@
 {
-  "version": "5.9.0-pasp",
+  "version": "5.9.1-pasp",
   "sourceKind": "SIMULADO",
   "individualIndicatorCount": 71,
   "institutionalPaspCount": 23,
@@ -78,6 +78,48 @@
       "label": "Detalle de candidatos a reintervención",
       "family": "security",
       "fixedPeriod": "VENTANA_30_DIAS"
+    },
+    {
+      "group": "KPI · Reportes por separado",
+      "type": "KPI_ENFERMERIA",
+      "label": "Productividad quirúrgica por enfermero jefe",
+      "family": "kpi"
+    },
+    {
+      "group": "Seguimiento · Productividad",
+      "type": "PASP_PRODUCTIVIDAD_ENFERMERIA",
+      "label": "Productividad de llamadas por enfermero jefe",
+      "family": "pasp"
+    },
+    {
+      "group": "KPI · Por especialista",
+      "type": "KPI_ESPECIALISTAS",
+      "label": "Especialistas: productividad y tasas",
+      "family": "kpi"
+    },
+    {
+      "group": "KPI · Por especialista",
+      "type": "KPI_PRODUCTIVIDAD_ESPECIALISTA",
+      "label": "Productividad por especialista",
+      "family": "kpi"
+    },
+    {
+      "group": "KPI · Por especialista",
+      "type": "KPI_CANCELACIONES_ESPECIALISTA",
+      "label": "Cancelaciones por especialista",
+      "family": "kpi"
+    },
+    {
+      "group": "KPI · Por especialista",
+      "type": "KPI_TASA_REALIZACION_ESPECIALISTA",
+      "label": "Tasa de realización por especialista",
+      "family": "kpi"
+    },
+    {
+      "group": "KPI · Por especialista",
+      "type": "KPI_TASA_CANCELACION_ESPECIALISTA",
+      "label": "Tasa de cancelación por especialista",
+      "family": "kpi"
     }
   ],
   "metrics": [
@@ -1008,16 +1050,16 @@
     {
       "id": "PASP_URGENT_ALARMS",
       "metricId": "urgent_alarms",
-      "label": "Fichas con alerta urgente",
+      "label": "Llamadas con al menos una alerta urgente",
       "group": "PASP · Seguimiento adicional",
-      "unit": "llamadas",
-      "definition": "No asigna categoría de triage ni confirma eventos adversos.",
-      "formula": "Fichas con señal urgente registrada",
+      "unit": "fichas",
+      "definition": "Cuenta cada ficha original con urgentSafety verdadero una sola vez, aunque tenga varias señales urgentes.",
+      "formula": "Conteo de fichas originales con urgentSafety = verdadero.",
       "institutionalFormula": "Fichas con señal urgente registrada",
       "goal": "Informativo",
       "frequency": "Según cohorte por fecha de cirugía",
       "owner": "Coordinación de Cirugía",
-      "limitations": "Sin denominador: No evaluable. No asigna categoría de triage ni confirma eventos adversos.",
+      "limitations": "Tres alertas en una llamada cuentan una ficha; dos llamadas con alerta al mismo paciente cuentan dos fichas. No mide pacientes únicos, productividad, triage ni eventos adversos confirmados. Un período sin fichas con alerta tiene conteo 0.",
       "download": "PASP_URGENT_ALARMS",
       "scope": "AMPLIACION"
     },

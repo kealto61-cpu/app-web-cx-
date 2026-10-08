@@ -545,6 +545,26 @@ describe('coordination and patient safety governance', () => {
 });
 
 describe('PASP matrix indicators', () => {
+  test('productividad atribuye fichas al autor autenticado y usa la fecha real aunque la cirugía sea anterior', async () => {
+    const e=await episode({surgeryDate:'2026-09-01'});
+    const first=await request('/calls',callPayload(e,{professional:'Autor inventado en formulario',recordedBy:'OTRA-CUENTA',professionalUserId:'ID-INVENTADO',contactResult:'No contesta',clinical:{},classification:'No contesta',conduct:'',extra:{}}),{session:{...staff,uid:'SIM-UID-A'}});
+    expect(first.status).toBe(200);expect(first.body.call.professionalUserId).toBe('SIM-UID-A');expect(first.body.call.recordedBy).toBe(staff.user);
+    const second=await request('/calls',callPayload(first.body.episode,{number:2,realDate:'2026-10-06'}),{session:{user:'SIM-NURSE-B',name:'Jefe SIMULADO B',role:'USER',uid:'SIM-UID-B'}});
+    expect(second.status).toBe(200);
+    const data=await request('/productivity?from=2026-10-01&to=2026-10-31');expect(data.status).toBe(200);
+    expect(data.body.dateBasis).toBe('CALL_DATE');expect(data.body.totals.attempts).toBe(2);expect(data.body.rows).toHaveLength(2);
+    expect(data.body.rows.find(r=>r.user===staff.user)).toMatchObject({attempts:1,effectiveContacts:0,contactRate:0});
+    expect(data.body.rows.find(r=>r.user==='SIM-NURSE-B')).toMatchObject({attempts:1,effectiveContacts:1,contactRate:100});
+    expect((await request('/indicators?from=2026-10-01&to=2026-10-31')).body.totals.attempts).toBe(0);
+    expect((await request('/productivity?from=2026-10-01&to=2026-10-04')).body.totals.attempts).toBe(0);
+    expect((await request('/productivity?from=2026-02-30')).status).toBe(400);
+    expect((await request('/productivity?from=2026-10-02&to=2026-10-01')).status).toBe(400);
+    expect((await request('/productivity',undefined,{session:null,permissions:[]})).status).toBe(401);
+    expect((await request('/productivity',undefined,{session:staff,permissions:['OPERACION_VER']})).status).toBe(403);
+    expect((await request('/productivity?download=1')).status).toBe(403);
+    const download=await request('/productivity?download=1&from=2026-10-01&to=2026-10-31&period=MES',undefined,{permissions:['CUIDADOS_POSTOP','DESCARGAS']});
+    expect(download.status).toBe(200);expect(download.body.sections[1].rows).toHaveLength(2);expect(download.body.from).toBe('2026-10-01');
+  });
   function metric(result: any, id: string) {
     const item = result.metrics.find((x: any) => x.id === id);
     expect(item).toBeDefined();

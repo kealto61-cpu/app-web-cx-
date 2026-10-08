@@ -79,7 +79,7 @@
     q('paspEscalationFilter')?.addEventListener('change', renderEscalations);
     const indicators = document.createElement('section'); indicators.id = 'paspIndicators'; indicators.className = 'panel pasp-workspace';
     const today = nowParts().date;
-    indicators.innerHTML = '<h3>Indicadores de la matriz de seguimiento</h3><p>Cohorte por fecha de cirugía. Las llamadas 1 y 2 conservan las fórmulas institucionales; los intentos adicionales se miden por separado.</p><div class="pasp-toolbar"><label>Desde<input id="paspIndicatorsFrom" type="date" value="' + today.slice(0, 7) + '-01"></label><label>Hasta<input id="paspIndicatorsTo" type="date" value="' + today + '"></label><button class="btn" data-pasp="indicators">Actualizar indicadores</button><button class="btn soft" data-pasp="indicators-export" data-id="ALL">Descargar todos CSV</button></div><div id="paspIndicatorStatus" role="status"></div><div id="paspIndicatorChart"></div><div id="paspIndicatorList" class="pasp-indicator-list"></div>';
+    indicators.innerHTML = '<h3>Indicadores de la matriz de seguimiento</h3><p>Cohorte por fecha de cirugía. Las llamadas 1 y 2 conservan las fórmulas institucionales; los intentos adicionales se miden por separado.</p><div class="pasp-toolbar"><label>Desde<input id="paspIndicatorsFrom" type="date" value="' + today.slice(0, 7) + '-01"></label><label>Hasta<input id="paspIndicatorsTo" type="date" value="' + today + '"></label><button class="btn" data-pasp="indicators">Actualizar indicadores</button><button class="btn soft" data-pasp="indicators-export" data-id="ALL">Descargar todos CSV</button></div><div id="paspIndicatorStatus" role="status"></div><div id="paspIndicatorChart"></div><div id="paspIndicatorList" class="pasp-indicator-list"></div><section id="paspNursingProductivity" style="margin-top:24px"></section>';
     node.after(indicators);
   }
   async function loadPostop() {
@@ -350,21 +350,34 @@
     series.forEach((row, i) => { if (i === 0 || i === series.length - 1 || i % Math.ceil(series.length / 7) === 0) svg += '<text x="' + x(i) + '" y="212" text-anchor="middle" font-size="10">' + safe(row.date.slice(5)) + '</text>'; });
     return svg + '</svg>';
   }
+  async function loadNursingProductivity(from, to) {
+    const data = await request('/api/pasp/productivity?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to));
+    if (data.sourceKind !== 'SIMULADO') throw Error('La productividad debe usar únicamente datos ficticios.');
+    const rows = data.rows || [], target = q('paspNursingProductivity');
+    if (from !== q('paspIndicatorsFrom')?.value || to !== q('paspIndicatorsTo')?.value) return;
+    if (!target) return;
+    target.innerHTML = '<h3>Productividad de llamadas por enfermero jefe / profesional</h3><p>Fecha real de la llamada: ' + safe(from) + ' a ' + safe(to) + '. Incluye cirugías de meses anteriores. Responsable: usuario que registró la ficha.</p><p>' + safe(data.totals.attempts) + ' fichas · ' + safe(data.totals.effectiveContacts) + ' contactos efectivos · ' + safe(data.totals.unassignedAttempts) + ' fichas sin responsable verificable.</p><div class="table-wrap"><table style="min-width:1000px"><thead><tr><th>Enfermero jefe / profesional</th><th>Usuario</th><th>Fichas / intentos</th><th>Contactos efectivos</th><th>Sin contacto efectivo</th><th>Pacientes contactados distintos</th><th>Episodios trabajados</th><th>Primera llamada</th><th>Segunda llamada</th><th>Adicionales</th><th>Contacto efectivo (%)</th></tr></thead><tbody>' + (rows.map(row => '<tr>' + [row.professional,row.user || 'Sin usuario verificable',row.attempts,row.effectiveContacts,row.withoutEffectiveContact,row.patientsContacted,row.episodesWorked,row.firstCalls,row.secondCalls,row.additionalCalls,row.contactRate == null ? 'No evaluable' : row.contactRate + '%'].map(value => '<td>' + safe(value) + '</td>').join('') + '</tr>').join('') || '<tr><td colspan="11">Sin llamadas en este período.</td></tr>') + '</tbody></table></div><details><summary>Cómo se calcula la productividad</summary>' + data.notes.map(note => '<p>' + safe(note) + '</p>').join('') + '</details>' + (can('DESCARGAS') || admin() ? '<button class="btn soft" data-pasp="indicators-export" data-id="PRODUCTIVIDAD_ENFERMERIA">Descargar productividad CSV</button>' : '');
+  }
   async function loadIndicators() {
     if (!q('paspIndicatorStatus')) return;
     q('paspIndicatorStatus').textContent = 'Calculando indicadores…';
-    const data = await indicatorData(q('paspIndicatorsFrom').value, q('paspIndicatorsTo').value); P.indicators = data;
+    const from=q('paspIndicatorsFrom').value,to=q('paspIndicatorsTo').value,session=user(),readId=P.indicatorReadId=(P.indicatorReadId||0)+1;
+    const data = await indicatorData(from,to);
+    if(readId!==P.indicatorReadId||from!==q('paspIndicatorsFrom').value||to!==q('paspIndicatorsTo').value||session!==user())return;
+    P.indicators = data;
     q('paspIndicatorStatus').textContent = data.metrics.filter(item => item.scope === 'INSTITUCIONAL').length + ' indicadores de la matriz · ' + data.totals.episodes + ' episodios · ' + data.totals.attempts + ' fichas. Sin denominador, el resultado es «No evaluable».';
     q('paspIndicatorChart').innerHTML = indicatorChart(data.series || []);
     q('paspIndicatorList').innerHTML = ['INSTITUCIONAL', 'AMPLIACION'].map(scope => '<div class="pasp-wide"><h4>' + (scope === 'INSTITUCIONAL' ? 'Indicadores de la matriz PASP' : 'Intentos, contactos y gestión adicional') + '</h4></div>' + data.metrics.filter(item => item.scope === scope).map(item => '<article class="pasp-indicator"><h4>' + safe(item.label) + '</h4><b class="pasp-indicator-value">' + (item.value == null ? 'No evaluable' : safe(item.value + ' ' + item.unit)) + '</b><p>' + safe(item.goal ? 'Meta: ' + item.goal : 'Informativo') + '</p><details><summary>Definición y cálculo</summary><p>' + safe(item.definition) + '</p><p>' + safe(item.formula) + '</p><p>Numerador: ' + safe(item.numerator) + ' · Denominador: ' + safe(item.denominator == null ? 'No aplica' : item.denominator) + '</p><p>' + safe(item.owner) + ' · ' + safe(item.frequency) + '</p><p class="pasp-pre">Fórmula de la matriz: ' + safe(item.sheetFormula || 'Ampliación de gestión') + '</p></details>' + (can('DESCARGAS') || admin() ? '<button class="btn soft" data-pasp="indicators-export" data-id="' + safe(item.id) + '">Descargar indicador CSV</button>' : '') + '</article>').join('')).join('');
     const select = q('dlType');
-    if (select) { let group = q('paspDownloadGroup'); if (!group) { group = document.createElement('optgroup'); group.id = 'paspDownloadGroup'; group.label = 'Matriz PASP · Indicadores de seguimiento'; select.appendChild(group); } const previous = select.value; group.innerHTML = '<option value="PASP_ALL">PASP: todos los indicadores de seguimiento</option>' + data.metrics.map(item => '<option value="PASP_' + safe(item.id.toUpperCase()) + '">' + safe(item.label) + '</option>').join(''); if ([...select.options].some(o => o.value === previous)) select.value = previous; }
+    if (select) { let group = q('paspDownloadGroup'); if (!group) { group = document.createElement('optgroup'); group.id = 'paspDownloadGroup'; group.label = 'Matriz PASP · Indicadores de seguimiento'; select.appendChild(group); } const previous = select.value; group.innerHTML = '<option value="PASP_ALL">PASP: todos los indicadores de seguimiento</option><option value="PASP_PRODUCTIVIDAD_ENFERMERIA">Productividad de llamadas por enfermero jefe</option>' + data.metrics.map(item => '<option value="PASP_' + safe(item.id.toUpperCase()) + '">' + safe(item.label) + '</option>').join(''); if ([...select.options].some(o => o.value === previous)) select.value = previous; }
+    await loadNursingProductivity(q('paspIndicatorsFrom').value, q('paspIndicatorsTo').value);
   }
   async function indicatorDownload(type, date, period, custom) {
     if (!can('DESCARGAS') && !admin()) throw Error('No tiene permiso para descargar indicadores.');
     let from = date, to = date;
     if (period === 'MES') { from = date.slice(0, 7) + '-01'; const end = new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 0); to = date.slice(0, 7) + '-' + String(end.getDate()).padStart(2, '0'); }
     if (custom) { from = custom.from; to = custom.to; }
+    if (type === 'PASP_PRODUCTIVIDAD_ENFERMERIA') return request('/api/pasp/productivity?download=1&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to) + '&period=' + encodeURIComponent(period));
     const data = await indicatorData(from, to), key = String(type).replace(/^PASP_/, '').toLowerCase();
     const chosen = key === 'all' ? data.metrics : data.metrics.filter(item => item.id === key);
     if (!chosen.length) throw Error('Seleccione un indicador disponible.');
