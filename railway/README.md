@@ -33,7 +33,11 @@ El servicio web existente usa raíz `/railway`, `Dockerfile`, inicio `bun run se
 
 ## Uso
 
-Entre con la cuenta de demostración. Abra **Seguimiento postoperatorio**, cree un episodio simulado y registre una ficha por llamada. Revise los eventos en **Coordinación** y los campos, listas, reglas y cuidados en **Configuración**. El portal de acompañantes consulta un token individual y recibe avisos mientras está abierto; esta versión no activa servicios de notificación de pago.
+Entre con la cuenta de demostración. **Seguimiento postoperatorio** contiene dos submódulos independientes: **Seguimiento de llamadas** y **Cuidados POP**. La lista de llamadas incluye cirugías realizadas de cualquier fecha, incluso sin episodio registrado. Al iniciar la primera llamada se crea el episodio enlazado a esa cirugía; guardar la primera habilita la segunda. La tercera es opcional: se programa con fecha, hora opcional y motivo desde el formulario de la segunda, o después de registrar la segunda. Cada intento tiene su propia ficha e ID, y las adendas conservan el registro original. La agenda se puede reprogramar antes de registrar la tercera, con control de versión e historial; no sustituye llamadas ya registradas.
+
+La lista muestra pendientes, pacientes sin llamadas, vencidos, pendientes para hoy y próximos; admite búsqueda por nombre/documento/teléfono/procedimiento, especialidad, estado del episodio, próxima llamada (1/2/3), último contacto y rangos independientes de fecha de cirugía o de llamada programada. La fecha del encabezado de la aplicación no limita esta lista. Las fechas de primera y segunda llamada respetan el calendario PASP configurado. La tabla tiene desplazamiento horizontal y vertical, encabezados fijos y acceso directo a cada llamada. Los episodios cerrados no generan pendientes y pueden consultarse con Todos los pacientes.
+
+**Cuidados POP** conserva el buscador educativo por procedimiento y anestesia. Revise los eventos en **Coordinación** y los campos, listas, reglas y cuidados en **Configuración**. El portal de acompañantes consulta un token individual y recibe avisos mientras está abierto; esta versión no activa servicios de notificación de pago.
 
 La exportación de matriz mantiene los 70 campos originales para las primeras dos llamadas. Las fichas adicionales y adendas permanecen en el historial por episodio. Los indicadores incluyen los intentos y llamadas adicionales según el denominador documentado de cada medida.
 

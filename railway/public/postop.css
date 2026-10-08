@@ -11,7 +11,27 @@
 .pasp-simulation{background:#fff7dd!important;color:#684b10!important;border-color:#e5d08c!important}
 .pasp-danger{background:#fff0f0;color:#7f1e26;border-color:#d38991;border-left-color:#af2435}
 .pasp-success{background:#eef8f2;color:#15553a;border-color:#92bea6}
-.pasp-episode-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;max-height:650px;overflow:auto;padding:2px 4px 10px 0}
+.pasp-episode-list{display:block;max-height:560px;overflow:auto;border:1px solid #cbd4df;border-radius:8px;background:#fff}
+.pasp-submodule[hidden]{display:none!important}
+.pasp-submodule-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.pasp-submodule-tabs .active{background:#275786;color:#fff}
+.pasp-filter-panel{padding:12px;border:1px solid #cbd4df;border-radius:8px;margin:12px 0;background:#f6f9fc}
+.pasp-filter-panel summary{font-weight:700;cursor:pointer}
+.pasp-filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:14px 0}
+.pasp-filter-grid label{display:flex;flex-direction:column;gap:6px;font-weight:600}
+.pasp-filter-grid select,.pasp-filter-grid input{min-height:40px;padding:8px;border:1px solid #bbc6d3;border-radius:7px;background:#fff;color:#243042;width:100%;box-sizing:border-box;font:inherit}
+.pasp-call-table{border-collapse:collapse;width:100%;min-width:1350px;table-layout:fixed;font-size:13px}
+.pasp-call-table th,.pasp-call-table td{padding:12px;border-bottom:1px solid #dbe2ea;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+.pasp-call-table thead th{position:sticky;top:0;z-index:1;background:#eaf0f8;color:#253c68}
+.pasp-call-table th:nth-child(2){width:210px}
+.pasp-call-table tr:nth-child(even){background:#f8fafc}
+.pasp-call-table small{display:block;margin-top:6px;font-size:12px;line-height:1.4;color:#4c5b6e}
+.pasp-call-table .btn{font-size:12px;white-space:normal;padding:8px;min-height:36px;margin:5px 0}
+.pasp-call-table button:disabled{opacity:.5;cursor:not-allowed}
+.pasp-due-vencida{background:#fff0f0;color:#8b2230;border:1px solid #edb8bf}
+.pasp-due-hoy{background:#fff7dd;color:#684b10;border:1px solid #e5d08c}
+.pasp-due-proxima{background:#edf5ff;color:#275786}
+.pasp-third-plan{border:1px solid #bbc6d3;border-radius:8px;margin:16px 0;padding:12px}
 .pasp-episode{border:1px solid #cbd4df;border-radius:10px;padding:15px;background:white;display:flex;flex-direction:column;justify-content:space-between;gap:12px}
 .pasp-episode h3{font-size:17px;margin:10px 0 5px}
 .pasp-episode p{margin:6px 0;line-height:1.5}

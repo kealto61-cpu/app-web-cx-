@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, afterAll, describe, expect, test } from 'bun:test';
 import { PGlite } from '@electric-sql/pglite';
+import { buildCallQueue, followupState } from '../followup.ts';
 import { initPasp, handlePasp } from '../pasp.ts';
 import { readFileSync } from 'node:fs';
 import { pgliteAdapter } from './pglite-adapter.ts';
@@ -30,6 +31,7 @@ async function request(path: string, payload?: any, opts: any = {}) {
     session: opts.session === undefined ? staff : opts.session,
     permissions: opts.permissions === undefined ? permissions : opts.permissions,
     findCase: opts.findCase,
+    listOperatedCases: opts.listOperatedCases,
     json: (body: any, status = 200) => Response.json(body, { status }),
   });
   if (!response) throw new Error('PASP endpoint returned no response');
@@ -176,7 +178,7 @@ describe('one immutable form per telephone call', () => {
     const original = await sql.unsafe('select payload from qx_simulation.qx_pasp_calls where id=$1', [first.call.id]);
     const rejected = await request('/calls', callPayload(first.episode, { number: 1 }));
     expect(rejected.status).toBe(409);
-    const second = await call(first.episode, { number: 2, time: '09:30', clinical: { feelsWell: 'No', painScore: '4' }, observations: 'Segundo intento SIMULADO, ficha distinta.' });
+    const second = await call(first.episode, { number: 2, thirdCall:{enabled:true,date:'2026-10-05',reason:'Seguimiento adicional SIMULADO'}, time: '09:30', clinical: { feelsWell: 'No', painScore: '4' }, observations: 'Segundo intento SIMULADO, ficha distinta.' });
     const third = await call(second.episode, { number: 3, time: '10:30' });
     expect(new Set([first.call.id, second.call.id, third.call.id]).size).toBe(3);
     expect(third.episode.calls).toHaveLength(3);
@@ -601,7 +603,7 @@ describe('PASP matrix indicators', () => {
     const secondEpisode = await episode({ surgeryDate: '2026-10-02', documentNumber: 'SIM-QA-0002', patientName: 'Paciente SIMULADO QA 2' });
     const outside = await episode({ surgeryDate: '2026-10-20', documentNumber: 'SIM-QA-OUTSIDE', patientName: 'Paciente SIMULADO fuera de cohorte' });
     const first = await call(firstEpisode, { realDate: '2026-10-05', clinical: { feelsWell: 'Sí' } });
-    const second = await call(first.episode, { number: 2, realDate: '2026-10-09', contactResult: 'Buzón', clinical: {}, classification: 'Buzón', conduct: '', extra: {} });
+    const second = await call(first.episode, { number: 2, thirdCall:{enabled:true,date:'2026-10-10',reason:'Reintento SIMULADO'}, realDate: '2026-10-09', contactResult: 'Buzón', clinical: {}, classification: 'Buzón', conduct: '', extra: {} });
     const third = await call(second.episode, { number: 3, realDate: '2026-10-10' });
     await call(outside, { realDate: '2026-10-21' });
     expect((await request('/calls/' + first.call.id + '/addenda', { episodeId: firstEpisode.id, expectedVersion: third.episode.version, reason: 'Adenda SIMULADA no suma otra llamada', content: 'Anotación de revisión SIMULADA' })).status).toBe(200);
@@ -645,5 +647,63 @@ describe('PASP matrix indicators', () => {
     expect((await request('/indicators', undefined, { session: null, permissions: [] })).status).toBe(401);
     expect((await request('/indicators', undefined, { session: staff, permissions: ['OPERACION_VER'] })).status).toBe(403);
     expect((await request('/indicators', undefined, { session: coord, permissions: coordPermissions })).status).toBe(200);
+  });
+});
+
+describe('lista de seguimiento y programación de tercera llamada',()=>{
+  test('la lista incluye cirugías realizadas sin episodio, excluye no operados y evita duplicar episodios enlazados',async()=>{
+    const created=await request('/episodes',episodePayload({sourceCaseId:'SIM-LINKED'}),{findCase:async()=>({payload:{OPERADO:'TRUE',DOCUMENTO:'SIM-QA-0001','FECHA CIRUGÍA':'2026-10-01'}})});expect(created.status).toBe(201);const e=created.body.episode;
+    const list=await request('/call-queue',undefined,{listOperatedCases:async()=>[
+      {id:'SIM-LINKED',operado:true,paciente:e.patientName,fecha:'2026-10-01'},
+      {id:'SIM-NEW',operado:true,paciente:'Paciente SIMULADO sin llamar',documento:'SIM-NEW-DOC',procedimiento:'Procedimiento SIMULADO',fecha:'2026-10-01',fechaCitaPop:'2026-10-20',horaCitaPop:'13:30'},
+      {id:'SIM-NOT-OPERATED',operado:false,paciente:'No operado'}
+    ]});
+    expect(list.status).toBe(200);expect(list.body.rows).toHaveLength(2);
+    const pending=list.body.rows.find(r=>r.sourceCaseId==='SIM-NEW');expect(pending.id).toBe('');expect(pending.followup.neverCalled).toBe(true);expect(pending.followup.nextNumber).toBe(1);expect(pending.followup.slots[1].enabled).toBe(false);expect(pending.appointment.time).toBe('13:30');
+    expect(await count('qx_pasp_episodes')).toBe(1);expect(await count('qx_pasp_calls')).toBe(0);
+    expect((await request('/call-queue',undefined,{session:null})).status).toBe(401);
+    expect((await request('/call-queue',undefined,{permissions:['OPERACION_VER']})).status).toBe(403);
+  });
+  test('primera habilita segunda, pero tercera solo aparece pendiente si se programa',async()=>{
+    const e=await episode();let list=(await request('/call-queue')).body.rows;
+    expect(list[0].followup.nextNumber).toBe(1);
+    const first=await call(e,{contactResult:'No contesta',clinical:{},classification:'No contesta',conduct:'',extra:{}});
+    list=(await request('/call-queue')).body.rows;expect(list[0].followup.nextNumber).toBe(2);expect(list[0].followup.neverCalled).toBe(false);
+    const second=await call(first.episode,{number:2});
+    list=(await request('/call-queue')).body.rows;expect(list[0].followup.pending).toBe(false);expect(list[0].followup.slots[2].enabled).toBe(false);
+    expect((await request('/calls',callPayload(second.episode,{number:3}))).status).toBe(409);
+  });
+  test('la segunda programa tercera en la misma transacción y la tercera conserva fecha, hora y registro individual',async()=>{
+    const first=await call(await episode());
+    const second=await call(first.episode,{number:2,thirdCall:{enabled:true,date:'2026-10-09',time:'14:30',reason:'Verificar evolución SIMULADA'}});
+    expect(second.episode.call3.scheduledDate).toBe('2026-10-09');expect(second.episode.call3.sourceCallId).toBe(second.call.id);
+    let list=(await request('/call-queue')).body.rows;expect(list[0].followup.nextNumber).toBe(3);expect(list[0].followup.nextScheduledTime).toBe('14:30');
+    const third=await call(second.episode,{number:3,realDate:'2026-10-09'});
+    expect(third.call.scheduledDate).toBe('2026-10-09');expect(third.call.scheduledTime).toBe('14:30');expect(third.episode.calls).toHaveLength(3);
+    list=(await request('/call-queue')).body.rows;expect(list[0].followup.pending).toBe(false);expect(list[0].followup.slots[2].recorded).toBe(true);
+    expect((await request('/episodes/'+third.episode.id+'/third-call',{expectedVersion:third.episode.version,enabled:true,date:'2026-10-12',reason:'No reemplazar ficha'})).status).toBe(409);
+  });
+  test('programación inválida no guarda segunda llamada, y una agenda posterior exige segunda registrada y versión vigente',async()=>{
+    const e=await episode();const before=await request('/episodes/'+e.id+'/third-call',{expectedVersion:e.version,enabled:true,date:'2026-10-09',reason:'Prueba SIMULADA'});expect(before.status).toBe(409);
+    const first=await call(e);
+    const bad=await request('/calls',callPayload(first.episode,{number:2,thirdCall:{enabled:true,date:'2026-10-04',reason:'Fecha anterior'}}));expect(bad.status).toBe(400);expect(await count('qx_pasp_calls')).toBe(1);
+    expect((await request('/calls',callPayload(first.episode,{number:2,thirdCall:{enabled:true,date:'2026-02-30',reason:'Fecha imposible'}}))).status).toBe(400);
+    expect((await request('/calls',callPayload(first.episode,{number:2,thirdCall:{enabled:true,date:'2026-10-09',reason:''}}))).status).toBe(400);
+    const second=await call(first.episode,{number:2});
+    const route='/episodes/'+e.id+'/third-call';
+    expect((await request(route,{expectedVersion:second.episode.version,enabled:true,date:'2026-10-10',reason:'Agenda SIMULADA'},{permissions:['OPERACION_VER']})).status).toBe(403);
+    const plan=await request(route,{expectedVersion:second.episode.version,enabled:true,date:'2026-10-10',time:'09:00',reason:'Revisión SIMULADA'});expect(plan.status).toBe(200);
+    expect((await request(route,{expectedVersion:second.episode.version,enabled:true,date:'2026-10-11',reason:'Versión vieja'})).status).toBe(409);
+    expect((await request(route,{expectedVersion:plan.body.episode.version,enabled:false})).status).toBe(400);
+    const cancelled=await request(route,{expectedVersion:plan.body.episode.version,enabled:false,reason:'No precisa reintento SIMULADO'});expect(cancelled.status).toBe(200);expect(cancelled.body.episode.call3.scheduledDate).toBe('');expect(await count('qx_pasp_calls')).toBe(2);
+  });
+  test('fechas de agenda: vencida, hoy, próxima; casos cerrados no generan pendientes',()=>{
+    const base={sourceKind:'SIMULADO',callCount:0,caseStatus:'Abierto'};
+    expect(followupState({...base,call1:{scheduledDate:'2026-10-06'}},'2026-10-07').queueStatus).toBe('VENCIDA');
+    expect(followupState({...base,call1:{scheduledDate:'2026-10-07'}},'2026-10-07').queueStatus).toBe('HOY');
+    expect(followupState({...base,call1:{scheduledDate:'2026-10-08'}},'2026-10-07').queueStatus).toBe('PROXIMA');
+    expect(followupState({...base,caseStatus:'Cerrado por seguimiento completado'},'2026-10-07').pending).toBe(false);
+    const list=buildCallQueue([{...base,id:'SIM-FUTURE',call1:{scheduledDate:'2026-10-08'}},{...base,id:'SIM-OVERDUE',call1:{scheduledDate:'2026-10-06'}}],[],'2026-10-07',d=>d);
+    expect(list.map(e=>e.id)).toEqual(['SIM-OVERDUE','SIM-FUTURE']);
   });
 });
