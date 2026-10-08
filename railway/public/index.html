@@ -1019,8 +1019,17 @@ header .logo{
     </div>
 
     <div class="panel" style="margin-top:10px">
-      <div class="roles-toolbar"><div><h3>Flujo quirúrgico</h3><div style="font-size:10px;color:var(--muted)">Defina los destinos permitidos desde cada etapa. Las validaciones clínicas de salida de QNO se mantienen obligatorias.</div></div></div>
+      <div class="roles-toolbar"><div><h3>Flujo quirúrgico</h3><div style="font-size:10px;color:var(--muted)">Defina los destinos permitidos desde cada etapa. El registro de tiempos, profilaxis y clasificación puede configurarse como electivo u obligatorio.</div></div></div>
       <div id="flowEditor"></div>
+      <div class="panel" style="padding:14px;margin-top:12px"><h3>Tarjeta de tiempos quirúrgicos y profilaxis</h3>
+        <p>Elija cuándo abrirla automáticamente y si el registro será electivo u obligatorio. El botón «Registro QX» siempre permite abrirla manualmente.</p>
+        <div class="field"><label for="ioCardRequired">Diligenciamiento de tiempos, profilaxis y clasificación</label><select id="ioCardRequired"><option value="false">Electivo (permite continuar sin completar)</option><option value="true">Obligatorio antes de salir de QNO o cerrar Recuperación</option></select></div>
+        <div class="intraop-grid">
+          <label><input type="checkbox" id="ioCardEntry"> Al ingresar a QNO</label>
+          <label><input type="checkbox" id="ioCardQnoExit"> Al salir de QNO hacia Recuperación, Alta u Hospitalización</label>
+          <label><input type="checkbox" id="ioCardRecoveryExit"> Al cerrar Recuperación (Alta u Hospitalización)</label>
+        </div><p>En modo electivo, si desmarca las tres opciones la tarjeta se abre solo con «Registro QX». En modo obligatorio se solicita además antes de salir de QNO o cerrar Recuperación; durante el ingreso y el registro manual se permiten datos parciales.</p>
+      </div>
       <div class="modal-actions"><button class="btn" id="saveOperationalConfigBtn">Guardar configuración operativa</button></div>
     </div>
   </div>
@@ -1039,9 +1048,9 @@ header .logo{
   <div class="config-panel" id="config-acompanantes">
     <div class="hero" style="margin-bottom:10px">
       <div><span class="kicker">ACOMPAÑANTES</span><h2>Mensajes y disparadores</h2><p>Configure el texto, el momento de envío y si cada aviso se genera automáticamente o de forma manual.</p></div>
-      <button class="btn" id="addCompanionMessageBtn">Nuevo mensaje</button>
+      <div><button class="btn soft" id="enableAllCompanionMessagesBtn">Habilitar todos</button> <button class="btn" id="addCompanionMessageBtn">Nuevo mensaje</button></div>
     </div>
-    <div class="notice">Los mensajes de <b>ALTA</b> y <b>HOSPITALIZACIÓN</b> son finales y se envían automáticamente. Puede editar su texto. Use <b>{{CAMA_FRASE}}</b> para incluir la cama cuando esté disponible.</div>
+    <div class="notice">Todos los mensajes son configurables, incluidos <b>ALTA</b> y <b>HOSPITALIZACIÓN</b>. Puede activarlos, desactivarlos, cambiar el envío automático o eliminarlos. Ninguno es obligatorio; los mensajes sin texto se conservan como borradores y no se envían. Use <b>{{CAMA_FRASE}}</b> para incluir la cama cuando esté disponible.</div>
     <div class="panel table-wrap">
       <table class="companion-message-table" style="min-width:1050px">
         <thead><tr><th>Código</th><th>Nombre</th><th>Momento de envío</th><th>Mensaje</th><th>Automático</th><th>Activo</th><th>Acción</th></tr></thead>
@@ -1073,22 +1082,22 @@ header .logo{
   <div class="modal-actions"><button class="btn soft" data-close="cancelModal">Volver</button><button class="btn red" id="confirmCancel">Confirmar cancelación</button></div>
 </div></div>
 <div class="modal" id="intraopModal"><div class="modal-card">
-  <div class="modal-head"><div><span class="kicker">INTRAOPERATORIO</span><h3 id="ioTitle">Registro obligatorio antes de salida de QNO</h3></div><button class="btn soft sm" data-close="intraopModal">Cerrar</button></div>
-  <input id="ioId" type="hidden"><input id="ioDestino" type="hidden"><input id="ioProf" type="hidden"><input id="ioClasif" type="hidden">
-  <div class="field"><label>Paciente</label><input id="ioPaciente" disabled></div>
+  <div class="modal-head"><div><span class="kicker">INTRAOPERATORIO</span><h3 id="ioTitle">Tiempos quirúrgicos y profilaxis</h3></div><button class="btn soft sm" data-close="intraopModal">Cerrar</button></div>
+  <input id="ioId" type="hidden"><input id="ioDestino" type="hidden"><input id="ioAction" type="hidden"><input id="ioProf" type="hidden"><input id="ioClasif" type="hidden">
+  <div class="field"><label>Paciente</label><input id="ioPaciente" disabled></div><p class="muted" id="ioRequirementNotice">Todos los campos son opcionales. Los datos que no registre quedarán sin información.</p>
   <div class="ops-flow-title">Tiempos intraoperatorios</div>
   <div class="intraop-grid">
-    <div class="field"><label>Inicio anestesia *</label><input id="ioAnestIni" type="time"></div><div class="field"><label>Fin anestesia *</label><input id="ioAnestFin" type="time"></div>
-    <div class="field"><label>Inicio cirugía / incisión *</label><input id="ioQxIni" type="time"></div><div class="field"><label>Fin cirugía *</label><input id="ioQxFin" type="time"></div>
+    <div class="field"><label>Inicio anestesia</label><input id="ioAnestIni" type="time"></div><div class="field"><label>Fin anestesia</label><input id="ioAnestFin" type="time"></div>
+    <div class="field"><label>Inicio cirugía / incisión</label><input id="ioQxIni" type="time"></div><div class="field"><label>Fin cirugía</label><input id="ioQxFin" type="time"></div>
   </div>
   <div class="ops-flow-title">Profilaxis antibiótica</div>
   <div class="clinical-choice"><button type="button" data-prof="SÍ">Sí administrada</button><button type="button" data-prof="NO">No administrada</button></div>
   <div class="intraop-grid" style="margin-top:8px"><div class="field"><label>Antibiótico / esquema</label><input id="ioAntibiotico" placeholder="Ej. Ampicilina/sulbactam + amikacina"></div><div class="field"><label>Hora de profilaxis</label><input id="ioProfHora" type="time"></div></div>
-  <div class="ops-flow-title">Clasificación de cirugía *</div>
+  <div class="ops-flow-title">Clasificación de cirugía</div>
   <div class="clinical-choice"><button type="button" data-clasif="LIMPIA">Limpia</button><button type="button" data-clasif="CONTAMINADA">Contaminada</button><button type="button" data-clasif="SUCIA">Sucia</button></div>
   <div class="intraop-calc"><div><small>Tiempo quirúrgico</small><b id="ioQxMin">—</b></div><div><small>Profilaxis → incisión</small><b id="ioProfMin">—</b></div></div>
   <div class="field" style="margin-top:9px"><label>Observación intraoperatoria</label><textarea id="ioObs"></textarea></div>
-  <div class="modal-actions"><button class="btn soft" data-close="intraopModal">Volver</button><button class="btn green" id="confirmIntraop">Validar y continuar</button></div>
+  <div class="modal-actions"><button class="btn soft" data-close="intraopModal">Volver</button><button class="btn soft" id="skipIntraop">Continuar sin completar</button><button class="btn green" id="confirmIntraop">Guardar y continuar</button></div>
 </div></div>
 <div class="modal" id="messageNotice" role="alertdialog" aria-modal="true" aria-labelledby="messageNoticeTitle" aria-describedby="messageNoticeText">
   <div class="modal-card"><div id="messageNoticeIcon" aria-hidden="true">i</div><h3 id="messageNoticeTitle">Información</h3><p id="messageNoticeText"></p><button class="btn" id="messageNoticeClose" type="button">Entendido</button></div>
@@ -1907,6 +1916,7 @@ async function loadPatients(){
 }
 async function moveCase(id,dest){
   const chief=currentChief(true);if(!chief)return;
+  const patient=state.patients.find(x=>x.id===id);if(shouldShowIntraop(patient,dest)){openIntraop(id,dest);return}
   return runPatientAction(id,async token=>{
     const reply=await api('/api/case/move',{method:'POST',body:JSON.stringify({id,destino:dest,jefeTurno:chief})});
     if(!sameActionSession(token))return;await refreshAfterPatientReply(reply,id);appAlert('Paciente trasladado a '+dest+'.','success');
@@ -1977,10 +1987,6 @@ function populateQnoSelectors(){
 }
 function flowDestinations(stateName){return Array.isArray(state.config?.flow?.[stateName])?state.config.flow[stateName]:[]}
 function flowButton(p,dest){
-  if(p.estado==="QUIRÓFANO"&&["RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"].includes(dest)){
-    const label=dest==="RECUPERACIÓN"?"Recuperación":dest==="ALTA"?"Alta directa":"Hospitalización";
-    return '<button class="btn '+(dest==="RECUPERACIÓN"||dest==="ALTA"?"green ":"")+'sm" onclick="openIntraop(\''+p.id+'\',\''+dest+'\')">'+label+'</button>';
-  }
   if(p.estado==="PROGRAMADO"&&dest==="QUIRÓFANO")return '<button class="btn sm" onclick="directQno(\''+p.id+'\')">Directo QNO</button>';
   const label=dest==="PREPARACIÓN"?"Preparación":dest==="QUIRÓFANO"?"Ingresar QNO":dest==="PROGRAMADO"?"Volver a programado":dest;
   return '<button class="btn '+(dest==="PREPARACIÓN"?"amber ":"")+'sm" onclick="moveCase(\''+p.id+'\',\''+dest+'\')">'+esc(label)+'</button>';
@@ -1990,6 +1996,7 @@ function operationActions(p){
   if(isPatientBusy(p.id))return '<span class="muted" role="status">Guardando…</span>';
   let a=flowDestinations(p.estado).map(d=>flowButton(p,d)).join("");
   if(["PROGRAMADO","PREPARACIÓN","QUIRÓFANO"].includes(p.estado))a+='<button class="btn red sm" onclick="openCancel(\''+p.id+'\')">Cancelar</button>';
+  a+='<button class="btn soft sm" onclick="openIntraop(\''+p.id+'\',\'\',\'SAVE\')">Registro QX</button>';
   a+='<button class="btn soft sm notify-badge" onclick="openCompanionNotify(\''+p.id+'\')">Notificar acompañante</button>';
   return a;
 }
@@ -2042,7 +2049,7 @@ function renderOp(d){
   $("qnoGrid").innerHTML=qnos.map((q,i)=>'<div class="lane"><div class="lane-head">'+esc(q)+' <span class="count" id="count-qno-'+i+'">0</span></div><div id="lane-qno-'+i+'" class="lane-list" tabindex="0" role="region" aria-label="Pacientes en '+esc(q)+'"></div></div>').join("")||'<div class="empty">No hay QNO habilitados.</div>';
   qnos.forEach((q,i)=>{const rows=state.patients.filter(p=>p.estado==="QUIRÓFANO"&&qnoNorm(p.qno)===q);renderLane("lane-qno-"+i,rows);const c=$("count-qno-"+i);if(c)c.textContent=rows.length});
   const rec=state.patients.filter(p=>p.estado==="RECUPERACIÓN"),allowed=flowDestinations("RECUPERACIÓN"),manage=hasUiPermission("OPERACION_GESTIONAR");
-  $("recoveryBody").innerHTML=rec.length?rec.map(p=>{let a="";if(manage&&allowed.includes("ALTA"))a+='<button class="btn green sm" onclick="finishCase(\''+p.id+'\',\'ALTA\')">Alta</button> ';if(manage&&allowed.includes("HOSPITALIZACIÓN"))a+='<button class="btn sm" onclick="finishCase(\''+p.id+'\',\'HOSPITALIZACIÓN\')">Hospitalizar</button> ';if(manage)a+='<button class="btn soft sm notify-badge" onclick="openCompanionNotify(\''+p.id+'\')">Notificar</button>';return '<tr data-case-id="'+esc(p.id)+'"><td>'+esc(p.hora)+'</td><td><b>'+esc(p.paciente)+'</b></td><td>'+esc(p.documento)+'</td><td>'+esc(p.procedimiento)+'</td><td>'+esc(p.especialidad)+'</td><td>'+esc(p.especialista)+'</td><td>'+esc(qnoNorm(p.qno)||"—")+'</td><td>'+esc(patientBed(p))+'</td><td>'+esc(p.actualizado||"—")+'</td><td>'+(a||"—")+'</td></tr>'}).join(""):'<tr><td colspan="10">Sin pacientes en recuperación</td></tr>';
+  $("recoveryBody").innerHTML=rec.length?rec.map(p=>{let a="";if(manage&&allowed.includes("ALTA"))a+='<button class="btn green sm" onclick="finishCase(\''+p.id+'\',\'ALTA\')">Alta</button> ';if(manage&&allowed.includes("HOSPITALIZACIÓN"))a+='<button class="btn sm" onclick="finishCase(\''+p.id+'\',\'HOSPITALIZACIÓN\')">Hospitalizar</button> ';if(manage)a+='<button class="btn soft sm" onclick="openIntraop(\''+p.id+'\',\'\',\'SAVE\')">Registro QX</button> <button class="btn soft sm notify-badge" onclick="openCompanionNotify(\''+p.id+'\')">Notificar</button>';return '<tr data-case-id="'+esc(p.id)+'"><td>'+esc(p.hora)+'</td><td><b>'+esc(p.paciente)+'</b></td><td>'+esc(p.documento)+'</td><td>'+esc(p.procedimiento)+'</td><td>'+esc(p.especialidad)+'</td><td>'+esc(p.especialista)+'</td><td>'+esc(qnoNorm(p.qno)||"—")+'</td><td>'+esc(patientBed(p))+'</td><td>'+esc(p.actualizado||"—")+'</td><td>'+(a||"—")+'</td></tr>'}).join(""):'<tr><td colspan="10">Sin pacientes en recuperación</td></tr>';
   sizeOperationalScroll();restoreOperationalScroll(previousScroll);
 }
 
@@ -2076,24 +2083,37 @@ function updateIntraopCalc(){
 }
 function chooseProf(v){$("ioProf").value=v;document.querySelectorAll("[data-prof]").forEach(b=>b.classList.toggle("active",b.dataset.prof===v));const dis=v==="NO";$("ioAntibiotico").disabled=dis;$("ioProfHora").disabled=dis;if(dis){$("ioAntibiotico").value="";$("ioProfHora").value=""}updateIntraopCalc()}
 function chooseClasif(v){$("ioClasif").value=v;document.querySelectorAll("[data-clasif]").forEach(b=>b.classList.toggle("active",b.dataset.clasif===v))}
-function openIntraop(id,destino){
-  const jefe=currentChief(true);if(!jefe)return;
+function intraoperativeCard(){return state.config?.intraoperativeCard||{onEntry:false,onQnoExit:true,onRecoveryExit:false,required:false}}
+function intraoperativeRequired(patient,destino,action){return intraoperativeCard().required&&((action==="FINISH"&&patient?.estado==="RECUPERACIÓN")||(action==="MOVE"&&patient?.estado==="QUIRÓFANO"&&["RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"].includes(destino)))}
+function shouldShowIntraop(patient,destino,action="MOVE"){
+  const cfg=intraoperativeCard();
+  if(intraoperativeRequired(patient,destino,action))return true;
+  if(action==="FINISH")return patient?.estado==="RECUPERACIÓN"&&cfg.onRecoveryExit;
+  return (destino==="QUIRÓFANO"&&cfg.onEntry)||(patient?.estado==="QUIRÓFANO"&&["RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"].includes(destino)&&cfg.onQnoExit);
+}
+function openIntraop(id,destino="",action="MOVE"){
   const p=state.patients.find(x=>x.id===id);if(!p)return;
-  $("ioId").value=id;$("ioDestino").value=destino;$("ioPaciente").value=p.paciente||"";$("ioTitle").textContent="Registro intraoperatorio · destino: "+destino;
+  $("ioId").value=id;$("ioDestino").value=destino;$("ioAction").value=action;$("ioPaciente").value=p.paciente||"";
+  const required=intraoperativeRequired(p,destino,action);
+  $("ioTitle").textContent=action==="SAVE"?"Tiempos quirúrgicos y profilaxis":(required?"Registro obligatorio":"Registro electivo")+" · destino: "+destino;
+  $("ioRequirementNotice").textContent=required?"Complete tiempos de anestesia y cirugía, profilaxis y clasificación. Si se administró profilaxis, registre antibiótico y hora. La observación es opcional.":"Todos los campos son opcionales. Los datos que no registre quedarán sin información.";
+  $("confirmIntraop").textContent=action==="SAVE"?"Guardar registro":"Guardar y continuar";$("skipIntraop").hidden=action==="SAVE"||required;
   $("ioAnestIni").value=p.horaAnestesia||"";$("ioAnestFin").value=p.horaFinAnestesia||"";$("ioQxIni").value=p.horaInicioCirugia||"";$("ioQxFin").value=p.horaFinCirugia||"";
-  $("ioAntibiotico").value=p.antibiotico||"";$("ioProfHora").value=p.profHora||"";$("ioObs").value="";
+  $("ioAntibiotico").value=p.antibiotico||"";$("ioProfHora").value=p.profHora||"";$("ioObs").value=action==="FINISH"?(p.observacionEgreso||""):(p.observacionIntraop||"");
   $("ioProf").value="";$("ioClasif").value="";document.querySelectorAll("[data-prof],[data-clasif]").forEach(b=>b.classList.remove("active"));$("ioAntibiotico").disabled=false;$("ioProfHora").disabled=false;
   if(p.prof)chooseProf(p.prof);if(p.clasif)chooseClasif(p.clasif);updateIntraopCalc();openModal("intraopModal");
 }
-async function submitIntraop(){
-  const jefe=currentChief(true);if(!jefe)return;
-  const p={id:$("ioId").value,destino:$("ioDestino").value,jefeTurno:jefe,horaAnestesia:$("ioAnestIni").value,horaFinAnestesia:$("ioAnestFin").value,horaInicioCirugia:$("ioQxIni").value,horaFinCirugia:$("ioQxFin").value,profilaxisAdministrada:$("ioProf").value,antibioticoProfilaxis:$("ioAntibiotico").value,horaProfilaxis:$("ioProfHora").value,clasificacionCirugia:$("ioClasif").value,observacion:$("ioObs").value};
-  if(!p.horaAnestesia||!p.horaFinAnestesia||!p.horaInicioCirugia||!p.horaFinCirugia||!p.profilaxisAdministrada||!p.clasificacionCirugia){appAlert("Complete los tiempos, profilaxis y clasificación de cirugía.");return}
-  if(p.profilaxisAdministrada==="SÍ"&&(!p.antibioticoProfilaxis||!p.horaProfilaxis)){appAlert("Registre antibiótico y hora de profilaxis.");return}
-  await performPatientFormAction(p.id,"intraopModal",{url:"/api/case/move",body:p},"Registro intraoperatorio guardado y paciente trasladado.");
+async function submitIntraop(skip=false){
+  const action=$("ioAction").value,jefe=action==="SAVE"?currentChief(false):currentChief(true);if(action!=="SAVE"&&!jefe)return;
+  const p={id:$("ioId").value,destino:$("ioDestino").value,jefeTurno:jefe};
+  if(!skip)Object.assign(p,{horaAnestesia:$("ioAnestIni").value,horaFinAnestesia:$("ioAnestFin").value,horaInicioCirugia:$("ioQxIni").value,horaFinCirugia:$("ioQxFin").value,profilaxisAdministrada:$("ioProf").value,antibioticoProfilaxis:$("ioAntibiotico").value,horaProfilaxis:$("ioProfHora").value,clasificacionCirugia:$("ioClasif").value,observacion:$("ioObs").value});
+  const url=action==="SAVE"?"/api/case/intraoperative":action==="FINISH"?"/api/case/finish":"/api/case/move";
+  await performPatientFormAction(p.id,"intraopModal",{url,body:p},action==="SAVE"?"Registro guardado.":"Paciente trasladado: "+p.destino+".");
 }
 async function finishCase(id,destino){
   const jefe=currentChief(true);if(!jefe)return;
+  const patient=state.patients.find(x=>x.id===id);
+  if(shouldShowIntraop(patient,destino,"FINISH")){openIntraop(id,destino,"FINISH");return}
   const obs=prompt("Observación de egreso / hospitalización (opcional):");if(obs===null)return;
   await performPatientFormAction(id,"",{url:"/api/case/finish",body:{id,destino,observacion:obs,jefeTurno:jefe}},"Salida registrada: "+destino+".");
 }
@@ -2281,7 +2301,7 @@ function renderTrackingTable(){
   if($("trackingSearchCount"))$("trackingSearchCount").textContent=rows.length+" de "+all.length+" pacientes";
   body.innerHTML=rows.length?rows.map(p=>{
     const active=!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(p.estado);
-    return '<tr data-case-id="'+esc(p.id)+'"><td>'+esc(p.hora||"")+'</td><td><b>'+esc(p.paciente||"")+'</b></td><td>'+esc(p.documento||"—")+'</td><td>'+(active?'<span class="tracking-code">'+esc(p.token||"—")+'</span>':'<span class="tracking-token">Inactivo</span>')+'</td><td>'+esc(p.estado||"")+'</td><td>'+esc(p.aviso||"—")+(p.avisoFecha?'<div class="tracking-token">'+esc(p.avisoFecha)+'</div>':'')+'</td><td>'+(active?'<button class="btn soft sm" onclick="copyTrackingCode(\''+p.id+'\')">Copiar token</button> <button class="btn soft sm notify-badge" onclick="openCompanionNotify(\''+p.id+'\')">Notificar</button>':'—')+'</td></tr>';
+    return '<tr data-case-id="'+esc(p.id)+'"><td>'+esc(p.hora||"")+'</td><td><b>'+esc(p.paciente||"")+'</b></td><td>'+esc(p.documento||"—")+'</td><td>'+(active?'<span class="tracking-code">'+esc(p.token||"—")+'</span>':'<span class="tracking-token">Inactivo</span>')+'</td><td>'+esc(p.estado||"")+'</td><td>'+esc(p.aviso||"—")+(p.avisoFecha?'<div class="tracking-token">'+esc(p.avisoFecha)+'</div>':'')+'</td><td>'+(active?'<button class="btn soft sm" onclick="copyTrackingCode(\''+p.id+'\')">Copiar token</button> <button class="btn soft sm" onclick="openIntraop(\''+p.id+'\',\'\',\'SAVE\')">Registro QX</button> <button class="btn soft sm notify-badge" onclick="openCompanionNotify(\''+p.id+'\')">Notificar</button>':'—')+'</td></tr>';
   }).join(""):'<tr><td colspan="7">'+(all.length?'No hay pacientes que coincidan con la búsqueda.':'No hay pacientes para la fecha seleccionada.')+'</td></tr>';
 }
 async function copyTrackingCode(id){
@@ -2736,7 +2756,7 @@ function companionMessageLabel(m){return (m.name||m.id)+" · "+(m.trigger||"MANU
 async function openCompanionNotify(id){
   const p=state.patients.find(x=>x.id===id)||(state.trackingRows||[]).find(x=>x.id===id);if(!p)return;
   if(!state.companionMessages.length)await loadCompanionMessages();
-  const rows=state.companionMessages.filter(m=>m.enabled);
+  const rows=state.companionMessages.filter(m=>m.enabled&&m.text);
   if(!rows.length){appAlert("No hay mensajes de acompañante activos.");return}
   $("notifyCaseId").value=id;$("notifyPatient").value=p.paciente||"Paciente";
   $("notifyMessageSelect").innerHTML=rows.map(m=>'<option value="'+esc(m.id)+'">'+esc(companionMessageLabel(m))+'</option>').join("");
@@ -2754,14 +2774,13 @@ function companionTriggerOptions(value){
 function renderCompanionMessagesConfig(){
   const body=$("companionMessagesConfigBody");if(!body)return;
   body.innerHTML=state.companionMessages.map((m,i)=>{
-    const terminal=["ALTA","HOSPITALIZACIÓN"].includes(m.trigger);
-    return '<tr><td><input type="text" data-cm="'+i+'" data-key="id" value="'+esc(m.id)+'" '+(terminal?'disabled':'')+'></td>'+
+    return '<tr><td><input type="text" data-cm="'+i+'" data-key="id" value="'+esc(m.id)+'"></td>'+
       '<td><input type="text" data-cm="'+i+'" data-key="name" value="'+esc(m.name||"")+'"></td>'+
-      '<td><select data-cm="'+i+'" data-key="trigger" '+(terminal?'disabled':'')+'>'+companionTriggerOptions(m.trigger)+'</select></td>'+
+      '<td><select data-cm="'+i+'" data-key="trigger">'+companionTriggerOptions(m.trigger)+'</select></td>'+
       '<td><textarea data-cm="'+i+'" data-key="text">'+esc(m.text||"")+'</textarea></td>'+
-      '<td style="text-align:center"><input type="checkbox" data-cm="'+i+'" data-key="automatic" '+(m.automatic?'checked':'')+' '+(terminal?'disabled':'')+'></td>'+
-      '<td style="text-align:center"><input type="checkbox" data-cm="'+i+'" data-key="enabled" '+(m.enabled?'checked':'')+' '+(terminal?'disabled':'')+'></td>'+
-      '<td>'+(terminal?'<span class="chip">Final obligatorio</span>':'<button class="btn red sm" onclick="removeCompanionMessage('+i+')">Eliminar</button>')+'</td></tr>';
+      '<td style="text-align:center"><input type="checkbox" data-cm="'+i+'" data-key="automatic" '+(m.automatic?'checked':'')+'></td>'+
+      '<td style="text-align:center"><input type="checkbox" data-cm="'+i+'" data-key="enabled" '+(m.enabled?'checked':'')+'></td>'+
+      '<td>'+'<button class="btn red sm" onclick="removeCompanionMessage('+i+')">Eliminar</button>'+'</td></tr>';
   }).join("");
   document.querySelectorAll("[data-cm]").forEach(el=>el.addEventListener("change",()=>syncCompanionMessageField(el)));
   document.querySelectorAll("[data-cm] textarea,[data-cm][type=text]").forEach(el=>el.addEventListener("input",()=>syncCompanionMessageField(el)));
@@ -2782,14 +2801,16 @@ async function saveCompanionMessages(){
     state.companionMessages=d.rows||[];renderCompanionMessagesConfig();appAlert("Mensajes de acompañantes actualizados.");
   }catch(e){appAlert(e.message,"error")}
 }
+function renderIntraoperativeConfig(){const c=intraoperativeCard();$("ioCardEntry").checked=c.onEntry;$("ioCardQnoExit").checked=c.onQnoExit;$("ioCardRecoveryExit").checked=c.onRecoveryExit;$("ioCardRequired").value=String(Boolean(c.required));}
+function enableAllCompanionMessages(){state.companionMessages.forEach(m=>m.enabled=true);renderCompanionMessagesConfig();}
 async function loadConfiguration(){
   if(!isSuperAdmin()){appAlert("Configuración es exclusiva de SUPERADMIN.");return}
-  const d=await api("/api/config-operativa");state.config=d;populateQnoSelectors();renderQnoConfig();renderFlowEditor();
+  const d=await api("/api/config-operativa");state.config=d;populateQnoSelectors();renderQnoConfig();renderFlowEditor();renderIntraoperativeConfig();
 }
 async function saveOperationalConfig(){
   if(!isSuperAdmin())return;
   const flow={};["PROGRAMADO","PREPARACIÓN","QUIRÓFANO","RECUPERACIÓN"].forEach(from=>{flow[from]=[...document.querySelectorAll('[data-flow-from="'+from+'"]:checked')].map(x=>x.value)});
-  try{const d=await api("/api/config-operativa",{method:"POST",body:JSON.stringify({qnos:state.config.qnos,flow})});state.config=d;renderQnoConfig();renderFlowEditor();populateQnoSelectors();appAlert("Configuración operativa actualizada.");if(state.view==="operativo"||state.view==="programacion")await loadPatients()}catch(e){appAlert(e.message,"error")}
+  try{const d=await api("/api/config-operativa",{method:"POST",body:JSON.stringify({qnos:state.config.qnos,flow,intraoperativeCard:{onEntry:$("ioCardEntry").checked,onQnoExit:$("ioCardQnoExit").checked,onRecoveryExit:$("ioCardRecoveryExit").checked,required:$("ioCardRequired").value==="true"}})});state.config=d;renderQnoConfig();renderFlowEditor();renderIntraoperativeConfig();populateQnoSelectors();appAlert("Configuración operativa actualizada.");if(state.view==="operativo"||state.view==="programacion")await loadPatients()}catch(e){appAlert(e.message,"error")}
 }
 function isAdminUi(){return hasUiPermission("USUARIOS_GESTIONAR")}
 function updateAdminUi(){applyAccessUi()}
@@ -2867,7 +2888,7 @@ $("dlPeriod").addEventListener("change",updateDownloadPeriod);
 updateDownloadPeriod();
 for(const kind of ["staff","public"]){careControl(kind,"submit").addEventListener("click",()=>searchCareGuides(kind));careControl(kind,"query").addEventListener("keydown",event=>{if(event.key==="Enter")searchCareGuides(kind)});careControl(kind,"query").addEventListener("input",()=>{careSearchState[kind].readId++;careControl(kind,"procedure").value="";careControl(kind,"anesthesia").value="";careControl(kind,"status").textContent="";careControl(kind,"coverage").innerHTML="";careControl(kind,"results").innerHTML="";careControl(kind,"submit").disabled=false;careControl(kind,"submit").textContent="Buscar cuidados"});for(const suffix of ["procedure","anesthesia"])careControl(kind,suffix).addEventListener("change",()=>searchCareGuides(kind))}
 document.querySelectorAll("[data-companion-panel]").forEach(button=>button.addEventListener("click",()=>chooseCompanionPanel(button.dataset.companionPanel)));
-$("lb").addEventListener("click",login);$("sendCompanionNotifyBtn")?.addEventListener("click",sendCompanionNotify);$("addCompanionMessageBtn")?.addEventListener("click",addCompanionMessage);$("saveCompanionMessagesBtn")?.addEventListener("click",saveCompanionMessages);$("addQnoBtn")?.addEventListener("click",addConfigQno);$("newQnoName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addConfigQno()});$("saveOperationalConfigBtn")?.addEventListener("click",saveOperationalConfig);$("newRoleBtn")?.addEventListener("click",openNewRole);$("saveRoleBtn")?.addEventListener("click",saveRole);$("changePinBtn")?.addEventListener("click",()=>openModal("changePinModal"));$("saveOwnPinBtn")?.addEventListener("click",saveOwnPin);$("newUserBtn")?.addEventListener("click",openNewUser);$("saveUserBtn")?.addEventListener("click",saveUser);$("saveResetPinBtn")?.addEventListener("click",saveResetPin);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",logoutSession);$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackingSearch").addEventListener("input",renderTrackingTable);$("trackingSearchClear").addEventListener("click",clearTrackingSearch);$("trackBtn").addEventListener("click",track);$("trackSoundBtn").addEventListener("click",toggleTrackingSound);$("trackCode").addEventListener("input",()=>{if($("trackCode").value!==liveTracking.code){stopLiveTracking();$("trackResult").innerHTML=""}});$("trackCode")?.addEventListener("keydown",e=>{if(e.key==="Enter")track()});$("copyTrackingPortalBtn")?.addEventListener("click",copyTrackingPortal);$("openTrackingPortalBtn")?.addEventListener("click",openTrackingPortal);$("printTrackingQrBtn")?.addEventListener("click",()=>printTrackingQr().catch(e=>appAlert(e.message,"error")));$("downloadCompanionCardsBtn")?.addEventListener("click",()=>downloadCompanionCards().catch(e=>appAlert(e.message,"error")));$("companionLogin").addEventListener("click",()=>{window.open(trackingPortalUrl(),"_blank","noopener")});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF, imágenes y archivos de texto compatibles intentarán procesarse automáticamente. Las imágenes y los PDF escaneados usan reconocimiento de texto; revise los datos antes de importar.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>appAlert(x.message,"error"))});$("patientFiles").addEventListener("change",async e=>{state.patientFiles=Array.from(e.target.files||[]);if(!state.patientFiles.length){$("patientFilesStatus").textContent="Sin archivos seleccionados.";return}const pdf=state.patientFiles.find(isPatientReadableFile);if(pdf&&!state.editPatientId)await readPatientFileIntoForm(pdf);else $("patientFilesStatus").textContent=state.patientFiles.length+" archivo(s) seleccionados. Se guardarán con el paciente.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);$("confirmCancel")?.addEventListener("click",submitCancel);$("confirmIntraop")?.addEventListener("click",submitIntraop);$("profSearchBtn")?.addEventListener("click",searchProfilaxisCatalog);$("profSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchProfilaxisCatalog()});document.querySelectorAll("[data-prof]").forEach(b=>b.addEventListener("click",()=>chooseProf(b.dataset.prof)));document.querySelectorAll("[data-clasif]").forEach(b=>b.addEventListener("click",()=>chooseClasif(b.dataset.clasif)));["ioAnestIni","ioAnestFin","ioQxIni","ioQxFin","ioProfHora"].forEach(id=>$(id)?.addEventListener("input",updateIntraopCalc));
+$("lb").addEventListener("click",login);$("sendCompanionNotifyBtn")?.addEventListener("click",sendCompanionNotify);$("addCompanionMessageBtn")?.addEventListener("click",addCompanionMessage);$("saveCompanionMessagesBtn")?.addEventListener("click",saveCompanionMessages);$("addQnoBtn")?.addEventListener("click",addConfigQno);$("newQnoName")?.addEventListener("keydown",e=>{if(e.key==="Enter")addConfigQno()});$("saveOperationalConfigBtn")?.addEventListener("click",saveOperationalConfig);$("newRoleBtn")?.addEventListener("click",openNewRole);$("saveRoleBtn")?.addEventListener("click",saveRole);$("changePinBtn")?.addEventListener("click",()=>openModal("changePinModal"));$("saveOwnPinBtn")?.addEventListener("click",saveOwnPin);$("newUserBtn")?.addEventListener("click",openNewUser);$("saveUserBtn")?.addEventListener("click",saveUser);$("saveResetPinBtn")?.addEventListener("click",saveResetPin);$("lp").addEventListener("keydown",e=>{if(e.key==="Enter")login()});$("logout").addEventListener("click",logoutSession);$("date").addEventListener("change",()=>showView(state.view));$("refreshOp").addEventListener("click",loadPatients);$("refreshProg").addEventListener("click",loadPatients);$("pq").addEventListener("input",renderProgram);$("pst").addEventListener("change",renderProgram);$("pqn").addEventListener("change",renderProgram);$("trackingSearch").addEventListener("input",renderTrackingTable);$("trackingSearchClear").addEventListener("click",clearTrackingSearch);$("trackBtn").addEventListener("click",track);$("trackSoundBtn").addEventListener("click",toggleTrackingSound);$("trackCode").addEventListener("input",()=>{if($("trackCode").value!==liveTracking.code){stopLiveTracking();$("trackResult").innerHTML=""}});$("trackCode")?.addEventListener("keydown",e=>{if(e.key==="Enter")track()});$("copyTrackingPortalBtn")?.addEventListener("click",copyTrackingPortal);$("openTrackingPortalBtn")?.addEventListener("click",openTrackingPortal);$("printTrackingQrBtn")?.addEventListener("click",()=>printTrackingQr().catch(e=>appAlert(e.message,"error")));$("downloadCompanionCardsBtn")?.addEventListener("click",()=>downloadCompanionCards().catch(e=>appAlert(e.message,"error")));$("companionLogin").addEventListener("click",()=>{window.open(trackingPortalUrl(),"_blank","noopener")});$("newPatient").addEventListener("click",openPatient);$("savePatient").addEventListener("click",savePatient);$("bulkOpen").addEventListener("click",()=>{state.bulk=[];state.bulkFiles=[];$("bulkFile").value="";$("bulkStatus").textContent="Puede seleccionar cualquier tipo de archivo. Excel, CSV, PDF, imágenes y archivos de texto compatibles intentarán procesarse automáticamente. Las imágenes y los PDF escaneados usan reconocimiento de texto; revise los datos antes de importar.";$("bulkPreview").innerHTML="";$("bulkImport").disabled=true;openModal("bulkModal")});$("bulkFile").addEventListener("change",e=>{if(e.target.files?.length)parseBulk(e.target.files).catch(x=>appAlert(x.message,"error"))});$("patientFiles").addEventListener("change",async e=>{state.patientFiles=Array.from(e.target.files||[]);if(!state.patientFiles.length){$("patientFilesStatus").textContent="Sin archivos seleccionados.";return}const pdf=state.patientFiles.find(isPatientReadableFile);if(pdf&&!state.editPatientId)await readPatientFileIntoForm(pdf);else $("patientFilesStatus").textContent=state.patientFiles.length+" archivo(s) seleccionados. Se guardarán con el paciente.";});$("bulkImport").addEventListener("click",importBulk);$("kpiRefresh").addEventListener("click",loadKpi);$("kpiView").addEventListener("change",loadKpi);$("kpiPeriod").addEventListener("change",loadKpi);$("downloadBtn").addEventListener("click",download);$("confirmCancel")?.addEventListener("click",submitCancel);$("confirmIntraop")?.addEventListener("click",()=>submitIntraop(false));$("skipIntraop")?.addEventListener("click",()=>submitIntraop(true));$("enableAllCompanionMessagesBtn")?.addEventListener("click",enableAllCompanionMessages);$("profSearchBtn")?.addEventListener("click",searchProfilaxisCatalog);$("profSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchProfilaxisCatalog()});document.querySelectorAll("[data-prof]").forEach(b=>b.addEventListener("click",()=>chooseProf(b.dataset.prof)));document.querySelectorAll("[data-clasif]").forEach(b=>b.addEventListener("click",()=>chooseClasif(b.dataset.clasif)));["ioAnestIni","ioAnestFin","ioQxIni","ioQxFin","ioProfHora"].forEach(id=>$(id)?.addEventListener("input",updateIntraopCalc));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&liveTracking.code&&liveTracking.last?.active){if(liveTracking.timer!==null){clearTimeout(liveTracking.timer);liveTracking.timer=null}refreshLiveTracking(liveTracking.epoch)}});
 window.addEventListener('pagehide',()=>stopLiveTracking());
 (async()=>{

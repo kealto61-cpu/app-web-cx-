@@ -1,3 +1,4 @@
+import {normalizeIntraoperativeCard,intraoperativePatch,requiredIntraoperativeError} from './intraoperative.ts';
 import {resolveReportRange} from './report-range.ts';
 import {DATABASE_JSON_TYPES,repairSimulationJson} from './database-json.ts';
 import postgres from "postgres";
@@ -125,7 +126,7 @@ function norm(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/
 function nowBog(){return new Date().toLocaleString("sv-SE",{timeZone:"America/Bogota"}).replace("T"," ")}
 function monthName(n){return ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][n-1]||""}
 async function body(req){try{return await req.json()}catch{return {}}}
-function mapCase(p){return {id:p["ID CASO"]||"",fecha:p["FECHA CIRUGÍA"]||"",hora:p["HORA PROGRAMADA"]||"",documento:p["DOCUMENTO"]||"",paciente:p["PACIENTE"]||"",edad:p["EDAD"]||"",telefono:p["TELÉFONO"]||"",sexo:p["SEXO"]||"",procedimiento:p["PROCEDIMIENTO"]||"",especialidad:p["ESPECIALIDAD"]||"",especialista:p["ESPECIALISTA"]||"",qno:p["SALA / QNO"]||"",estado:String(p["ESTADO ACTUAL"]||"PROGRAMADO").toUpperCase(),observaciones:p["OBSERVACIONES"]||"",tipoAtencion:p["TIPO DE ATENCIÓN"]||"",operado:["TRUE","SI","SÍ","1"].includes(norm(p["OPERADO"])),destino:p["DESTINO POSTOP"]||"",salida:p["HORA SALIDA RECUPERACIÓN"]||"",observacionEgreso:p["OBSERVACIÓN EGRESO / HOSPITALIZACIÓN"]||"",codigo:p["CÓDIGO SEGUIMIENTO"]||"",token:p["TOKEN SEGUIMIENTO"]||"",actualizado:p["ÚLTIMA ACTUALIZACIÓN WEB"]||p["FECHA/HORA ÚLTIMO MOVIMIENTO"]||"",tPrepa:Number(p["TIEMPO PREPA → QNO (MIN)"]||0)||0,tQnoRec:Number(p["TIEMPO QNO → RECUPERACIÓN (MIN)"]||0)||0,tMuerto:Number(p["INTERVALO ENTRE PACIENTES QNO (MIN)"]||0)||0,prof:p["PROFILAXIS ADMINISTRADA"]||"",profHora:p["HORA ADMINISTRACIÓN PROFILAXIS"]||"",profMin:p["PROFILAXIS → INCISIÓN (MIN)"]??"",clasif:p["CLASIFICACIÓN CIRUGÍA"]||"",antibiotico:p["PROFILAXIS ANTIBIÓTICA / MEDICAMENTO"]||"",cups:p["CUPS"]||"",uvr:p["UVR"]||"",tiempoQx:p["TIEMPO QX ESTIMADO (MIN)"]||"",recursos:p["RECURSOS / ALERTAS PREQUIRÚRGICAS"]||"",cama:p["CAMA / UBICACIÓN PROGRAMADA"]||"",fechaCitaPop:p["FECHA CITA POP"]||"",horaCitaPop:p["HORA CITA POP"]||"",enfermeroJefe:p["ENFERMERO JEFE"]||"",horaAnestesia:p["HORA INICIO ANESTESIA"]||"",horaFinAnestesia:p["HORA FIN ANESTESIA"]||"",horaInicioCirugia:p["HORA INICIO CIRUGÍA / INCISIÓN"]||"",horaFinCirugia:p["HORA FIN CIRUGÍA"]||"",aviso:p["AVISO ACOMPAÑANTE"]||"",avisoFecha:p["FECHA/HORA AVISO ACOMPAÑANTE"]||"",avisoOrigen:p["ORIGEN AVISO ACOMPAÑANTE"]||"",avisoId:p["ID MENSAJE ACOMPAÑANTE"]||""}}
+function mapCase(p){return {id:p["ID CASO"]||"",fecha:p["FECHA CIRUGÍA"]||"",hora:p["HORA PROGRAMADA"]||"",documento:p["DOCUMENTO"]||"",paciente:p["PACIENTE"]||"",edad:p["EDAD"]||"",telefono:p["TELÉFONO"]||"",sexo:p["SEXO"]||"",procedimiento:p["PROCEDIMIENTO"]||"",especialidad:p["ESPECIALIDAD"]||"",especialista:p["ESPECIALISTA"]||"",qno:p["SALA / QNO"]||"",estado:String(p["ESTADO ACTUAL"]||"PROGRAMADO").toUpperCase(),observaciones:p["OBSERVACIONES"]||"",tipoAtencion:p["TIPO DE ATENCIÓN"]||"",operado:["TRUE","SI","SÍ","1"].includes(norm(p["OPERADO"])),destino:p["DESTINO POSTOP"]||"",salida:p["HORA SALIDA RECUPERACIÓN"]||"",observacionEgreso:p["OBSERVACIÓN EGRESO / HOSPITALIZACIÓN"]||"",observacionIntraop:p["OBSERVACIÓN INTRAOPERATORIA"]||"",codigo:p["CÓDIGO SEGUIMIENTO"]||"",token:p["TOKEN SEGUIMIENTO"]||"",actualizado:p["ÚLTIMA ACTUALIZACIÓN WEB"]||p["FECHA/HORA ÚLTIMO MOVIMIENTO"]||"",tPrepa:Number(p["TIEMPO PREPA → QNO (MIN)"]||0)||0,tQnoRec:Number(p["TIEMPO QNO → RECUPERACIÓN (MIN)"]||0)||0,tMuerto:Number(p["INTERVALO ENTRE PACIENTES QNO (MIN)"]||0)||0,prof:p["PROFILAXIS ADMINISTRADA"]||"",profHora:p["HORA ADMINISTRACIÓN PROFILAXIS"]||"",profMin:p["PROFILAXIS → INCISIÓN (MIN)"]??"",clasif:p["CLASIFICACIÓN CIRUGÍA"]||"",antibiotico:p["PROFILAXIS ANTIBIÓTICA / MEDICAMENTO"]||"",cups:p["CUPS"]||"",uvr:p["UVR"]||"",tiempoQx:p["TIEMPO QX ESTIMADO (MIN)"]||"",recursos:p["RECURSOS / ALERTAS PREQUIRÚRGICAS"]||"",cama:p["CAMA / UBICACIÓN PROGRAMADA"]||"",fechaCitaPop:p["FECHA CITA POP"]||"",horaCitaPop:p["HORA CITA POP"]||"",enfermeroJefe:p["ENFERMERO JEFE"]||"",horaAnestesia:p["HORA INICIO ANESTESIA"]||"",horaFinAnestesia:p["HORA FIN ANESTESIA"]||"",horaInicioCirugia:p["HORA INICIO CIRUGÍA / INCISIÓN"]||"",horaFinCirugia:p["HORA FIN CIRUGÍA"]||"",aviso:p["AVISO ACOMPAÑANTE"]||"",avisoFecha:p["FECHA/HORA AVISO ACOMPAÑANTE"]||"",avisoOrigen:p["ORIGEN AVISO ACOMPAÑANTE"]||"",avisoId:p["ID MENSAJE ACOMPAÑANTE"]||""}}
 async function saveCasePayload(p){
   const c=mapCase(p);if(!c.id)throw new Error("ID de caso requerido.");
   await sql.unsafe(`insert into qx_cases(case_id,surgery_date,surgery_time,document,procedure_name,tracking_token,payload,updated_at)
@@ -277,11 +278,11 @@ async function operationalConfig(){
   if(!Array.isArray(qnos)||!qnos.length)qnos=DEFAULT_QNOS.slice();
   qnos=[...new Set(qnos.map(x=>String(x||"").trim().toUpperCase()).filter(Boolean))];
   if(!flow||typeof flow!=="object"||Array.isArray(flow))flow=JSON.parse(JSON.stringify(DEFAULT_FLOW));
-  return {qnos,flow,states:FLOW_STATES};
+  return {qnos,flow,states:FLOW_STATES,intraoperativeCard:normalizeIntraoperativeCard(await readSystemConfig("TARJETA INTRAOPERATORIA",{}))};
 }
 async function companionMessagesConfig(){
   let rows=await readSystemConfig("MENSAJES ACOMPAÑANTE",DEFAULT_COMPANION_MESSAGES);
-  if(!Array.isArray(rows)||!rows.length)rows=JSON.parse(JSON.stringify(DEFAULT_COMPANION_MESSAGES));
+  if(!Array.isArray(rows))rows=JSON.parse(JSON.stringify(DEFAULT_COMPANION_MESSAGES));
   const seen=new Set();
   rows=rows.map((m,i)=>{
     const id=String(m?.id||("MSG_"+(i+1))).trim().toUpperCase().replace(/[^A-Z0-9_]/g,"_").slice(0,40);
@@ -293,18 +294,11 @@ async function companionMessagesConfig(){
       name:String(m?.name||id).trim().slice(0,80),
       trigger:["MANUAL",...FLOW_STATES].includes(trigger)?trigger:"MANUAL",
       text:String(m?.text||"").trim().slice(0,300),
-      automatic:terminal?true:Boolean(m?.automatic),
-      enabled:terminal?true:m?.enabled!==false,
+      automatic:Boolean(m?.automatic),
+      enabled:m?.enabled!==false,
       terminal
     };
   }).filter(Boolean);
-  for(const terminalId of ["ALTA","HOSPITALIZACION"]){
-    const trigger=terminalId==="ALTA"?"ALTA":"HOSPITALIZACIÓN";
-    if(!rows.some(x=>x.trigger===trigger)){
-      const d=DEFAULT_COMPANION_MESSAGES.find(x=>x.trigger===trigger);
-      rows.push({...d});
-    }
-  }
   return rows;
 }
 function renderCompanionMessage(template,payload){
@@ -356,7 +350,7 @@ async function sendCompanionPush(caseId,payload,message,messageId){
 }
 async function setCompanionNotice(session,id,messageId,origin="MANUAL"){
   const hit=await findCase(id);if(!hit)throw new Error("Paciente no encontrado.");
-  const cfg=await companionMessagesConfig(),msg=cfg.find(x=>x.id===String(messageId||"").toUpperCase()&&x.enabled);
+  const cfg=await companionMessagesConfig(),msg=cfg.find(x=>x.id===String(messageId||"").toUpperCase()&&x.enabled&&x.text);
   if(!msg)throw new Error("Mensaje de acompañante no disponible.");
   const text=renderCompanionMessage(msg.text,hit.payload);
   if(!text)throw new Error("El mensaje configurado está vacío.");
@@ -373,7 +367,7 @@ async function setCompanionNotice(session,id,messageId,origin="MANUAL"){
 }
 async function autoNotifyCompanion(session,id,stateName){
   const state=String(stateName||"").toUpperCase(),cfg=await companionMessagesConfig();
-  const msg=cfg.find(x=>x.enabled&&x.automatic&&x.trigger===state);
+  const msg=cfg.find(x=>x.enabled&&x.text&&x.automatic&&x.trigger===state);
   if(!msg)return null;
   return setCompanionNotice(session,id,msg.id,"AUTOMÁTICO");
 }
@@ -427,7 +421,7 @@ async function seedSimulation(){
 function csvCell(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 await seedSimulation();
 Bun.serve({port:PORT,async fetch(req){try{
- const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'5.9.2-pasp',dataMode:DATA_MODE,push:false,educationalCards:count[0].n});}if(url.pathname==="/")return html(PAGE);
+ const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'5.9.3-pasp',dataMode:DATA_MODE,push:false,educationalCards:count[0].n});}if(url.pathname==="/")return html(PAGE);
  if(['/postop.js','/postop.css','/settings.js'].includes(url.pathname))return textResponse(await Bun.file('./public'+url.pathname).text(),url.pathname.endsWith('.js')?'application/javascript; charset=utf-8':'text/css; charset=utf-8');
  if(url.pathname==='/api/care-guides-public'&&req.method==='GET'){const catalog=await sql.unsafe('select payload from qx_pasp_care_catalog'),dictionary=await sql.unsafe('select payload from qx_pasp_dictionary');return json(searchCare(catalog.map(r=>r.payload),dictionary.map(r=>r.payload),Object.fromEntries(url.searchParams),true));}
  if(url.pathname==='/api/application-settings/public'){const response=await handleApplicationSettings(req,url,{sql,session:null,json});if(response)return response;}
@@ -511,7 +505,8 @@ Bun.serve({port:PORT,async fetch(req){try{
      clean[from]=[...new Set(arr.map(x=>String(x||"").trim().toUpperCase()).filter(x=>FLOW_STATES.includes(x)&&x!==from))];
    }
    await writeSystemConfig(s,"QNO HABILITADOS",qnos);await writeSystemConfig(s,"FLUJO QUIRÚRGICO",clean);
-   return json({ok:true,qnos,flow:clean,states:FLOW_STATES});
+   if(b.intraoperativeCard!==undefined)await writeSystemConfig(s,"TARJETA INTRAOPERATORIA",normalizeIntraoperativeCard(b.intraoperativeCard));
+   return json({ok:true,...await operationalConfig()});
  }
  if(url.pathname==="/api/companion-messages"&&req.method==="GET"){
    if(!(hasPermission(permissions,"OPERACION_VER")||hasPermission(permissions,"OPERACION_GESTIONAR")||String(s.role||"").toUpperCase()==="SUPERADMIN"))return permissionDenied("OPERACION_VER");
@@ -520,18 +515,14 @@ Bun.serve({port:PORT,async fetch(req){try{
  if(url.pathname==="/api/companion-messages"&&req.method==="POST"){
    if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede configurar mensajes para acompañantes."},403);
    const b=await body(req),rows=Array.isArray(b.rows)?b.rows:[];
-   if(!rows.length||rows.length>30)return json({error:"Configure entre 1 y 30 mensajes."},400);
+   if(!Array.isArray(b.rows)||rows.length>30)return json({error:"Configure una lista de hasta 30 mensajes."},400);
    const clean=[],ids=new Set();
    for(let i=0;i<rows.length;i++){
      const raw=rows[i]||{},id=String(raw.id||("MSG_"+(i+1))).trim().toUpperCase().replace(/[^A-Z0-9_]/g,"_").slice(0,40),trigger=String(raw.trigger||"MANUAL").trim().toUpperCase(),text=String(raw.text||"").trim().slice(0,300);
      if(!id||ids.has(id))return json({error:"Hay códigos de mensaje duplicados o inválidos."},400);ids.add(id);
      if(!["MANUAL",...FLOW_STATES].includes(trigger))return json({error:"Momento de envío inválido: "+trigger},400);
-     if(!text)return json({error:"Todos los mensajes deben tener texto."},400);
      const terminal=["ALTA","HOSPITALIZACIÓN"].includes(trigger);
-     clean.push({id,name:String(raw.name||id).trim().slice(0,80),trigger,text,automatic:terminal?true:Boolean(raw.automatic),enabled:terminal?true:raw.enabled!==false,terminal});
-   }
-   for(const trigger of ["ALTA","HOSPITALIZACIÓN"]){
-     if(!clean.some(x=>x.trigger===trigger))return json({error:"Debe existir un mensaje final para "+trigger+"."},400);
+     clean.push({id,name:String(raw.name||id).trim().slice(0,80),trigger,text,automatic:Boolean(raw.automatic),enabled:raw.enabled!==false,terminal});
    }
    await writeSystemConfig(s,"MENSAJES ACOMPAÑANTE",clean);
    return json({ok:true,rows:await companionMessagesConfig()});
@@ -629,40 +620,42 @@ Bun.serve({port:PORT,async fetch(req){try{
   const b=await body(req),hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);
   const jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno antes de mover al paciente."},400);
   const from=String(hit.payload["ESTADO ACTUAL"]||"PROGRAMADO").toUpperCase(),to=String(b.destino||"").toUpperCase();
-  const allowed=(await operationalConfig()).flow;
+  const operational=await operationalConfig(),allowed=operational.flow;
   if(!(allowed[from]||[]).includes(to))return json({error:"Transición no permitida: "+from+" → "+to},409);
-  const patch={"ESTADO ACTUAL":to,"ENFERMERO JEFE":jefe};
+  const clinical=intraoperativePatch(b,hit.payload);if(clinical.error)return json({error:clinical.error},400);
+  const patch={...clinical.patch,"ESTADO ACTUAL":to,"ENFERMERO JEFE":jefe};
   if(to==="QUIRÓFANO")patch["EN QNO"]="TRUE";
   if(from==="QUIRÓFANO"&&["RECUPERACIÓN","ALTA","HOSPITALIZACIÓN"].includes(to)){
-    const required=["horaAnestesia","horaFinAnestesia","horaInicioCirugia","horaFinCirugia","profilaxisAdministrada","clasificacionCirugia"];
-    if(required.some(k=>!String(b[k]||"").trim()))return json({error:"Antes de salir de QNO debe completar tiempos intraoperatorios, profilaxis y clasificación de cirugía."},400);
-    const tqx=elapsedMinutes(b.horaInicioCirugia,b.horaFinCirugia),tan=elapsedMinutes(b.horaAnestesia,b.horaFinAnestesia);
-    if(tqx===null||tqx<=0||tan===null||tan<=0)return json({error:"Revise los horarios de anestesia y cirugía."},400);
-    const prof=norm(b.profilaxisAdministrada)==="SI"?"SÍ":norm(b.profilaxisAdministrada)==="NO"?"NO":"";
-    if(!prof)return json({error:"Seleccione si se administró profilaxis."},400);
-    let profMin="";
-    if(prof==="SÍ"){
-      if(!String(b.antibioticoProfilaxis||"").trim()||hhmmMinutes(b.horaProfilaxis)===null)return json({error:"Registre antibiótico y hora de profilaxis."},400);
-      profMin=elapsedMinutes(b.horaProfilaxis,b.horaInicioCirugia);
-    }
-    const clas=String(b.clasificacionCirugia||"").toUpperCase();
-    if(!["LIMPIA","CONTAMINADA","SUCIA"].includes(clas))return json({error:"Clasificación de cirugía no válida."},400);
-    Object.assign(patch,{
-      "HORA INICIO ANESTESIA":b.horaAnestesia,"HORA FIN ANESTESIA":b.horaFinAnestesia,
-      "HORA INICIO CIRUGÍA / INCISIÓN":b.horaInicioCirugia,"HORA FIN CIRUGÍA":b.horaFinCirugia,
-      "PROFILAXIS ADMINISTRADA":prof,"PROFILAXIS ANTIBIÓTICA / MEDICAMENTO":prof==="SÍ"?String(b.antibioticoProfilaxis||""):"",
-      "HORA ADMINISTRACIÓN PROFILAXIS":prof==="SÍ"?b.horaProfilaxis:"","PROFILAXIS → INCISIÓN (MIN)":profMin,
-      "CLASIFICACIÓN CIRUGÍA":clas,"OPERADO":"TRUE"
-    });
+    if(operational.intraoperativeCard.required){const error=requiredIntraoperativeError({...hit.payload,...clinical.patch});if(error)return json({error},400);}
+    patch["OPERADO"]="TRUE";
     Object.assign(patch,surgicalNurseSnapshot(hit.payload,jefe));
     if(to==="RECUPERACIÓN")patch["RECUPERACIÓN"]="TRUE";
     if(["ALTA","HOSPITALIZACIÓN"].includes(to)){patch["DESTINO POSTOP"]=to;patch["OBSERVACIÓN EGRESO / HOSPITALIZACIÓN"]=String(b.observacion||"");}
   }
   let c=await updateCase(s,b.id,patch,"MOVER PACIENTE");await addMovement(s,Object.assign({},hit.payload,patch),from,to);const notice=await autoNotifyCompanion(s,b.id,to);if(notice)c=notice;return json(c)
 }
+ if(url.pathname==="/api/case/intraoperative"&&req.method==="POST"){
+  if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");
+  const b=await body(req),hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);
+  const clinical=intraoperativePatch(b,hit.payload);if(clinical.error)return json({error:clinical.error},400);
+  if(!Object.keys(clinical.patch).length)return json(mapCase(hit.payload));
+  return json(await updateCase(s,b.id,clinical.patch,"REGISTRO INTRAOPERATORIO"));
+ }
  if(url.pathname==="/api/case/qno"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req),q=String(b.qno||"").toUpperCase(),jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno."},400);const cfg=await operationalConfig();if(!cfg.qnos.includes(q))return json({error:"QNO inválido o no habilitado."},400);return json(await updateCase(s,b.id,{"SALA / QNO":q,"ENFERMERO JEFE":jefe},"CAMBIO QNO"))}
  if(url.pathname==="/api/case/cancel"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req);if(!String(b.jefeTurno||"").trim())return json({error:"Debe registrar el Jefe de turno."},400);if(!String(b.momento||"").trim()||!String(b.causa||"").trim()||!String(b.motivo||"").trim()||!String(b.atribuible||"").trim())return json({error:"Momento, causa, motivo y atribuibilidad son obligatorios."},400);const hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);await insertCancellation(s,hit.payload,b);const obs=[b.causa,b.motivo,b.observaciones].filter(Boolean).join(" | ");const c=await updateCase(s,b.id,{"ESTADO ACTUAL":"CANCELADO","CANCELAR":"TRUE","ENFERMERO JEFE":String(b.jefeTurno),"OBSERVACIONES":obs},"CANCELAR PACIENTE");await addMovement(s,Object.assign({},hit.payload,{"ESTADO ACTUAL":"CANCELADO"}),hit.payload["ESTADO ACTUAL"]||"","CANCELADO");return json(c)}
- if(url.pathname==="/api/case/finish"&&req.method==="POST"){if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");const b=await body(req),d=String(b.destino||"").toUpperCase(),jefe=String(b.jefeTurno||"").trim();if(!jefe)return json({error:"Debe registrar el Jefe de turno."},400);if(!["ALTA","HOSPITALIZACIÓN"].includes(d))return json({error:"Destino inválido."},400);let c=await updateCase(s,b.id,{"ESTADO ACTUAL":d,"DESTINO POSTOP":d,"HORA SALIDA RECUPERACIÓN":nowBog(),"OBSERVACIÓN EGRESO / HOSPITALIZACIÓN":String(b.observacion||""),"ENFERMERO JEFE":jefe},"CIERRE RECUPERACIÓN");const notice=await autoNotifyCompanion(s,b.id,d);if(notice)c=notice;return json(c)}
+ if(url.pathname==="/api/case/finish"&&req.method==="POST"){
+  if(!hasPermission(permissions,"OPERACION_GESTIONAR"))return permissionDenied("OPERACION_GESTIONAR");
+  const b=await body(req),d=String(b.destino||"").toUpperCase(),jefe=String(b.jefeTurno||"").trim();
+  if(!jefe)return json({error:"Debe registrar el Jefe de turno."},400);
+  if(!["ALTA","HOSPITALIZACIÓN"].includes(d))return json({error:"Destino inválido."},400);
+  const hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);
+  const from=String(hit.payload["ESTADO ACTUAL"]||"PROGRAMADO").toUpperCase(),cfg=await operationalConfig();
+  if(from!=="RECUPERACIÓN"||!(cfg.flow[from]||[]).includes(d))return json({error:"Transición no permitida: "+from+" → "+d},409);
+  const clinical=intraoperativePatch(b,hit.payload);if(clinical.error)return json({error:clinical.error},400);
+  if(cfg.intraoperativeCard.required){const error=requiredIntraoperativeError({...hit.payload,...clinical.patch});if(error)return json({error},400);}
+  let c=await updateCase(s,b.id,{...clinical.patch,"ESTADO ACTUAL":d,"DESTINO POSTOP":d,"HORA SALIDA RECUPERACIÓN":nowBog(),"OBSERVACIÓN EGRESO / HOSPITALIZACIÓN":String(b.observacion||""),"ENFERMERO JEFE":jefe},"CIERRE RECUPERACIÓN");
+  const notice=await autoNotifyCompanion(s,b.id,d);if(notice)c=notice;return json(c);
+ }
  if(url.pathname==="/api/patient/update"&&req.method==="POST"){if(!hasPermission(permissions,"PROGRAMACION_EDITAR"))return permissionDenied("PROGRAMACION_EDITAR");
    const b=await body(req),ucfg=await operationalConfig();if(b.qno&&!ucfg.qnos.includes(String(b.qno).trim().toUpperCase()))return json({error:"QNO no habilitado."},400);const hit=await findCase(b.id);if(!hit)return json({error:"Paciente no encontrado."},404);
    const p=Object.assign({},hit.payload);const appointment=validateProgrammingAppointment({fechaCitaPop:b.fechaCitaPop??p["FECHA CITA POP"],horaCitaPop:b.horaCitaPop??p["HORA CITA POP"]});if(appointment.error)return json({error:appointment.error},400);
