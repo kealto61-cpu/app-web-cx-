@@ -64,6 +64,8 @@ function surgeryCaseFromRow_(row) {
       row['TIEMPO QX ESTIMADO (MIN)'],
     recursos: normalizeText_(row['RECURSOS / ALERTAS PREQUIRÚRGICAS']),
     cama: normalizeText_(row['CAMA / UBICACIÓN PROGRAMADA']),
+    fechaCitaPop: formatDate_(row['FECHA CITA POP']),
+    horaCitaPop: formatTime_(row['HORA CITA POP']),
     enfermeroJefe: normalizeText_(row['ENFERMERO JEFE']),
     horaAnestesia: formatTime_(row['HORA INICIO ANESTESIA']),
     horaFinAnestesia: formatTime_(row['HORA FIN ANESTESIA']),

@@ -8,6 +8,9 @@ function apiRequest(request) {
 
   if (path === '/health') return apiHealth();
 
+  if (path === '/api/care-guides-public' && method === 'GET') return careGuidesApp_('', query, true);
+  if (path === '/api/care-guides' && method === 'GET') return careGuidesApp_(token, query, false);
+
   if (path === '/api/tracking') {
     return publicTracking_(query.code || '');
   }

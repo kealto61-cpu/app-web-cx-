@@ -311,6 +311,8 @@ function normalizePatientPayloadApp_(body, original) {
     qno: 'SALA / QNO',
     tipoAtencion: 'TIPO DE ATENCIÓN',
     cama: 'CAMA / UBICACIÓN PROGRAMADA',
+    fechaCitaPop: 'FECHA CITA POP',
+    horaCitaPop: 'HORA CITA POP',
     uvr: 'UVR',
     tiempoQx: 'TIEMPO QX ESTIMADO (MIN)',
     recursos: 'RECURSOS / ALERTAS PREQUIRÚRGICAS',
@@ -348,9 +350,28 @@ function normalizePatientPayloadApp_(body, original) {
   return p;
 }
 
+// Adds only the two optional appointment columns; existing sheets and cells are preserved.
+function ensurePopAppointmentColumnsApp_() {
+  var sheet = getSheet_(SHEETS.PROGRAMACION, DATA_SOURCES.MAIN);
+  var meta = getHeaderMap_(sheet);
+  var missing = ['FECHA CITA POP', 'HORA CITA POP'].filter(function(header) {
+    return !meta.map[normalizeHeader_(header)];
+  });
+  if (missing.length) {
+    var column = sheet.getLastColumn() + 1;
+    var requiredColumns = column + missing.length - 1;
+    if (sheet.getMaxColumns() < requiredColumns) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), requiredColumns - sheet.getMaxColumns());
+    }
+    sheet.getRange(1, column, 1, missing.length).setValues([missing]);
+  }
+  return sheet;
+}
+
 function createPatientApp_(token, body) {
   var session = requirePermission_(token, 'PROGRAMACION_EDITAR');
   var p = normalizePatientPayloadApp_(body, {});
+  ensurePopAppointmentColumnsApp_();
   var date = formatDate_(p['FECHA CIRUGÍA']);
 
   p['ID CASO'] =
@@ -393,6 +414,7 @@ function updatePatientApp_(token, body) {
   if (!hit) throw new Error('Paciente no encontrado.');
 
   var p = normalizePatientPayloadApp_(body, hit.object);
+  ensurePopAppointmentColumnsApp_();
   p['USUARIO ÚLTIMO MOVIMIENTO'] = session.user;
 
   var updated = patchRow_(
@@ -482,7 +504,7 @@ function bulkImportApp_(token, body) {
   var skipped = 0;
   var errors = [];
 
-  var sheet = getSheet_(SHEETS.PROGRAMACION, DATA_SOURCES.MAIN);
+  var sheet = ensurePopAppointmentColumnsApp_();
   var headers = getHeaders_(sheet);
   var output = [];
 
@@ -526,6 +548,8 @@ function bulkImportApp_(token, body) {
         'SALA / QNO': qno,
         'TIPO DE ATENCIÓN': tipo,
         'CAMA / UBICACIÓN PROGRAMADA': normalizeText_(raw.cama),
+        'FECHA CITA POP': normalizeText_(raw.fechaCitaPop),
+        'HORA CITA POP': normalizeText_(raw.horaCitaPop),
         'TIEMPO QX ESTIMADO (MIN)': normalizeText_(raw.tiempoQx),
         'OBSERVACIONES': normalizeText_(raw.observaciones),
         'ESTADO ACTUAL': 'PROGRAMADO',

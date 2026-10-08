@@ -1,0 +1,284 @@
+{
+  "headers": [
+    "CONCEPTO",
+    "TIPO",
+    "FAMILIA",
+    "SINONIMOS",
+    "ESTADO"
+  ],
+  "rows": [
+    [
+      "Hombro",
+      "REGION",
+      "",
+      "hombro;cirugía de hombro;operación del hombro;operacion de hombro",
+      "ACTIVO"
+    ],
+    [
+      "Artroscopia de hombro",
+      "PROCEDIMIENTO",
+      "Hombro",
+      "artroscopia de hombro;artroscopia del hombro;artroscopia hombro;artroscopía de hombro;artroscopia en el hombro;cirugía artroscópica de hombro",
+      "ACTIVO"
+    ],
+    [
+      "Reparación del manguito rotador",
+      "PROCEDIMIENTO",
+      "Hombro",
+      "manguito rotador;manguito;reparación del manguito;reparacion de manguito rotador;ruptura de manguito rotador;cirugía de manguito rotador;reparación de tendones del hombro;reparación artroscópica del manguito",
+      "ACTIVO"
+    ],
+    [
+      "Bloqueo regional de brazo",
+      "ANESTESIA",
+      "",
+      "anestesia en todo el brazo;anestesia todo el brazo;anestesia en el brazo;bloqueo de brazo;bloqueo del brazo;bloqueo regional;brazo anestesiado;bloqueo anestésico del brazo;bloqueo del plexo braquial",
+      "ACTIVO"
+    ],
+    [
+      "Anestesia general",
+      "ANESTESIA",
+      "",
+      "anestesia general;anestesia en todo el cuerpo",
+      "ACTIVO"
+    ],
+    [
+      "Sedación",
+      "ANESTESIA",
+      "",
+      "sedación;sedado;sedada",
+      "ACTIVO"
+    ],
+    [
+      "Anestesia local",
+      "ANESTESIA",
+      "",
+      "anestesia local",
+      "ACTIVO"
+    ],
+    [
+      "Sonda vesical",
+      "TEMA",
+      "",
+      "sonda vesical;sonda urinaria;sonda foley;catéter urinario",
+      "ACTIVO"
+    ],
+    [
+      "Drenaje",
+      "TEMA",
+      "",
+      "drenaje;drenajes;dren;hemovac;jackson pratt",
+      "ACTIVO"
+    ],
+    [
+      "Férula o inmovilizador",
+      "TEMA",
+      "",
+      "férula;inmovilizador;cabestrillo",
+      "ACTIVO"
+    ],
+    [
+      "Catéter",
+      "TEMA",
+      "",
+      "catéter;cateter",
+      "ACTIVO"
+    ],
+    [
+      "Artroplastia de cadera",
+      "PROCEDIMIENTO",
+      "Cadera",
+      "reemplazo de cadera;prótesis de cadera;reemplazo total de cadera",
+      "ACTIVO"
+    ],
+    [
+      "Cadera",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Artroplastia de rodilla",
+      "PROCEDIMIENTO",
+      "Rodilla",
+      "reemplazo de rodilla;prótesis de rodilla;reemplazo total de rodilla",
+      "ACTIVO"
+    ],
+    [
+      "Rodilla",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Reconstrucción del ligamento cruzado anterior",
+      "PROCEDIMIENTO",
+      "Rodilla",
+      "reconstrucción de LCA;cirugía del ligamento cruzado anterior;ligamentoplastia LCA",
+      "ACTIVO"
+    ],
+    [
+      "Meniscectomía parcial",
+      "PROCEDIMIENTO",
+      "Rodilla",
+      "resección parcial de menisco;meniscectomía artroscópica",
+      "ACTIVO"
+    ],
+    [
+      "Reparación de menisco",
+      "PROCEDIMIENTO",
+      "Rodilla",
+      "sutura de menisco;reparación meniscal;sutura meniscal",
+      "ACTIVO"
+    ],
+    [
+      "Colecistectomía laparoscópica",
+      "PROCEDIMIENTO",
+      "Vesícula",
+      "cirugía de vesícula por laparoscopia;extracción laparoscópica de vesícula;operación de vesícula laparoscópica",
+      "ACTIVO"
+    ],
+    [
+      "Vesícula",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Reparación de hernia inguinal",
+      "PROCEDIMIENTO",
+      "Ingle",
+      "herniorrafia inguinal;hernioplastia inguinal;cirugía de hernia inguinal",
+      "ACTIVO"
+    ],
+    [
+      "Ingle",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Resección colorrectal",
+      "PROCEDIMIENTO",
+      "Intestino",
+      "colectomía;resección de colon;resección de recto;cirugía colorrectal",
+      "ACTIVO"
+    ],
+    [
+      "Intestino",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Ureteroscopia por litiasis con o sin catéter ureteral doble J",
+      "PROCEDIMIENTO",
+      "Urología - uréter y cálculos",
+      "ureteroscopia por cálculos;ureterorrenoscopia por litiasis;extracción endoscópica de cálculo ureteral;doble J después de ureteroscopia",
+      "ACTIVO"
+    ],
+    [
+      "Urología - uréter y cálculos",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Resección transuretral de próstata por hiperplasia benigna (RTU/TURP)",
+      "PROCEDIMIENTO",
+      "Urología - próstata",
+      "RTU de próstata;TURP;resección transuretral prostática;resección endoscópica de próstata por hiperplasia",
+      "ACTIVO"
+    ],
+    [
+      "Urología - próstata",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Enucleación prostática con láser de holmio (HoLEP)",
+      "PROCEDIMIENTO",
+      "Urología - próstata",
+      "HoLEP;enucleación con láser de holmio;enucleación prostática holmio;cirugía de próstata HoLEP",
+      "ACTIVO"
+    ],
+    [
+      "Prostatectomía radical asistida por robot",
+      "PROCEDIMIENTO",
+      "Urología - próstata",
+      "prostatectomía radical robótica;RARP;extracción radical de próstata con robot",
+      "ACTIVO"
+    ],
+    [
+      "Nefrectomía parcial laparoscópica asistida por robot",
+      "PROCEDIMIENTO",
+      "Urología - riñón",
+      "nefrectomía parcial robótica;extracción parcial del riñón con robot;resección parcial renal robótica",
+      "ACTIVO"
+    ],
+    [
+      "Urología - riñón",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Histerectomía laparoscópica",
+      "PROCEDIMIENTO",
+      "Ginecología - útero",
+      "extracción de útero por laparoscopia;histerectomía por laparoscopia;histerectomía laparoscópica total;histerectomía laparoscópica subtotal",
+      "ACTIVO"
+    ],
+    [
+      "Ginecología - útero",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Histeroscopia ambulatoria diagnóstica con o sin biopsia o polipectomía menor",
+      "PROCEDIMIENTO",
+      "Ginecología - útero",
+      "histeroscopia diagnóstica;histeroscopia ambulatoria;biopsia endometrial por histeroscopia;polipectomía histeroscópica menor",
+      "ACTIVO"
+    ],
+    [
+      "Quistectomía ovárica u ooforectomía laparoscópica",
+      "PROCEDIMIENTO",
+      "Ginecología - ovario y anexos",
+      "quistectomía ovárica laparoscópica;extracción laparoscópica de quiste ovárico;ooforectomía laparoscópica;extracción de ovario por laparoscopia",
+      "ACTIVO"
+    ],
+    [
+      "Ginecología - ovario y anexos",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ],
+    [
+      "Reparación vaginal de prolapso: colporrafia anterior o posterior",
+      "PROCEDIMIENTO",
+      "Ginecología - piso pélvico",
+      "colporrafia anterior;colporrafia posterior;reparación vaginal anterior;reparación vaginal posterior;cirugía vaginal de prolapso",
+      "ACTIVO"
+    ],
+    [
+      "Ginecología - piso pélvico",
+      "REGION",
+      "",
+      "",
+      "ACTIVO"
+    ]
+  ]
+}

@@ -1,0 +1,2628 @@
+{
+  "schemaVersion": "1.0.0",
+  "title": "Seguimiento postoperatorio",
+  "reviewedAt": "2026-10-07",
+  "sourceKind": "SIMULADO",
+  "referencePolicy": "Solo encabezados, listas y formulas institucionales. Identificadores de documentos privados omitidos de la version publica.",
+  "scope": "Esquema sin datos de pacientes: matriz institucional más campos clínicos de llamada trazables; no asigna triage automático ni prescribe.",
+  "sources": [
+    {
+      "id": "MATRIZ_PASP_HEADERS_ROW7",
+      "url": "",
+      "sheet": "Matriz PASP",
+      "headerRow": 7,
+      "dataStartRow": 8,
+      "columns": "A:BR",
+      "headerCount": 70
+    },
+    {
+      "id": "PASP_INSTRUCTIVO",
+      "url": "",
+      "version": "Versión actualizada el 23/07/2026",
+      "authority": "Reglas operativas; sus letras de columna posteriores a AM están desplazadas frente a encabezados reales."
+    },
+    {
+      "id": "PASP_LISTAS",
+      "url": "",
+      "ranges": [
+        "A1:N19",
+        "O2:P91"
+      ],
+      "authority": "Opciones y calendario realmente usados por validaciones/fórmulas."
+    },
+    {
+      "id": "PASP_CALL_GUIDE",
+      "url": "",
+      "title": "PASP — Guía de llamadas telefónicas — PROPUESTA REVISIÓN 1732-2026",
+      "version": "1-2026, 15/07/2026",
+      "approval": "Título propuesta; elaboración observada, revisión/aprobación institucional no inferida.",
+      "sections": [
+        "9.1",
+        "9.2",
+        "9.3",
+        "9.4",
+        "9.5",
+        "9.6",
+        "9.7",
+        "9.8"
+      ]
+    }
+  ],
+  "headers": [
+    {
+      "column": "A",
+      "columnIndex": 1,
+      "label": "Código PASP",
+      "id": "paspCode"
+    },
+    {
+      "column": "B",
+      "columnIndex": 2,
+      "label": "Fecha de registro",
+      "id": "registeredAt"
+    },
+    {
+      "column": "C",
+      "columnIndex": 3,
+      "label": "Fecha cirugía",
+      "id": "surgeryDate"
+    },
+    {
+      "column": "D",
+      "columnIndex": 4,
+      "label": "Nombre completo",
+      "id": "patientName"
+    },
+    {
+      "column": "E",
+      "columnIndex": 5,
+      "label": "Número documento",
+      "id": "documentNumber"
+    },
+    {
+      "column": "F",
+      "columnIndex": 6,
+      "label": "Teléfono principal",
+      "id": "phone"
+    },
+    {
+      "column": "G",
+      "columnIndex": 7,
+      "label": "Especialista tratante",
+      "id": "specialist"
+    },
+    {
+      "column": "H",
+      "columnIndex": 8,
+      "label": "Especialidad",
+      "id": "specialty"
+    },
+    {
+      "column": "I",
+      "columnIndex": 9,
+      "label": "Procedimiento",
+      "id": "procedure"
+    },
+    {
+      "column": "J",
+      "columnIndex": 10,
+      "label": "Estado del usuario (Ambulatorio / Hospitalizado / Fallecido)",
+      "id": "patientStatus"
+    },
+    {
+      "column": "K",
+      "columnIndex": 11,
+      "label": "Fecha cita POP",
+      "id": "appointment.date"
+    },
+    {
+      "column": "L",
+      "columnIndex": 12,
+      "label": "Hora cita POP",
+      "id": "appointment.time"
+    },
+    {
+      "column": "M",
+      "columnIndex": 13,
+      "label": "¿Debe ser valorado por el mismo especialista?",
+      "id": "appointment.sameSpecialist"
+    },
+    {
+      "column": "N",
+      "columnIndex": 14,
+      "label": "Estado cita POP",
+      "id": "appointment.status"
+    },
+    {
+      "column": "O",
+      "columnIndex": 15,
+      "label": "Fecha programada primera llamada",
+      "id": "call1.scheduledDate"
+    },
+    {
+      "column": "P",
+      "columnIndex": 16,
+      "label": "Fecha real primera llamada",
+      "id": "call1.realDate"
+    },
+    {
+      "column": "Q",
+      "columnIndex": 17,
+      "label": "Hora primera llamada",
+      "id": "call1.time"
+    },
+    {
+      "column": "R",
+      "columnIndex": 18,
+      "label": "Profesional primera llamada",
+      "id": "call1.professional"
+    },
+    {
+      "column": "S",
+      "columnIndex": 19,
+      "label": "¿Usuario contesta primera llamada?",
+      "id": "call1.contactResult"
+    },
+    {
+      "column": "T",
+      "columnIndex": 20,
+      "label": "Se siente bien 1",
+      "id": "call1.clinical.feelsWell"
+    },
+    {
+      "column": "U",
+      "columnIndex": 21,
+      "label": "Dolor controlado 1",
+      "id": "call1.clinical.painControlled"
+    },
+    {
+      "column": "V",
+      "columnIndex": 22,
+      "label": "EVA dolor 1",
+      "id": "call1.clinical.painScore"
+    },
+    {
+      "column": "W",
+      "columnIndex": 23,
+      "label": "Presenta fiebre 1",
+      "id": "call1.clinical.fever"
+    },
+    {
+      "column": "X",
+      "columnIndex": 24,
+      "label": "Presenta sangrado 1",
+      "id": "call1.clinical.bleeding"
+    },
+    {
+      "column": "Y",
+      "columnIndex": 25,
+      "label": "Presenta secreción 1",
+      "id": "call1.clinical.discharge"
+    },
+    {
+      "column": "Z",
+      "columnIndex": 26,
+      "label": "Enrojecimiento / inflamación 1",
+      "id": "call1.clinical.rednessSwelling"
+    },
+    {
+      "column": "AA",
+      "columnIndex": 27,
+      "label": "Mal olor 1",
+      "id": "call1.clinical.badOdor"
+    },
+    {
+      "column": "AB",
+      "columnIndex": 28,
+      "label": "Tolera alimentación 1",
+      "id": "call1.clinical.oralTolerance"
+    },
+    {
+      "column": "AC",
+      "columnIndex": 29,
+      "label": "Eliminación urinaria 1",
+      "id": "call1.clinical.urinaryElimination"
+    },
+    {
+      "column": "AD",
+      "columnIndex": 30,
+      "label": "Eliminación intestinal 1",
+      "id": "call1.clinical.bowelElimination"
+    },
+    {
+      "column": "AE",
+      "columnIndex": 31,
+      "label": "Toma medicamentos formulados 1",
+      "id": "call1.clinical.medicationsTaken"
+    },
+    {
+      "column": "AF",
+      "columnIndex": 32,
+      "label": "Comprendió recomendaciones de egreso 1",
+      "id": "call1.clinical.dischargeUnderstood"
+    },
+    {
+      "column": "AG",
+      "columnIndex": 33,
+      "label": "Tiene dudas 1",
+      "id": "call1.clinical.questions"
+    },
+    {
+      "column": "AH",
+      "columnIndex": 34,
+      "label": "Observaciones primera llamada / información adicional",
+      "id": "call1.observations"
+    },
+    {
+      "column": "AI",
+      "columnIndex": 35,
+      "label": "Clasificación del hallazgo 1",
+      "id": "call1.classification"
+    },
+    {
+      "column": "AJ",
+      "columnIndex": 36,
+      "label": "Conducta derivada primera llamada",
+      "id": "call1.conduct"
+    },
+    {
+      "column": "AK",
+      "columnIndex": 37,
+      "label": "Responsable del escalamiento 1",
+      "id": "call1.escalationResponsible"
+    },
+    {
+      "column": "AL",
+      "columnIndex": 38,
+      "label": "Fecha escalamiento 1",
+      "id": "call1.escalationDate"
+    },
+    {
+      "column": "AM",
+      "columnIndex": 39,
+      "label": "Fecha citación 1",
+      "id": "call1.citationDate"
+    },
+    {
+      "column": "AN",
+      "columnIndex": 40,
+      "label": "Fecha programada segunda llamada",
+      "id": "call2.scheduledDate"
+    },
+    {
+      "column": "AO",
+      "columnIndex": 41,
+      "label": "Fecha real segunda llamada",
+      "id": "call2.realDate"
+    },
+    {
+      "column": "AP",
+      "columnIndex": 42,
+      "label": "Hora segunda llamada",
+      "id": "call2.time"
+    },
+    {
+      "column": "AQ",
+      "columnIndex": 43,
+      "label": "Profesional segunda llamada",
+      "id": "call2.professional"
+    },
+    {
+      "column": "AR",
+      "columnIndex": 44,
+      "label": "¿Usuario contesta segunda llamada?",
+      "id": "call2.contactResult"
+    },
+    {
+      "column": "AS",
+      "columnIndex": 45,
+      "label": "¿Asistió a la cita POP?",
+      "id": "call2.appointmentAttendance"
+    },
+    {
+      "column": "AT",
+      "columnIndex": 46,
+      "label": "¿Se realizó retiro de puntos?",
+      "id": "call2.stitchesRemoved"
+    },
+    {
+      "column": "AU",
+      "columnIndex": 47,
+      "label": "¿Se realizó curación / revisión de herida?",
+      "id": "call2.woundReviewed"
+    },
+    {
+      "column": "AV",
+      "columnIndex": 48,
+      "label": "Se siente bien 2",
+      "id": "call2.clinical.feelsWell"
+    },
+    {
+      "column": "AW",
+      "columnIndex": 49,
+      "label": "Dolor controlado 2",
+      "id": "call2.clinical.painControlled"
+    },
+    {
+      "column": "AX",
+      "columnIndex": 50,
+      "label": "EVA dolor 2",
+      "id": "call2.clinical.painScore"
+    },
+    {
+      "column": "AY",
+      "columnIndex": 51,
+      "label": "Presenta fiebre 2",
+      "id": "call2.clinical.fever"
+    },
+    {
+      "column": "AZ",
+      "columnIndex": 52,
+      "label": "Presenta sangrado 2",
+      "id": "call2.clinical.bleeding"
+    },
+    {
+      "column": "BA",
+      "columnIndex": 53,
+      "label": "Presenta secreción 2",
+      "id": "call2.clinical.discharge"
+    },
+    {
+      "column": "BB",
+      "columnIndex": 54,
+      "label": "Enrojecimiento / inflamación 2",
+      "id": "call2.clinical.rednessSwelling"
+    },
+    {
+      "column": "BC",
+      "columnIndex": 55,
+      "label": "Tolera alimentación 2",
+      "id": "call2.clinical.oralTolerance"
+    },
+    {
+      "column": "BD",
+      "columnIndex": 56,
+      "label": "Tiene dudas 2",
+      "id": "call2.clinical.questions"
+    },
+    {
+      "column": "BE",
+      "columnIndex": 57,
+      "label": "Observaciones segunda llamada",
+      "id": "call2.observations"
+    },
+    {
+      "column": "BF",
+      "columnIndex": 58,
+      "label": "Clasificación del hallazgo 2",
+      "id": "call2.classification"
+    },
+    {
+      "column": "BG",
+      "columnIndex": 59,
+      "label": "Conducta derivada segunda llamada",
+      "id": "call2.conduct"
+    },
+    {
+      "column": "BH",
+      "columnIndex": 60,
+      "label": "Responsable del escalamiento 2",
+      "id": "call2.escalationResponsible"
+    },
+    {
+      "column": "BI",
+      "columnIndex": 61,
+      "label": "Fecha citación 2",
+      "id": "call2.citationDate"
+    },
+    {
+      "column": "BJ",
+      "columnIndex": 62,
+      "label": "Estado del caso",
+      "id": "caseStatus"
+    },
+    {
+      "column": "BK",
+      "columnIndex": 63,
+      "label": "Alerta automática para valorar derivación a Seguridad del Paciente",
+      "id": "safetyAlert"
+    },
+    {
+      "column": "BL",
+      "columnIndex": 64,
+      "label": "Observación inicial de coordinación de cirugía",
+      "id": "coordination.initialObservation1"
+    },
+    {
+      "column": "BM",
+      "columnIndex": 65,
+      "label": "Observación inicial de coordinación de cirugía 2",
+      "id": "coordination.initialObservation2"
+    },
+    {
+      "column": "BN",
+      "columnIndex": 66,
+      "label": "Seguridad del Paciente notificada del caso",
+      "id": "coordination.spNotified"
+    },
+    {
+      "column": "BO",
+      "columnIndex": 67,
+      "label": "Profesional de Coordinación de Cirugía que revisó el caso",
+      "id": "coordination.reviewer"
+    },
+    {
+      "column": "BP",
+      "columnIndex": 68,
+      "label": "Análisis y resolución primera llamada",
+      "id": "coordination.analysis1"
+    },
+    {
+      "column": "BQ",
+      "columnIndex": 69,
+      "label": "Análisis y resolución segunda llamada",
+      "id": "coordination.analysis2"
+    },
+    {
+      "column": "BR",
+      "columnIndex": 70,
+      "label": "Estado del caso COORDINACIÓN CIRUGIA",
+      "id": "coordination.status"
+    }
+  ],
+  "fields": [
+    {
+      "column": "A",
+      "columnIndex": 1,
+      "label": "Código PASP",
+      "id": "paspCode",
+      "stage": "initial",
+      "type": "text",
+      "options": [],
+      "ownership": "computed",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "B",
+      "columnIndex": 2,
+      "label": "Fecha de registro",
+      "id": "registeredAt",
+      "stage": "initial",
+      "type": "date",
+      "options": [],
+      "ownership": "computed",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "C",
+      "columnIndex": 3,
+      "label": "Fecha cirugía",
+      "id": "surgeryDate",
+      "stage": "initial",
+      "type": "date",
+      "options": [],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": true,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "D",
+      "columnIndex": 4,
+      "label": "Nombre completo",
+      "id": "patientName",
+      "stage": "initial",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": true,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "E",
+      "columnIndex": 5,
+      "label": "Número documento",
+      "id": "documentNumber",
+      "stage": "initial",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": true,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "F",
+      "columnIndex": 6,
+      "label": "Teléfono principal",
+      "id": "phone",
+      "stage": "initial",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": true,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "G",
+      "columnIndex": 7,
+      "label": "Especialista tratante",
+      "id": "specialist",
+      "stage": "initial",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": true,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "H",
+      "columnIndex": 8,
+      "label": "Especialidad",
+      "id": "specialty",
+      "stage": "initial",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": true,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "I",
+      "columnIndex": 9,
+      "label": "Procedimiento",
+      "id": "procedure",
+      "stage": "initial",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": true,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "J",
+      "columnIndex": 10,
+      "label": "Estado del usuario (Ambulatorio / Hospitalizado / Fallecido)",
+      "id": "patientStatus",
+      "stage": "initial",
+      "type": "select",
+      "options": [
+        "Ambulatorio",
+        "Hospitalizado",
+        "Fallecido"
+      ],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": true,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$A$2:$A$4",
+      "inputMessage": "Seleccione Ambulatorio, Hospitalizado o Fallecido."
+    },
+    {
+      "column": "K",
+      "columnIndex": 11,
+      "label": "Fecha cita POP",
+      "id": "appointment.date",
+      "stage": "initial",
+      "type": "date",
+      "options": [],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "L",
+      "columnIndex": 12,
+      "label": "Hora cita POP",
+      "id": "appointment.time",
+      "stage": "initial",
+      "type": "time",
+      "options": [],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": false,
+      "requiredWhen": "attemptRecorded",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "M",
+      "columnIndex": 13,
+      "label": "¿Debe ser valorado por el mismo especialista?",
+      "id": "appointment.sameSpecialist",
+      "stage": "initial",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica"
+      ],
+      "ownership": "manual",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$B$2:$B$4",
+      "inputMessage": "Seleccione Sí, No o No aplica."
+    },
+    {
+      "column": "N",
+      "columnIndex": 14,
+      "label": "Estado cita POP",
+      "id": "appointment.status",
+      "stage": "initial",
+      "type": "select",
+      "options": [
+        "Pendiente",
+        "Programada",
+        "Reprogramar cita",
+        "Asistió",
+        "No aplica",
+        "Fallecido"
+      ],
+      "ownership": "computed",
+      "role": "CIRUGIA_RECUPERACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$C$2:$C$7",
+      "inputMessage": "Estado automático. Puede seleccionar Fallecido cuando el paciente no tendrá cita POP."
+    },
+    {
+      "column": "O",
+      "columnIndex": 15,
+      "label": "Fecha programada primera llamada",
+      "id": "call1.scheduledDate",
+      "stage": "call1",
+      "type": "date",
+      "options": [],
+      "ownership": "computed",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "P",
+      "columnIndex": 16,
+      "label": "Fecha real primera llamada",
+      "id": "call1.realDate",
+      "stage": "call1",
+      "type": "date",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "attemptRecorded",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "Q",
+      "columnIndex": 17,
+      "label": "Hora primera llamada",
+      "id": "call1.time",
+      "stage": "call1",
+      "type": "time",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "attemptRecorded",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "R",
+      "columnIndex": 18,
+      "label": "Profesional primera llamada",
+      "id": "call1.professional",
+      "stage": "call1",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "attemptRecorded",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "S",
+      "columnIndex": 19,
+      "label": "¿Usuario contesta primera llamada?",
+      "id": "call1.contactResult",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No contesta",
+        "Número errado",
+        "Buzón",
+        "No aplica",
+        "Hospitalizado",
+        "Fallecido"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "attemptRecorded",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$D$2:$D$9",
+      "inputMessage": "Registre el resultado real del contacto de la primera llamada. Use Fallecido cuando se confirme esta condición."
+    },
+    {
+      "column": "T",
+      "columnIndex": 20,
+      "label": "Se siente bien 1",
+      "id": "call1.clinical.feelsWell",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "U",
+      "columnIndex": 21,
+      "label": "Dolor controlado 1",
+      "id": "call1.clinical.painControlled",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "V",
+      "columnIndex": 22,
+      "label": "EVA dolor 1",
+      "id": "call1.clinical.painScore",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$N$2:$N$15",
+      "inputMessage": "Registre EVA de 0 a 10 o el estado aplicable."
+    },
+    {
+      "column": "W",
+      "columnIndex": 23,
+      "label": "Presenta fiebre 1",
+      "id": "call1.clinical.fever",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "X",
+      "columnIndex": 24,
+      "label": "Presenta sangrado 1",
+      "id": "call1.clinical.bleeding",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "Y",
+      "columnIndex": 25,
+      "label": "Presenta secreción 1",
+      "id": "call1.clinical.discharge",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "Z",
+      "columnIndex": 26,
+      "label": "Enrojecimiento / inflamación 1",
+      "id": "call1.clinical.rednessSwelling",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AA",
+      "columnIndex": 27,
+      "label": "Mal olor 1",
+      "id": "call1.clinical.badOdor",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AB",
+      "columnIndex": 28,
+      "label": "Tolera alimentación 1",
+      "id": "call1.clinical.oralTolerance",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AC",
+      "columnIndex": 29,
+      "label": "Eliminación urinaria 1",
+      "id": "call1.clinical.urinaryElimination",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AD",
+      "columnIndex": 30,
+      "label": "Eliminación intestinal 1",
+      "id": "call1.clinical.bowelElimination",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AE",
+      "columnIndex": 31,
+      "label": "Toma medicamentos formulados 1",
+      "id": "call1.clinical.medicationsTaken",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AF",
+      "columnIndex": 32,
+      "label": "Comprendió recomendaciones de egreso 1",
+      "id": "call1.clinical.dischargeUnderstood",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AG",
+      "columnIndex": 33,
+      "label": "Tiene dudas 1",
+      "id": "call1.clinical.questions",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AH",
+      "columnIndex": 34,
+      "label": "Observaciones primera llamada / información adicional",
+      "id": "call1.observations",
+      "stage": "call1",
+      "type": "textarea",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "AI",
+      "columnIndex": 35,
+      "label": "Clasificación del hallazgo 1",
+      "id": "call1.classification",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Evolución esperada",
+        "Hallazgo administrativo",
+        "Hallazgo clínico no urgente",
+        "Hallazgo clínico prioritario",
+        "Hallazgo clínico urgente prioritario",
+        "Evento o incidente",
+        "No contesta",
+        "Hospitalizado",
+        "No aplica",
+        "Buzón",
+        "Fallecido"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "callAssessed",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$F$2:$F$12",
+      "inputMessage": "Clasificación del hallazgo de la primera llamada."
+    },
+    {
+      "column": "AJ",
+      "columnIndex": 36,
+      "label": "Conducta derivada primera llamada",
+      "id": "call1.conduct",
+      "stage": "call1",
+      "type": "select",
+      "options": [
+        "Sin requerimiento adicional",
+        "Educación y seguimiento",
+        "Programación / reprogramación",
+        "Escalamiento a enfermería",
+        "Escalamiento a especialista",
+        "Remisión a urgencias",
+        "Reporte seguridad del paciente",
+        "Otro"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "callAssessed",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "AK",
+      "columnIndex": 37,
+      "label": "Responsable del escalamiento 1",
+      "id": "call1.escalationResponsible",
+      "stage": "call1",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "applicableAction",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "AL",
+      "columnIndex": 38,
+      "label": "Fecha escalamiento 1",
+      "id": "call1.escalationDate",
+      "stage": "call1",
+      "type": "date",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "applicableAction",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "AM",
+      "columnIndex": 39,
+      "label": "Fecha citación 1",
+      "id": "call1.citationDate",
+      "stage": "call1",
+      "type": "date",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "applicableAction",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "AN",
+      "columnIndex": 40,
+      "label": "Fecha programada segunda llamada",
+      "id": "call2.scheduledDate",
+      "stage": "call2",
+      "type": "date",
+      "options": [],
+      "ownership": "computed",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "AO",
+      "columnIndex": 41,
+      "label": "Fecha real segunda llamada",
+      "id": "call2.realDate",
+      "stage": "call2",
+      "type": "date",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "attemptRecorded",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "AP",
+      "columnIndex": 42,
+      "label": "Hora segunda llamada",
+      "id": "call2.time",
+      "stage": "call2",
+      "type": "time",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "attemptRecorded",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "AQ",
+      "columnIndex": 43,
+      "label": "Profesional segunda llamada",
+      "id": "call2.professional",
+      "stage": "call2",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "attemptRecorded",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "AR",
+      "columnIndex": 44,
+      "label": "¿Usuario contesta segunda llamada?",
+      "id": "call2.contactResult",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No contesta",
+        "Número errado",
+        "Buzón",
+        "No aplica",
+        "Hospitalizado",
+        "Fallecido"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "attemptRecorded",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$D$2:$D$9",
+      "inputMessage": "Registre el resultado real del contacto de la segunda llamada. Use Fallecido cuando se confirme esta condición."
+    },
+    {
+      "column": "AS",
+      "columnIndex": 45,
+      "label": "¿Asistió a la cita POP?",
+      "id": "call2.appointmentAttendance",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado",
+        "Pendiente asistir a cita"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$7",
+      "inputMessage": "Seleccione el estado de asistencia a la cita POP."
+    },
+    {
+      "column": "AT",
+      "columnIndex": 46,
+      "label": "¿Se realizó retiro de puntos?",
+      "id": "call2.stitchesRemoved",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AU",
+      "columnIndex": 47,
+      "label": "¿Se realizó curación / revisión de herida?",
+      "id": "call2.woundReviewed",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AV",
+      "columnIndex": 48,
+      "label": "Se siente bien 2",
+      "id": "call2.clinical.feelsWell",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AW",
+      "columnIndex": 49,
+      "label": "Dolor controlado 2",
+      "id": "call2.clinical.painControlled",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AX",
+      "columnIndex": 50,
+      "label": "EVA dolor 2",
+      "id": "call2.clinical.painScore",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$N$2:$N$15",
+      "inputMessage": "Registre EVA de 0 a 10 o el estado aplicable."
+    },
+    {
+      "column": "AY",
+      "columnIndex": 51,
+      "label": "Presenta fiebre 2",
+      "id": "call2.clinical.fever",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "AZ",
+      "columnIndex": 52,
+      "label": "Presenta sangrado 2",
+      "id": "call2.clinical.bleeding",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "BA",
+      "columnIndex": 53,
+      "label": "Presenta secreción 2",
+      "id": "call2.clinical.discharge",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "BB",
+      "columnIndex": 54,
+      "label": "Enrojecimiento / inflamación 2",
+      "id": "call2.clinical.rednessSwelling",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "BC",
+      "columnIndex": 55,
+      "label": "Tolera alimentación 2",
+      "id": "call2.clinical.oralTolerance",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "BD",
+      "columnIndex": 56,
+      "label": "Tiene dudas 2",
+      "id": "call2.clinical.questions",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica",
+        "No contesta",
+        "Hospitalizado"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "verifiedEffectiveContact",
+      "visibility": "effectiveContact",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$E$2:$E$6",
+      "inputMessage": "Seleccione Sí, No, No aplica, No contesta u Hospitalizado."
+    },
+    {
+      "column": "BE",
+      "columnIndex": 57,
+      "label": "Observaciones segunda llamada",
+      "id": "call2.observations",
+      "stage": "call2",
+      "type": "textarea",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BF",
+      "columnIndex": 58,
+      "label": "Clasificación del hallazgo 2",
+      "id": "call2.classification",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Evolución esperada",
+        "Hallazgo administrativo",
+        "Hallazgo clínico no urgente",
+        "Hallazgo clínico prioritario",
+        "Hallazgo clínico urgente prioritario",
+        "Evento o incidente",
+        "No contesta",
+        "Hospitalizado",
+        "No aplica",
+        "Buzón",
+        "Fallecido"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "callAssessed",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$F$2:$F$12",
+      "inputMessage": "Clasificación del hallazgo de la segunda llamada."
+    },
+    {
+      "column": "BG",
+      "columnIndex": 59,
+      "label": "Conducta derivada segunda llamada",
+      "id": "call2.conduct",
+      "stage": "call2",
+      "type": "select",
+      "options": [
+        "Sin requerimiento adicional",
+        "Educación y seguimiento",
+        "Programación / reprogramación",
+        "Escalamiento a enfermería",
+        "Escalamiento a especialista",
+        "Remisión a urgencias",
+        "Reporte seguridad del paciente",
+        "Otro"
+      ],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "callAssessed",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BH",
+      "columnIndex": 60,
+      "label": "Responsable del escalamiento 2",
+      "id": "call2.escalationResponsible",
+      "stage": "call2",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "applicableAction",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BI",
+      "columnIndex": 61,
+      "label": "Fecha citación 2",
+      "id": "call2.citationDate",
+      "stage": "call2",
+      "type": "date",
+      "options": [],
+      "ownership": "manual",
+      "role": "ENFERMERIA_PASP",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "applicableAction",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BJ",
+      "columnIndex": 62,
+      "label": "Estado del caso",
+      "id": "caseStatus",
+      "stage": "coordination",
+      "type": "text",
+      "options": [],
+      "ownership": "computed",
+      "role": "COORDINACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BK",
+      "columnIndex": 63,
+      "label": "Alerta automática para valorar derivación a Seguridad del Paciente",
+      "id": "safetyAlert",
+      "stage": "coordination",
+      "type": "text",
+      "options": [],
+      "ownership": "computed",
+      "role": "COORDINACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BL",
+      "columnIndex": 64,
+      "label": "Observación inicial de coordinación de cirugía",
+      "id": "coordination.initialObservation1",
+      "stage": "coordination",
+      "type": "textarea",
+      "options": [],
+      "ownership": "computed",
+      "role": "COORDINACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BM",
+      "columnIndex": 65,
+      "label": "Observación inicial de coordinación de cirugía 2",
+      "id": "coordination.initialObservation2",
+      "stage": "coordination",
+      "type": "textarea",
+      "options": [],
+      "ownership": "computed",
+      "role": "COORDINACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BN",
+      "columnIndex": 66,
+      "label": "Seguridad del Paciente notificada del caso",
+      "id": "coordination.spNotified",
+      "stage": "coordination",
+      "type": "select",
+      "options": [
+        "Sí",
+        "No",
+        "No aplica"
+      ],
+      "ownership": "manual",
+      "role": "COORDINACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": "=Listas!$J$2:$J$4",
+      "inputMessage": "Seleccione Sí, No o No aplica."
+    },
+    {
+      "column": "BO",
+      "columnIndex": 67,
+      "label": "Profesional de Coordinación de Cirugía que revisó el caso",
+      "id": "coordination.reviewer",
+      "stage": "coordination",
+      "type": "text",
+      "options": [],
+      "ownership": "manual",
+      "role": "COORDINACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BP",
+      "columnIndex": 68,
+      "label": "Análisis y resolución primera llamada",
+      "id": "coordination.analysis1",
+      "stage": "coordination",
+      "type": "textarea",
+      "options": [],
+      "ownership": "manual",
+      "role": "COORDINACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BQ",
+      "columnIndex": 69,
+      "label": "Análisis y resolución segunda llamada",
+      "id": "coordination.analysis2",
+      "stage": "coordination",
+      "type": "textarea",
+      "options": [],
+      "ownership": "manual",
+      "role": "COORDINACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    },
+    {
+      "column": "BR",
+      "columnIndex": 70,
+      "label": "Estado del caso COORDINACIÓN CIRUGIA",
+      "id": "coordination.status",
+      "stage": "coordination",
+      "type": "text",
+      "options": [],
+      "ownership": "computed",
+      "role": "COORDINACION",
+      "required": false,
+      "requiredWhen": "optional",
+      "visibility": "always",
+      "source": "MATRIZ_PASP_HEADERS_ROW7",
+      "validationSource": null,
+      "inputMessage": null
+    }
+  ],
+  "forms": {
+    "initial": {
+      "fieldIds": [
+        "paspCode",
+        "registeredAt",
+        "surgeryDate",
+        "patientName",
+        "documentNumber",
+        "phone",
+        "specialist",
+        "specialty",
+        "procedure",
+        "patientStatus",
+        "appointment.date",
+        "appointment.time",
+        "appointment.sameSpecialist",
+        "appointment.status"
+      ]
+    },
+    "call": {
+      "fieldIds": [
+        "call1.scheduledDate",
+        "call1.realDate",
+        "call1.time",
+        "call1.professional",
+        "call1.contactResult",
+        "call1.clinical.feelsWell",
+        "call1.clinical.painControlled",
+        "call1.clinical.painScore",
+        "call1.clinical.fever",
+        "call1.clinical.bleeding",
+        "call1.clinical.discharge",
+        "call1.clinical.rednessSwelling",
+        "call1.clinical.badOdor",
+        "call1.clinical.oralTolerance",
+        "call1.clinical.urinaryElimination",
+        "call1.clinical.bowelElimination",
+        "call1.clinical.medicationsTaken",
+        "call1.clinical.dischargeUnderstood",
+        "call1.clinical.questions",
+        "call1.observations",
+        "call1.classification",
+        "call1.conduct",
+        "call1.escalationResponsible",
+        "call1.escalationDate",
+        "call1.citationDate",
+        "call2.scheduledDate",
+        "call2.realDate",
+        "call2.time",
+        "call2.professional",
+        "call2.contactResult",
+        "call2.appointmentAttendance",
+        "call2.stitchesRemoved",
+        "call2.woundReviewed",
+        "call2.clinical.feelsWell",
+        "call2.clinical.painControlled",
+        "call2.clinical.painScore",
+        "call2.clinical.fever",
+        "call2.clinical.bleeding",
+        "call2.clinical.discharge",
+        "call2.clinical.rednessSwelling",
+        "call2.clinical.oralTolerance",
+        "call2.clinical.questions",
+        "call2.observations",
+        "call2.classification",
+        "call2.conduct",
+        "call2.escalationResponsible",
+        "call2.citationDate"
+      ],
+      "additionalClinicalFields": [
+        {
+          "id": "clinical.dyspnea",
+          "label": "Dificultad para respirar nueva o que empeora",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.chestPain",
+          "label": "Dolor nuevo en el pecho",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.alteredConsciousness",
+          "label": "Desmayo, confusión o dificultad para despertar",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.persistentVomiting",
+          "label": "Vómitos persistentes",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.liquidTolerance",
+          "label": "Puede retener líquidos",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.urinaryRetention",
+          "label": "Imposibilidad nueva para orinar, aun sin dolor",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.abdominalDistension",
+          "label": "Abdomen cada vez más distendido",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.catheterDrainageFailure",
+          "label": "Sonda sin drenaje después de revisar tubo y posición de la bolsa",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.unilateralLegSwelling",
+          "label": "Dolor o hinchazón nueva de una sola pierna",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.progressiveLimbDeficit",
+          "label": "Pérdida progresiva de fuerza/sensibilidad o extremidad fría",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.woundDeepOpening",
+          "label": "Herida que se abre profundamente o deja tejido expuesto",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        },
+        {
+          "id": "clinical.clinicalDeterioration",
+          "label": "Empeoramiento general importante",
+          "type": "select",
+          "options": [
+            "Sí",
+            "No",
+            "No valorable"
+          ],
+          "scope": "bothCalls",
+          "source": "PASP_CALL_GUIDE_9_3_9_7_AND_REVIEWED_GENERAL_ALARMS",
+          "matrixColumn": null,
+          "storage": "call.clinical",
+          "requiredWhen": "verifiedEffectiveContact",
+          "doNotInfer": true
+        }
+      ],
+      "additionalCapture": [
+        {
+          "id": "identityVerified",
+          "label": "Identidad confirmada con dos identificadores",
+          "type": "boolean",
+          "requiredWhen": "effectiveContact",
+          "matrixColumn": null
+        },
+        {
+          "id": "authorizationConfirmed",
+          "label": "Usuario o cuidador autorizado acepta continuar",
+          "type": "boolean",
+          "requiredWhen": "effectiveContact",
+          "matrixColumn": null
+        },
+        {
+          "id": "respondent",
+          "label": "Quién aporta información",
+          "type": "select",
+          "options": [
+            "Usuario",
+            "Cuidador autorizado",
+            "Equipo intrainstitucional autorizado"
+          ],
+          "matrixColumn": null
+        },
+        {
+          "id": "contactMedium",
+          "label": "Medio institucional utilizado",
+          "type": "select",
+          "options": [
+            "Llamada telefónica",
+            "WhatsApp institucional",
+            "SMS institucional",
+            "Otro canal institucional"
+          ],
+          "requiredWhen": "attemptRecorded",
+          "matrixColumn": null
+        },
+        {
+          "id": "communicationBarrier",
+          "label": "Barrera de comunicación y apoyo utilizado",
+          "type": "textarea",
+          "matrixColumn": null
+        },
+        {
+          "id": "educationProvided",
+          "label": "Educación reforzada según el egreso",
+          "type": "textarea",
+          "matrixColumn": null
+        },
+        {
+          "id": "teachBack",
+          "label": "Cómo demostró comprensión de cuidados y alarmas",
+          "type": "textarea",
+          "matrixColumn": null
+        },
+        {
+          "id": "medicationAccess",
+          "label": "Acceso a medicamentos formulados y barreras",
+          "type": "textarea",
+          "matrixColumn": null
+        },
+        {
+          "id": "deviceDetails",
+          "label": "Dispositivos, cambios y plan individual",
+          "type": "textarea",
+          "matrixColumn": null
+        },
+        {
+          "id": "safetyInstruction",
+          "label": "Orientación de urgencias efectivamente dada",
+          "type": "textarea",
+          "matrixColumn": null
+        },
+        {
+          "id": "recordedInClinicalRecord",
+          "label": "Registro realizado en historia clínica/SAFIX",
+          "type": "boolean",
+          "matrixColumn": null
+        }
+      ],
+      "secondCallSupplemental": [
+        "badOdor",
+        "urinaryElimination",
+        "bowelElimination",
+        "medicationsTaken",
+        "dischargeUnderstood"
+      ],
+      "extraCalls": "Se permiten llamadas adicionales persistentes; solo primera y segunda corresponden a las columnas de la matriz."
+    },
+    "coordination": {
+      "fieldIds": [
+        "caseStatus",
+        "safetyAlert",
+        "coordination.initialObservation1",
+        "coordination.initialObservation2",
+        "coordination.spNotified",
+        "coordination.reviewer",
+        "coordination.analysis1",
+        "coordination.analysis2",
+        "coordination.status"
+      ],
+      "safetyNotificationProof": {
+        "requiredWhen": "spNotified=Sí",
+        "fields": [
+          "recipient",
+          "notifiedAt",
+          "channel",
+          "evidenceReference"
+        ]
+      }
+    }
+  },
+  "lists": {
+    "Estado usuario": [
+      "Ambulatorio",
+      "Hospitalizado",
+      "Fallecido"
+    ],
+    "Sí / No / No aplica": [
+      "Sí",
+      "No",
+      "No aplica"
+    ],
+    "Estado cita POP": [
+      "Pendiente",
+      "Programada",
+      "Reprogramar cita",
+      "Asistió",
+      "No aplica",
+      "Fallecido"
+    ],
+    "Resultado contacto": [
+      "Sí",
+      "No",
+      "No contesta",
+      "Número errado",
+      "Buzón",
+      "No aplica",
+      "Hospitalizado",
+      "Fallecido"
+    ],
+    "Respuesta clínica": [
+      "Sí",
+      "No",
+      "No aplica",
+      "No contesta",
+      "Hospitalizado",
+      "Pendiente asistir a cita"
+    ],
+    "Clasificación hallazgo": [
+      "Evolución esperada",
+      "Hallazgo administrativo",
+      "Hallazgo clínico no urgente",
+      "Hallazgo clínico prioritario",
+      "Hallazgo clínico urgente prioritario",
+      "Evento o incidente",
+      "No contesta",
+      "Hospitalizado",
+      "No aplica",
+      "Buzón",
+      "Fallecido"
+    ],
+    "Conducta": [
+      "Sin requerimiento adicional",
+      "Educación y seguimiento",
+      "Programación / reprogramación",
+      "Escalamiento a enfermería",
+      "Escalamiento a especialista",
+      "Remisión a urgencias",
+      "Reporte seguridad del paciente",
+      "Otro"
+    ],
+    "Estado pendiente": [
+      "Activo",
+      "Cerrado",
+      "No aplica"
+    ],
+    "Estado caso": [
+      "Abierto",
+      "En seguimiento",
+      "Pendiente de asistir a cita",
+      "Cerrado por seguimiento completado",
+      "Cerrado por imposibilidad de contacto"
+    ],
+    "Seguridad del paciente": [
+      "Sí",
+      "No",
+      "No aplica"
+    ],
+    "Medio de contacto": [
+      "Llamada telefónica",
+      "WhatsApp institucional",
+      "SMS institucional",
+      "Otro canal institucional"
+    ],
+    "Área escalada": [
+      "Coordinación de Cirugía",
+      "Seguridad del Paciente",
+      "Especialista tratante",
+      "Dirección Médica",
+      "Programación / Consulta Externa",
+      "Urgencias"
+    ],
+    "Motivo de cierre": [
+      "Seguimiento completado",
+      "Imposibilidad de contacto"
+    ],
+    "EVA dolor / estados": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "No aplica",
+      "No contesta",
+      "Hospitalizado"
+    ]
+  },
+  "scheduling": {
+    "timezone": "America/Bogota",
+    "precision": "date-only: la matriz no contiene hora de cirugía; no promete oportunidad exacta de 48 horas a partir de una fecha sola.",
+    "defaultMode": "SHEET_COMPATIBILITY",
+    "institutionalText": {
+      "firstHours": 48,
+      "secondHours": 72,
+      "secondBase": "Guía: primera llamada programada; instructivo: primera llamada, sin precisar real/programada."
+    },
+    "first": {
+      "base": "surgeryDate",
+      "offsetCalendarDays": 2,
+      "rollForwardToBusinessDay": true,
+      "sheetFormula": "WORKDAY.INTL(C+1;1;1;Listas!O2:O91)"
+    },
+    "second": {
+      "base": "firstCall.realDate",
+      "offsetCalendarDays": 3,
+      "rollForwardToBusinessDay": true,
+      "requireFirstAttemptDate": true,
+      "sheetFormula": "WORKDAY.INTL(P+2;1;1;Listas!O2:O91)"
+    },
+    "weekendDays": [
+      0,
+      6
+    ],
+    "holidaySource": "Listas!O2:O91",
+    "holidays": [{"date":"2026-01-01","label":"Año Nuevo"},{"date":"2026-01-12","label":"Día de los Reyes Magos"},{"date":"2026-03-23","label":"Día de San José"},{"date":"2026-04-02","label":"Jueves Santo"},{"date":"2026-04-03","label":"Viernes Santo"},{"date":"2026-05-01","label":"Día del Trabajo"},{"date":"2026-05-18","label":"Ascensión del Señor"},{"date":"2026-06-08","label":"Corpus Christi"},{"date":"2026-06-15","label":"Sagrado Corazón de Jesús"},{"date":"2026-06-29","label":"San Pedro y San Pablo"},{"date":"2026-07-20","label":"Día de la Independencia"},{"date":"2026-08-07","label":"Batalla de Boyacá"},{"date":"2026-08-17","label":"Asunción de la Virgen"},{"date":"2026-10-12","label":"Día de la Raza"},{"date":"2026-11-02","label":"Todos los Santos"},{"date":"2026-11-16","label":"Independencia de Cartagena"},{"date":"2026-12-08","label":"Inmaculada Concepción"},{"date":"2026-12-25","label":"Navidad"},{"date":"2027-01-01","label":"Año Nuevo"},{"date":"2027-01-11","label":"Día de los Reyes Magos"},{"date":"2027-03-22","label":"Día de San José"},{"date":"2027-03-25","label":"Jueves Santo"},{"date":"2027-03-26","label":"Viernes Santo"},{"date":"2027-05-01","label":"Día del Trabajo"},{"date":"2027-05-10","label":"Ascensión del Señor"},{"date":"2027-05-31","label":"Corpus Christi"},{"date":"2027-06-07","label":"Sagrado Corazón de Jesús"},{"date":"2027-07-05","label":"San Pedro y San Pablo"},{"date":"2027-07-20","label":"Día de la Independencia"},{"date":"2027-08-07","label":"Batalla de Boyacá"},{"date":"2027-08-16","label":"Asunción de la Virgen"},{"date":"2027-10-18","label":"Día de la Raza"},{"date":"2027-11-01","label":"Todos los Santos"},{"date":"2027-11-15","label":"Independencia de Cartagena"},{"date":"2027-12-08","label":"Inmaculada Concepción"},{"date":"2027-12-25","label":"Navidad"},{"date":"2028-01-01","label":"Año Nuevo"},{"date":"2028-01-10","label":"Día de los Reyes Magos"},{"date":"2028-03-20","label":"Día de San José"},{"date":"2028-04-13","label":"Jueves Santo"},{"date":"2028-04-14","label":"Viernes Santo"},{"date":"2028-05-01","label":"Día del Trabajo"},{"date":"2028-05-29","label":"Ascensión del Señor"},{"date":"2028-06-19","label":"Corpus Christi"},{"date":"2028-06-26","label":"Sagrado Corazón de Jesús"},{"date":"2028-07-03","label":"San Pedro y San Pablo"},{"date":"2028-07-20","label":"Día de la Independencia"},{"date":"2028-08-07","label":"Batalla de Boyacá"},{"date":"2028-08-21","label":"Asunción de la Virgen"},{"date":"2028-10-16","label":"Día de la Raza"},{"date":"2028-11-06","label":"Todos los Santos"},{"date":"2028-11-13","label":"Independencia de Cartagena"},{"date":"2028-12-08","label":"Inmaculada Concepción"},{"date":"2028-12-25","label":"Navidad"},{"date":"2029-01-01","label":"Año Nuevo"},{"date":"2029-01-08","label":"Día de los Reyes Magos"},{"date":"2029-03-19","label":"Día de San José"},{"date":"2029-03-29","label":"Jueves Santo"},{"date":"2029-03-30","label":"Viernes Santo"},{"date":"2029-05-01","label":"Día del Trabajo"},{"date":"2029-05-14","label":"Ascensión del Señor"},{"date":"2029-06-04","label":"Corpus Christi"},{"date":"2029-06-11","label":"Sagrado Corazón de Jesús"},{"date":"2029-07-02","label":"San Pedro y San Pablo"},{"date":"2029-07-20","label":"Día de la Independencia"},{"date":"2029-08-07","label":"Batalla de Boyacá"},{"date":"2029-08-20","label":"Asunción de la Virgen"},{"date":"2029-10-15","label":"Día de la Raza"},{"date":"2029-11-05","label":"Todos los Santos"},{"date":"2029-11-12","label":"Independencia de Cartagena"},{"date":"2029-12-08","label":"Inmaculada Concepción"},{"date":"2029-12-25","label":"Navidad"},{"date":"2030-01-01","label":"Año Nuevo"},{"date":"2030-01-07","label":"Día de los Reyes Magos"},{"date":"2030-03-25","label":"Día de San José"},{"date":"2030-04-18","label":"Jueves Santo"},{"date":"2030-04-19","label":"Viernes Santo"},{"date":"2030-05-01","label":"Día del Trabajo"},{"date":"2030-06-03","label":"Ascensión del Señor"},{"date":"2030-06-24","label":"Corpus Christi"},{"date":"2030-07-01","label":"Sagrado Corazón de Jesús"},{"date":"2030-07-01","label":"San Pedro y San Pablo"},{"date":"2030-07-20","label":"Día de la Independencia"},{"date":"2030-08-07","label":"Batalla de Boyacá"},{"date":"2030-08-19","label":"Asunción de la Virgen"},{"date":"2030-10-14","label":"Día de la Raza"},{"date":"2030-11-04","label":"Todos los Santos"},{"date":"2030-11-11","label":"Independencia de Cartagena"},{"date":"2030-12-08","label":"Inmaculada Concepción"},{"date":"2030-12-25","label":"Navidad"}],
+    "allowManualOverrideWithReason": true,
+    "editableBy": "ADMIN_CON_CONFIG",
+    "missingFirstDate": "No inventar una fecha real de primera llamada. Mantener segunda sin fecha calculada hasta registro real; un cambio de base requiere configuración y motivo.",
+    "alternativeModes": [
+      "CALENDAR_DAYS",
+      "CALENDAR_HOURS_WITH_SURGERY_TIMESTAMP"
+    ],
+    "holidayConflict": "_PARAM_QX contiene 13/07/2026, pero Listas usada por O/AN no lo contiene. No modificar calendarios silenciosamente; indicar fuente y versión usada."
+  },
+  "routing": {
+    "ambulatoryCystoscopy": {
+      "appointmentApplicable": false,
+      "excludedFromAppointmentDenominator": true,
+      "callsStillApplicable": true,
+      "match": "procedimiento con cistoscop y estado Ambulatorio; confirmar técnica/condición"
+    },
+    "hospitalized": {
+      "included": true,
+      "firstAttemptStillScheduled": true,
+      "defaultContactResult": "Hospitalizado",
+      "doNotInferClinicalData": true,
+      "inpatientCareContinues": true,
+      "policyConflict": "Instructivo incluye primera y segunda llamada; guía propuesta 9.4 indica registrar Hospitalizado sin realizar primera llamada. No excluir usuarios ni simular respuestas. Configurar ruta explícita conservando registro de condición e intentos."
+    },
+    "deceased": {
+      "confirmedOnly": true,
+      "doNotInferFromNonResponse": true,
+      "stopClinicalQuestionnaire": true,
+      "verifySourceAndResponsible": true,
+      "legacyFormulaConflict": "Listas=Fallecido; algunas fórmulas comparan Paciente fallecido. Normalizar semántica en aplicación sin sobrescribir el documento."
+    },
+    "effectiveContact": [
+      "Sí"
+    ],
+    "nonEffectiveContact": [
+      "No",
+      "No contesta",
+      "Número errado",
+      "Buzón",
+      "No aplica",
+      "Hospitalizado",
+      "Fallecido"
+    ],
+    "noContactBehavior": "Registrar fecha/hora/medio/profesional/resultado. Campos clínicos no valorables; no autocompletar observaciones ni ausencia de síntomas. Conservar lo observado en otros intentos.",
+    "closure": {
+      "operative": "Refleja ejecución documentada de llamadas/intentos; no confirma resolución clínica ni ausencia de riesgo.",
+      "coordination": "Cierra exclusivamente Coordinación, con revisión y análisis/resolución independiente de cada hallazgo aplicable.",
+      "reopenOnNewFinding": true,
+      "safetyAlertIsNotNotification": true,
+      "safetyCanReceiveAnalyzeResolveOwnEvent": true,
+      "safetyDoesNotClosePaspCase": true,
+      "noContactMinimumAttempts": "No hay un número de intentos validado en las fuentes leídas. Debe ser configurable por institución, sin fijar 3 u otro número como requisito documental."
+    }
+  },
+  "conditionalRules": [
+    {
+      "if": "No contacto efectivo, identidad sin verificar o falta autorización",
+      "then": "Desactivar valoración clínica; permitir registrar intento y barrera sin inferir respuestas."
+    },
+    {
+      "if": "Número errado",
+      "then": "Permitir gestión administrativa de datos y escalamiento; no revelar información clínica al receptor."
+    },
+    {
+      "if": "Fiebre=Sí",
+      "then": "Capturar temperatura si medida, inicio y signos de deterioro; no inventar medición ni diagnóstico."
+    },
+    {
+      "if": "Dolor no controlado o dolor EVA elevada",
+      "then": "Capturar sitio, inicio, progresión y manejo formulado. EVA sola no asigna urgencia ni categoría de triage."
+    },
+    {
+      "if": "Sangrado=Sí",
+      "then": "Capturar sitio, cantidad percibida, persistencia, coágulos y síntomas asociados; identificar sangrado abundante/incontrolable para orientación inmediata."
+    },
+    {
+      "if": "Tolera alimentación=No o vómitos persistentes",
+      "then": "Capturar capacidad de retener líquidos, disminución de orina, debilidad y distensión; si no retiene líquidos o hay deterioro orientar Urgencias."
+    },
+    {
+      "if": "Eliminación urinaria=No o cambió",
+      "then": "Distinguir imposibilidad nueva para orinar, disminución de volumen, ardor y falla de sonda; retención nueva con o sin dolor orienta Urgencias inmediatamente."
+    },
+    {
+      "if": "Secreción/enrojecimiento/inflamación/mal olor=Sí",
+      "then": "Capturar evolución, herida profunda, fiebre y deterioro; no diagnosticar infección automáticamente."
+    },
+    {
+      "if": "Dudas=Sí, medicamentos no tomados o recomendaciones no comprendidas",
+      "then": "Registrar dudas/barreras, educación conforme al egreso y verificación de comprensión; no modificar fórmula."
+    },
+    {
+      "if": "Cita futura",
+      "then": "Asistencia=Pendiente asistir a cita; no registrar No como inasistencia."
+    },
+    {
+      "if": "Conducta exige escalamiento",
+      "then": "Requerir área/receptor real, fecha/hora, acción, plazo y estado de respuesta; Urgencias no debe esperar completar todos los campos."
+    },
+    {
+      "if": "Seguridad del Paciente notificada=Sí",
+      "then": "Exigir registro de derivación real; no derivar este valor automáticamente de la alerta."
+    }
+  ],
+  "urgentSafety": {
+    "automaticTriage": false,
+    "automaticDiagnosis": false,
+    "automaticEventConfirmation": false,
+    "userFacingAction": "URGENCIAS INMEDIATAMENTE",
+    "notDelayForForm": true,
+    "minimumRecord": [
+      "episodeId",
+      "attemptAt",
+      "professional",
+      "reportedAlarm",
+      "orientationActuallyGiven",
+      "escalationStatus"
+    ],
+    "immediateFlags": [
+      "dyspnea",
+      "chestPain",
+      "alteredConsciousness",
+      "urinaryRetention",
+      "catheterDrainageFailure",
+      "woundDeepOpening",
+      "progressiveLimbDeficit"
+    ],
+    "combinations": [
+      "fiebre con deterioro",
+      "sangrado abundante o incontrolable",
+      "dolor intenso creciente no controlado",
+      "vómitos persistentes con intolerancia a líquidos",
+      "distensión progresiva sintomática"
+    ],
+    "sameDay": [
+      "fiebre medida sin deterioro",
+      "signos de herida sin gravedad",
+      "pierna unilateral hinchada y dolorosa sin síntomas respiratorios: valoración urgente el mismo día"
+    ],
+    "fallback": "Si no obtiene valoración o empeora, Urgencias. Ante compromiso grave o traslado inseguro, solicitar emergencias por la línea 123.",
+    "traceability": "Registrar síntoma referido, orientación, receptor, fecha/hora y actuación real; alertar no implica que haya remisión recibida, atención efectuada ni evento adverso confirmado."
+  },
+  "audit": {
+    "immutableAttempts": true,
+    "changesRequireReason": true,
+    "versionConflictProtection": true,
+    "actorAndTimestamps": true,
+    "storeOriginalAndCorrectedValues": true,
+    "episodeKey": "Episodio quirúrgico, no documento aislado: un usuario puede tener varias cirugías.",
+    "clientIdsAreNotIdentityVerification": true,
+    "avoidClinicalDataInLogs": true,
+    "publicCompanionCannotViewCallRegister": true,
+    "eventFields": [
+      "id",
+      "episodeId",
+      "callId",
+      "sourceKind",
+      "actorId",
+      "actorName",
+      "actorRole",
+      "occurredAt",
+      "recordedAt",
+      "eventType",
+      "before",
+      "after",
+      "reason",
+      "expectedVersion"
+    ],
+    "types": [
+      "EPISODE_CREATED",
+      "CALL_ATTEMPT_RECORDED",
+      "CALL_CORRECTED",
+      "ESCALATION_CREATED",
+      "ESCALATION_RECEIVED",
+      "ESCALATION_REASSESSED",
+      "SP_NOTIFICATION_DOCUMENTED",
+      "COORDINATION_ANALYSIS_RECORDED",
+      "COORDINATION_CLOSED",
+      "COORDINATION_REOPENED",
+      "CONFIG_CHANGED"
+    ],
+    "simulationOnly": true,
+    "noRealPatientImport": true
+  },
+  "knownConflicts": [
+    "Encabezados reales son autoridad para mapeo: desde segunda llamada el instructivo señala letras antiguas; usar AN:BI y BJ:BR.",
+    "Matriz fila4 y guía propuesta llaman a ambulatorios; instructivo incluye hospitalizados en ambas llamadas. Ruta hospitalizado visible y configurable, sin excluirlos automáticamente.",
+    "Texto 48h/72h difiere de fórmulas con días hábiles y segunda basada en fecha real primera.",
+    "Lista Fallecido difiere de fórmulas que comparan Paciente fallecido.",
+    "Estado cita POP N es fórmula con validación que permite seleccionar Fallecido; no sobrescribir fórmulas durante captura.",
+    "La guía se titula PROPUESTA REVISIÓN; no inferir aprobación completa ni reproducir como normativa verificada sus referencias legales inconsistentes."
+  ]
+}

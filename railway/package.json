@@ -1,13 +1,17 @@
 {
   "name": "app-web-cx-railway",
-  "version": "5.8.0",
+  "version": "5.9.0-pasp",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "bun run server.ts"
+    "start": "bun run server.ts",
+    "test": "bun test"
   },
   "dependencies": {
     "postgres": "^3.4.7",
     "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
   }
 }

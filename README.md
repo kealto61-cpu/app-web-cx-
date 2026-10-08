@@ -1,76 +1,37 @@
-# APP WEB CX
+# APP WEB CX · Seguimiento postoperatorio PASP
 
-Reconstrucción desde cero de la Web App de gestión quirúrgica para Google Apps Script.
+Versión Railway: **5.9.0-pasp**. El código, las definiciones de la matriz, las pruebas y la configuración del despliegue están en este repositorio. La aplicación se publica desde `main`, carpeta `railway/`.
 
-## Principio de arquitectura
+## Despliegue de demostración
 
-**Google Drive / Google Sheets es la fuente de verdad. GitHub contiene solamente el código.**
+Esta versión funciona exclusivamente con **pacientes ficticios**. `DATA_MODE=SIMULATED` es obligatorio. Todas las tablas se inicializan en el esquema PostgreSQL `qx_simulation`, sin consultar, copiar o migrar pacientes, usuarios o registros clínicos de Google Drive o del esquema `public`.
 
-La aplicación no crea una base paralela, no reemplaza las hojas existentes y no cambia los encabezados de la base real para adaptarlos al código. El código se adapta a las hojas existentes.
+El repositorio es público: no contiene credenciales, PIN de despliegue ni información de pacientes reales. Las variables privadas se conservan en Railway. Las pruebas usan una base PostgreSQL temporal en memoria.
 
-La base principal contiene, entre otras:
+## Seguimiento postoperatorio
 
-- `BD PROGRAMACIÓN`
-- `CANCELACIONES QX`
-- `USUARIOS`
-- `ROLES`
-- `LOG AUDITORÍA`
-- `HISTORIAL MOVIMIENTOS`
-- `REINTERVENCIONES QX`
-- `CONFIGURACIÓN SISTEMA`
-- hojas diarias de programación
+- Un episodio por intervención; **una ficha independiente por cada llamada o intento**, incluyendo llamadas adicionales. Las fichas son inmutables y admiten adendas trazables.
+- Fecha real, profesional, contacto, valoración, recomendaciones, clasificación, conducta, cita y gestión de hallazgos. Los 70 encabezados de la matriz PASP se conservan en la definición y en la exportación compatible.
+- Programación de llamadas con plazos, base de cálculo, calendario y festivos configurables. La segunda llamada toma la primera llamada efectiva según la regla elegida.
+- Eventos escalados a Coordinación de Cirugía o Seguridad del Paciente, con permisos, responsable, análisis y resolución independientes del registro de la llamada.
+- Indicadores de la matriz con denominadores explícitos, filtros por fecha y descarga separada.
+- Catálogo educativo de 38 fichas y 39 conceptos de búsqueda; procedimientos, anestesia, recomendaciones, alarmas, fuentes y sinónimos editables desde la página.
+- Campos y listas del formulario, reglas de seguimiento y criterios administrativos de cierre editables en Configuración. Los cambios no sobrescriben las fichas anteriores.
 
-Las asignaciones de personal se manejan mediante su Google Sheet operativo independiente.
+La búsqueda de cuidados muestra candidatos cuando la descripción es ambigua; el profesional o acompañante confirma el procedimiento. Las señales de alarma indican una conducta de consulta y no asignan una categoría de triage ni un diagnóstico.
 
-## Seguridad del repositorio
+## Funciones quirúrgicas conservadas
 
-Este repositorio es público. Por esa razón:
+Operativo con Preparación y QNO configurables, jefe de turno, camas, movimientos, profilaxis, tiempos intraoperatorios, Alta/Hospitalización, programación, lector PDF e imágenes, corrección antes de importar, portal de acompañantes, QR y token individual, avisos mientras el portal está abierto, KPI, MCI con meta/programadas/realizadas, descargas por indicador y administración de usuarios con PIN alfanumérico de 4 a 16 caracteres.
 
-- no se almacenan IDs de Google Sheets;
-- no se almacenan credenciales;
-- no se almacenan PIN, salts ni pepper;
-- no se almacenan datos de pacientes.
+## Instalación y validación
 
-Los IDs de las fuentes se guardan en **Script Properties** de Google Apps Script.
+Ver [railway/README.md](railway/README.md), [.railway/README.md](.railway/README.md) y el flujo de validación en `.github/workflows/validate.yml`. `/health` confirma la versión, el modo de datos y la conexión a la base.
 
-## Compatibilidad
+Los archivos `.gs`, `Index.html` y `appsscript.json` de la raíz mantienen la variante Google Apps Script V8 y sus correcciones previas. La nueva implementación completa de PASP pertenece a Railway. `APPS_SCRIPT_INSTALL.md` es la guía de la variante Apps Script; la carpeta `railway/` no se copia a ese editor.
 
-Solo se utiliza código ejecutable directamente en Google Apps Script V8:
+## Fuentes y decisiones
 
-- archivos `.gs`;
-- HTML;
-- CSS;
-- JavaScript nativo del navegador;
-- `google.script.run`.
+Las definiciones de los campos y de los indicadores se transcriben de los encabezados, listas y fórmulas de la matriz original, sin registros de pacientes. Las discrepancias de fechas, estados y cierre se explican en los metadatos de esas definiciones. Las referencias científicas se incluyen en cada ficha educativa.
 
-No se usa Node.js, npm, React, TypeScript, Vite ni bundlers.
-
-## Configuración
-
-La aplicación reutiliza la propiedad histórica `SPREADSHEET_ID` si ya existe en el proyecto Apps Script. Esto permite conservar la conexión con la base actual al reemplazar el código.
-
-También reconoce:
-
-- `QX_MAIN_DB_ID`
-- `QX_ASSIGNMENTS_DB_ID`
-- `QX_AUTH_PEPPER_V1`
-
-El valor de `QX_AUTH_PEPPER_V1` es crítico para validar los PIN que ya fueron migrados a hash + salt. **No debe eliminarse ni regenerarse al reemplazar el código.**
-
-Si fuera necesario configurar las fuentes manualmente:
-
-```javascript
-setDataSources('ID_BASE_PRINCIPAL', 'ID_BASE_ASIGNACIONES');
-```
-
-Después:
-
-```javascript
-setupSystem();
-```
-
-`setupSystem()` valida la estructura existente pero no crea ni modifica hojas.
-
-## Estado
-
-Versión de reconstrucción: `5.0.0-alpha.1`.
+La propuesta que cita la Resolución 1732 de 2026 no se utiliza como norma vigente: fue derogada por la Resolución 2080 del 8 de septiembre de 2026. El marco de habilitación utilizado continúa siendo la Resolución 3100 de 2019 y sus modificaciones vigentes. Las fichas científicas complementan las instrucciones individuales de egreso.

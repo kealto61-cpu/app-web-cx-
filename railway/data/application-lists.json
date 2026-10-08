@@ -1,0 +1,87 @@
+{
+  "fSexo": [
+    "F",
+    "M"
+  ],
+  "cMomento": [
+    "Antes del día de la cirugía",
+    "Día de cirugía, antes del ingreso",
+    "Después del ingreso a la institución",
+    "En preparación prequirúrgica",
+    "En sala de cirugía"
+  ],
+  "cCausa": [
+    "Disponibilidad de quirófano o tiempo quirúrgico",
+    "Insumos, medicamentos o dispositivos",
+    "Instrumental o esterilización",
+    "Equipo biomédico o tecnología",
+    "Talento humano asistencial",
+    "Especialista o equipo médico",
+    "Anestesia",
+    "Condición o decisión del paciente",
+    "Programación, autorización o asegurador",
+    "Condición clínica",
+    "Otra"
+  ],
+  "cAtribuible": [
+    "PACIENTE",
+    "ESPECIALISTA",
+    "INSTITUCIÓN"
+  ],
+  "cPrevenible": [
+    "Sí",
+    "No",
+    "Parcialmente",
+    "No se puede determinar"
+  ],
+  "cHallazgo": [
+    "Verificación prequirúrgica por fortalecer",
+    "Comunicación o transferencia de información por fortalecer",
+    "Confirmación de recursos por fortalecer",
+    "Escalamiento del proceso por fortalecer",
+    "Seguimiento del proceso por fortalecer",
+    "Coordinación del proceso por fortalecer",
+    "Alistamiento prequirúrgico por fortalecer",
+    "Otro hallazgo de mejora"
+  ],
+  "cRecurso": [
+    "INSUMOS Y SUMINISTROS",
+    "MEDICAMENTOS",
+    "EQUIPOS / TECNOLOGÍA",
+    "DISPOSITIVOS MÉDICOS",
+    "IMPLANTES / OSTEOSÍNTESIS",
+    "INSTRUMENTAL",
+    "NO APLICA",
+    "OTRO"
+  ],
+  "fEsp": [
+    "ORTOPEDIA",
+    "CIRUGÍA GENERAL",
+    "UROLOGÍA",
+    "GINECOLOGÍA"
+  ],
+  "fMed": [
+    "ESPECIALISTA DE PRUEBA"
+  ],
+  "fProc": [
+    "Artroscopia de hombro",
+    "Reparación del manguito rotador",
+    "Artroplastia de cadera",
+    "Artroplastia de rodilla",
+    "Reconstrucción del ligamento cruzado anterior",
+    "Meniscectomía parcial",
+    "Reparación de menisco",
+    "Colecistectomía laparoscópica",
+    "Reparación de hernia inguinal",
+    "Resección colorrectal",
+    "Ureteroscopia por litiasis con o sin catéter ureteral doble J",
+    "Resección transuretral de próstata por hiperplasia benigna (RTU/TURP)",
+    "Enucleación prostática con láser de holmio (HoLEP)",
+    "Prostatectomía radical asistida por robot",
+    "Nefrectomía parcial laparoscópica asistida por robot",
+    "Histerectomía laparoscópica",
+    "Histeroscopia ambulatoria diagnóstica con o sin biopsia o polipectomía menor",
+    "Quistectomía ovárica u ooforectomía laparoscópica",
+    "Reparación vaginal de prolapso: colporrafia anterior o posterior"
+  ]
+}

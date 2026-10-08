@@ -1,3 +1,24 @@
+// Reporting calculations preserved from Apps Script; inputs come from the isolated database.
+export function createReports({cases,reporting,permissions,session,config,boardMetrics,reportRange=null,indicatorMetadata={}}){
+const normalizeText_=value=>String(value??'').trim();
+const normalizeHeader_=value=>normalizeText_(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+const parseIsoDate_=value=>new Date(String(value).slice(0,10)+'T12:00:00Z');
+const todayIso_=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'});
+const normalDate_=value=>{if(value instanceof Date)return value;const s=String(value||''),m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);const d=parseIsoDate_(m?m[3]+'-'+m[2]+'-'+m[1]:s);return Number.isNaN(d.getTime())?null:d;};
+const formatDate_=value=>{const d=normalDate_(value);return d?d.toISOString().slice(0,10):''};
+const jsonSafe_=value=>JSON.parse(JSON.stringify(value));
+const rowToObject_=(headers,row)=>Object.fromEntries(headers.map((h,i)=>[h,row[i]??'']));
+const requirePermission_=(_,permission)=>{if(!permissions.includes('*')&&!permissions.includes(permission))throw Object.assign(new Error('No tiene permiso para esta acción.'),{status:403});return session};
+const selectedCases_=()=>cases.filter(row=>row.fecha>=reportRange.from&&row.fecha<=reportRange.to);
+const readCasesForDate_=date=>reportRange?selectedCases_():cases.filter(row=>row.fecha===date);
+const readCasesForMonth_=date=>reportRange?selectedCases_():cases.filter(row=>row.fecha.slice(0,7)===date.slice(0,7));
+const programmingRowsMatching_=predicate=>cases.filter(row=>predicate(row.fecha)).map(row=>({object:row}));
+const surgeryCaseFromRow_=row=>row;
+const boardMetrics_=boardMetrics;
+const operationalConfig_=()=>config;
+const auditEvent_=()=>{};
+const SHEETS={PROFILAXIS:'BD PROFILAXIS QX'};
+function mainSpreadsheet_(){return {getSheetByName(name){const data=reporting.filter(r=>r.dataset===name).map(r=>r.payload);if(!data.length)return null;const headers=[...new Set(data.flatMap(Object.keys))],values=[headers,...data.map(row=>headers.map(h=>row[h]??''))];return {getLastRow:()=>values.length,getLastColumn:()=>headers.length,getRange:(row,col,count,width)=>({getValues:()=>values.slice(row-1,row-1+count).map(r=>r.slice(col-1,col-1+width)),getDisplayValues:()=>values.slice(row-1,row-1+count).map(r=>r.slice(col-1,col-1+width).map(String))})}}}}
 function pctApp_(a, b) {
   return b ? Math.round((a * 1000) / b) / 10 : 0;
 }
@@ -447,8 +468,8 @@ function mciApp_(token, dateIso) {
 
 function reinterventionsApp_(token, dateIso) {
   requirePermission_(token, 'REINTERVENCIONES_REVISAR');
-  var end = parseIsoDate_(dateIso || todayIso_());
-  var start = new Date(end.getTime() - 30 * 86400000);
+  var end = parseIsoDate_(reportRange?.to || dateIso || todayIso_());
+  var start = new Date(parseIsoDate_(reportRange?.from || dateIso || todayIso_()).getTime() - 30 * 86400000);
 
   var rows = programmingRowsMatching_(function(value) {
     var d = normalDate_(value);
@@ -473,7 +494,7 @@ function reinterventionsApp_(token, dateIso) {
       var prev = parseIsoDate_(arr[i - 1].fecha);
       var next = parseIsoDate_(arr[i].fecha);
       var days = Math.round((next.getTime() - prev.getTime()) / 86400000);
-      if (days >= 0 && days < 30) {
+      if (days >= 0 && days < 30 && (!reportRange || (arr[i].fecha >= reportRange.from && arr[i].fecha <= reportRange.to))) {
         candidates.push({
           paciente: arr[i].paciente,
           documento: arr[i].documento,
@@ -488,12 +509,31 @@ function reinterventionsApp_(token, dateIso) {
 
   return {
     total: candidates.length,
-    reviewed: 0,
-    pending: candidates.length,
+    reviewed: null,
+    pending: null,
+    reviewAvailability: "SIN REGISTRO DE REVISION VERIFICABLE",
     rows: candidates
   };
 }
 
+function mciRangeApp_(token) {
+  requirePermission_(token,'INDICADORES_VER');
+  const num=value=>{if(value===''||value==null)return null;const n=Number(String(value).replace(',','.'));return Number.isFinite(n)?n:null};
+  const daily=reporting.filter(r=>/^BASE ANUAL \d{4}$/.test(r.dataset)).map(r=>r.payload).map(row=>({fecha:formatDate_(findValueIgnoreCase_(row,['Fecha'])),dia:findValueIgnoreCase_(row,['Día','Dia']),qxDisponibles:findValueIgnoreCase_(row,['Qx disponibles']),metaDiaria:num(findValueIgnoreCase_(row,['Meta diaria'])),programadas:num(findValueIgnoreCase_(row,['Cirugías programadas netas'])),ejecutadas:num(findValueIgnoreCase_(row,['Cirugías ejecutadas'])),cumple:findValueIgnoreCase_(row,['Cumple meta diaria']),diferencia:findValueIgnoreCase_(row,['Diferencia vs meta diaria']),acumulado:findValueIgnoreCase_(row,['Acumulado mensual'])})).filter(r=>r.fecha>=reportRange.from&&r.fecha<=reportRange.to).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  function totals(rows){const sum=key=>rows.length&&rows.every(r=>r[key]!=null)?rows.reduce((n,r)=>n+r[key],0):null;const meta=sum('metaDiaria'),programadas=sum('programadas'),ejecutadas=sum('ejecutadas');return {meta,programadas,ejecutadas,cumplimiento:meta>0&&ejecutadas!=null?pctApp_(ejecutadas,meta):null,tasaRealizacion:programadas>0&&ejecutadas!=null?pctApp_(ejecutadas,programadas):null,brecha:meta!=null&&ejecutadas!=null?ejecutadas-meta:null,proyeccion:null,estado:rows.length?'BASE DIARIA':'SIN DATOS',mes:''};}
+  const monthly=[],cursor=new Date(reportRange.from.slice(0,7)+'-01T12:00:00Z');
+  while(cursor.toISOString().slice(0,7)<=reportRange.to.slice(0,7)){
+   const month=cursor.toISOString().slice(0,7),rows=daily.filter(r=>r.fecha.startsWith(month)),m=totals(rows);
+   const fullFrom=month+'-01',fullTo=new Date(Date.UTC(cursor.getUTCFullYear(),cursor.getUTCMonth()+1,0,12)).toISOString().slice(0,10);
+   const from=reportRange.from>fullFrom?reportRange.from:fullFrom,to=reportRange.to<fullTo?reportRange.to:fullTo;
+   const matching=reporting.filter(r=>r.dataset==='RESUMEN ANUAL').map(r=>r.payload).filter(r=>normalizeHeader_(findValueIgnoreCase_(r,['Mes']))===normalizeHeader_(spanishMonthNameApp_(cursor.getUTCMonth()+1))&&String(findValueIgnoreCase_(r,['Año','Anio','Year']))===month.slice(0,4));
+   if(from===fullFrom&&to===fullTo&&matching.length===1)m.proyeccion=num(findValueIgnoreCase_(matching[0],['Proyección']));
+   monthly.push({month,from,to,availableDates:rows.length,...m});cursor.setUTCMonth(cursor.getUTCMonth()+1);
+  }
+  const metrics=totals(daily);metrics.mes=reportRange.from+' a '+reportRange.to;
+  if(monthly.length===1)metrics.proyeccion=monthly[0].proyeccion;
+  return {metrics,daily,monthly};
+}
 function csvCellApp_(value) {
   var s = String(value == null ? '' : value);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -504,10 +544,12 @@ function indicatorDownloadCatalogApp_() { return [{"group":"KPI · Indicadores i
 function downloadIndicatorApp_(token, date, period, type, session) {
   var option = indicatorDownloadCatalogApp_().filter(function(item) { return item.type === type; })[0];
   if (!option) return null;
-  if (option.fixedPeriod) period = option.fixedPeriod;
+  if (!reportRange && option.fixedPeriod) period = option.fixedPeriod;
+  if (indicatorMetadata[type]) option = {...option,...indicatorMetadata[type]};
   var sections = [], chart = null;
   function section(title, headers, rows) { sections.push({ title: title, headers: headers, rows: rows }); }
   function metricValue(value, unit) {
+    if(value==null)return "No evaluable";
     if (unit === '%' && typeof value === 'string' && value.indexOf('%') !== -1) {
       var number = value.replace(/\s|%/g, '');
       if (number.indexOf(',') !== -1) number = number.replace(/\./g, '').replace(',', '.');
@@ -516,7 +558,7 @@ function downloadIndicatorApp_(token, date, period, type, session) {
     return value;
   }
   function metricSection(metrics) {
-    section(option.label, ['Indicador', 'Valor', 'Unidad', 'Periodo', 'Fecha de referencia'], [[option.label, metricValue(metrics[option.field], option.unit), option.unit, period, date]]);
+    section(option.label, ['Indicador', 'Valor', 'Unidad', 'Periodo', 'Fecha de referencia'], [[option.label, metrics[option.field]==null?'No evaluable':metricValue(metrics[option.field], option.unit), option.unit, period, reportRange?reportRange.from+' a '+reportRange.to:date]]);
   }
   if (option.family === 'kpi') {
     var kpi = kpiApp_(token, date, period);
@@ -532,18 +574,20 @@ function downloadIndicatorApp_(token, date, period, type, session) {
       if (type === 'KPI_FLUJO') section('Flujo por etapa', ['Etapa', 'Pacientes'], kpi.flujo.map(function(row) { return [row.label, row.value]; }));
     }
   } else if (option.family === 'mci') {
-    var mci = mciApp_(token, date);
+    var mci = reportRange?mciRangeApp_(token):mciApp_(token, date);
     if (option.field) metricSection(mci.metrics);
     else if (option.dailyField) {
-      section(option.label, ['Fecha', option.label + ' (cirugías)'], mci.daily.filter(function(row) { return period === 'MES' || row.fecha === date; }).map(function(row) { return [row.fecha, row[option.dailyField]]; }));
+      section(option.label, ['Fecha', option.label + ' (cirugías)'], mci.daily.filter(function(row) { return !!reportRange || period === 'MES' || row.fecha === date; }).map(function(row) { return [row.fecha, row[option.dailyField]]; }));
     } else if (type === 'MCI_MENSUAL') {
       section(option.label, ['Indicador', 'Valor', 'Unidad'], indicatorDownloadCatalogApp_().filter(function(item) { return item.family === 'mci' && item.field; }).map(function(item) { return [item.label, metricValue(mci.metrics[item.field], item.unit), item.unit]; }));
     }
     else {
-      var daily = mci.daily.filter(function(row) { return period === 'MES' || row.fecha === date; });
+      var daily = mci.daily.filter(function(row) { return !!reportRange || period === 'MES' || row.fecha === date; });
       section('MCI diario', ['Fecha', 'Día', 'QNO disponibles', 'Meta diaria', 'Programadas netas', 'Realizadas', 'Diferencia vs meta', 'Cumple meta', 'Acumulado mensual'], daily.map(function(row) { return [row.fecha, row.dia, row.qxDisponibles, row.metaDiaria, row.programadas, row.ejecutadas, row.diferencia, row.cumple, row.acumulado]; }));
-      if (period === 'MES') chart = { date: date, rows: daily };
+      if (period === 'MES') chart = { date: reportRange?.from || date, rows: daily };
     }
+    if(reportRange&&option.field) section('Desglose mensual del periodo',['Mes','Desde','Hasta','Fechas con registro',option.label,'Unidad'],mci.monthly.map(r=>[r.month,r.from,r.to,r.availableDates,r[option.field]==null?'No evaluable':r[option.field],option.unit]));
+    if(reportRange&&type==='MCI_MENSUAL') section('Desglose mensual del periodo',['Mes','Desde','Hasta','Fechas con registro','Meta','Programadas netas','Realizadas','Cumplimiento (%)','Realización (%)','Brecha','Proyección'],mci.monthly.map(r=>[r.month,r.from,r.to,r.availableDates,...['meta','programadas','ejecutadas','cumplimiento','tasaRealizacion','brecha','proyeccion'].map(k=>r[k]==null?'No evaluable':r[k])]));
   } else if (option.family === 'prof' || option.family === 'pop') {
     requirePermission_(token, option.family === 'prof' ? 'PROFILAXIS_PREQX' : 'CUIDADOS_POSTOP');
     var cases = period === 'MES' ? readCasesForMonth_(date) : readCasesForDate_(date, true);
@@ -555,11 +599,12 @@ function downloadIndicatorApp_(token, date, period, type, session) {
     if (option.field) metricSection(security);
     else section(option.label, ['Paciente', 'Documento', 'Cirugía previa', 'Nueva cirugía', 'Días', 'Especialidad'], security.rows.map(function(row) { return [row.paciente, row.documento, row.fechaPrevia, row.fechaNueva, row.dias, row.especialidad]; }));
   }
+  if(reportRange) sections.unshift({title:'Periodo de la descarga',headers:['Periodo','Desde (incluido)','Hasta (incluido)','Base de fecha','Modo','Meta configurada'],rows:[[reportRange.period,reportRange.from,reportRange.to,'Fecha de cirugía; MCI: fecha del registro diario','SIMULADO',option.goal||'Informativo']]});
   var csv = sections.map(function(item) {
     return (sections.length > 1 ? csvCellApp_(item.title) + '\n' : '') + [item.headers].concat(item.rows).map(function(row) { return row.map(csvCellApp_).join(','); }).join('\n');
   }).join('\n\n');
   auditEvent_(session, 'DESCARGA', 'INDICADORES', '', '', type + ' ' + period, 'OK');
-  return { title: option.label, period: period, date: date, filename: 'Indicador_' + type + '_' + date + '.csv', csv: '\ufeff' + csv, sections: sections, chart: chart };
+  return { title: option.label, period: period, date: date,from:reportRange?.from,to:reportRange?.to, filename: 'Indicador_' + type + '_' + (reportRange?reportRange.from+'_'+reportRange.to:date) + '.csv', csv: '\ufeff' + csv, sections: sections, chart: chart };
 }
 
 function downloadApp_(token, dateIso, period, type) {
@@ -640,7 +685,12 @@ function downloadApp_(token, dateIso, period, type) {
   );
 
   return {
-    filename: 'Cirugia_' + t.replace(/\s+/g, '_') + '_' + date + '.csv',
-    csv: '\ufeff' + csv
+    filename: 'Cirugia_' + t.replace(/\s+/g, '_') + '_' + (reportRange?reportRange.from+'_'+reportRange.to:date) + '.csv',
+    title:t,period:p,from:reportRange?.from,to:reportRange?.to,
+    sections:[...(reportRange?[{title:'Periodo de la descarga',headers:['Periodo','Desde (incluido)','Hasta (incluido)','Modo'],rows:[[p,reportRange.from,reportRange.to,'SIMULADO']]}]:[]),{title:t,headers,rows:data}],
+    csv: '\ufeff' + (reportRange?'Periodo,Desde (incluido),Hasta (incluido),Modo\n'+[p,reportRange.from,reportRange.to,'SIMULADO'].join(',')+'\n\n':'')+csv
   };
+}
+
+return {kpi:kpiApp_,mci:mciApp_,download:downloadApp_,reinterventions:reinterventionsApp_,profilaxis:profilaxisApp_,postop:postopApp_,catalog:indicatorDownloadCatalogApp_};
 }

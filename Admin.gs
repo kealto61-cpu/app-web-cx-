@@ -114,12 +114,12 @@ function saveOperationalConfig_(token, body) {
 
 function validPinApp_(pin) {
   var p = String(pin || '');
-  if (!/^\d{6,8}$/.test(p)) return false;
-  if (/^(\d)\1+$/.test(p)) return false;
-  if ([
-    '123456', '654321', '1234567', '7654321',
-    '12345678', '87654321', '000000', '111111'
-  ].indexOf(p) !== -1) return false;
+  if (!/^[A-Za-z0-9]{4,16}$/.test(p)) return false;
+  if (/^([A-Za-z0-9])\1+$/i.test(p)) return false;
+  if (/^\d+$/.test(p) && (
+    '0123456789012345'.indexOf(p) !== -1 ||
+    '9876543210987654'.indexOf(p) !== -1
+  )) return false;
   return true;
 }
 
@@ -132,7 +132,7 @@ function apiChangeOwnPinApp_(token, body) {
   var newPin = String(body.newPin || '');
   if (!validPinApp_(newPin)) {
     throw new Error(
-      'El nuevo PIN debe tener 6–8 dígitos y no puede ser una secuencia simple o repetida.'
+      'El nuevo PIN debe tener 4–16 caracteres: letras A–Z o números, sin espacios, secuencias numéricas simples ni un único carácter repetido.'
     );
   }
 
@@ -317,7 +317,7 @@ function createUserApp_(token, body) {
   if (!name) throw new Error('El nombre es obligatorio.');
   ensureRoleActiveApp_(role);
   if (!validPinApp_(pin)) {
-    throw new Error('El PIN debe tener 6–8 dígitos y no ser una secuencia simple.');
+    throw new Error('El PIN debe tener 4–16 caracteres: letras A–Z o números, sin espacios, secuencias numéricas simples ni un único carácter repetido.');
   }
   if (findUserByUsername_(username)) throw new Error('Ese usuario ya existe.');
 
@@ -405,7 +405,7 @@ function resetUserPinApp_(token, body) {
   var pin = String(body.pin || '');
 
   if (!validPinApp_(pin)) {
-    throw new Error('El PIN debe tener 6–8 dígitos y no ser una secuencia simple.');
+    throw new Error('El PIN debe tener 4–16 caracteres: letras A–Z o números, sin espacios, secuencias numéricas simples ni un único carácter repetido.');
   }
 
   var salt = newPinSalt_();

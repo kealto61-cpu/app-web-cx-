@@ -270,6 +270,15 @@ function ensureTrackingForDate_(session, dateIso) {
   return out;
 }
 
+function trackingRevision_(row) {
+  var fields = ['ÚLTIMA ACTUALIZACIÓN WEB', 'FECHA/HORA ÚLTIMO MOVIMIENTO', 'FECHA/HORA AVISO ACOMPAÑANTE'];
+  return fields.reduce(function(latest, field) {
+    var value = row[field];
+    var time = value instanceof Date ? value.getTime() : (typeof value === 'string' ? Date.parse(value) : NaN);
+    return isFinite(time) ? Math.max(latest, time) : latest;
+  }, 0);
+}
+
 function publicTracking_(code) {
   var token = String(code || '').replace(/\D/g, '').slice(0, 5);
   if (!/^\d{5}$/.test(token)) {
@@ -291,8 +300,10 @@ function publicTracking_(code) {
 
   return jsonSafe_({
     ok: true,
+    paciente: c.paciente,
     estadoPublico: terminal ? '' : publicState_(c.estado, c.destino),
-    actualizado: c.avisoFecha || c.actualizado,
+    actualizado: c.actualizado || c.avisoFecha,
+    revision: trackingRevision_(hit.object),
     active: !terminal && trackingActiveState_(c.estado),
     terminal: terminal,
     aviso: c.aviso || '',

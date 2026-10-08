@@ -1,0 +1,418 @@
+{
+  "sourceKind": "SIMULADO",
+  "referencePolicy": "Solo encabezados, listas y formulas institucionales. Identificadores de documentos privados omitidos de la version publica.",
+  "reviewedAt": "2026-10-07",
+  "source": {
+    "url": "",
+    "spreadsheetTitle": "SEGUIMIENTO A PACIENTES POSTOPERATORIOS",
+    "readScope": [
+      "'Indicadores'!A1:L45",
+      "'Dashboard PASP'!A1:P84"
+    ],
+    "fieldMask": "userEnteredValue(stringValue,formulaValue)",
+    "effectiveValuesRead": false,
+    "patientRowsRead": false
+  },
+  "definitions": [
+    {
+      "id": "total_users",
+      "label": "Total de usuarios registrados",
+      "institutionalFormula": "Conteo de usuarios con nombre registrado",
+      "sheetFormula": "=COUNTA('Matriz PASP'!D8:D1191)",
+      "goal": "Informativo",
+      "definition": "Volumen total de usuarios incorporados al programa PASP.",
+      "objective": "Dimensionar la población objeto de seguimiento.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A4:H4",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "appointment_assigned",
+      "label": "% de usuarios con cita POP asignada",
+      "institutionalFormula": "Episodios quirúrgicos definitivos con cita POP asignada / Episodios definitivos que requieren cita POP × 100. Los grupos pendientes de revisión no ingresan al indicador.",
+      "sheetFormula": "=IFERROR(COUNTA(UNIQUE(FILTER('_EPISODIOS_QX'!$AA$2:$AA$1185;'Matriz PASP'!$N$8:$N$1191<>\"No aplica\";'Matriz PASP'!$K$8:$K$1191<>\"\";'_EPISODIOS_QX'!$AA$2:$AA$1185<>\"\")))/COUNTA(UNIQUE(FILTER('_EPISODIOS_QX'!$AA$2:$AA$1185;'Matriz PASP'!$N$8:$N$1191<>\"No aplica\";'_EPISODIOS_QX'!$AA$2:$AA$1185<>\"\")));0)",
+      "goal": "≥95%",
+      "definition": "Proporción de usuarios que requieren consulta postoperatoria y cuentan con fecha asignada.",
+      "objective": "Garantizar la continuidad del control postoperatorio sin incluir procedimientos exentos de cita POP.",
+      "owner": "Programación de Cirugía",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A5:H5",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "first_call_coverage",
+      "label": "Cobertura de primera llamada",
+      "institutionalFormula": "Usuarios con primera llamada realizada / Total de usuarios × 100",
+      "sheetFormula": "=IFERROR(COUNTIFS('Matriz PASP'!D8:D1191;\"<>\";'Matriz PASP'!P8:P1191;\">0\")/COUNTA('Matriz PASP'!D8:D1191);0)",
+      "goal": "≥90%",
+      "definition": "Cumplimiento del primer contacto telefónico en todos los usuarios incluidos en PASP.",
+      "objective": "Asegurar seguimiento temprano a las 48 horas posteriores al procedimiento.",
+      "owner": "Enfermería PASP",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A6:H6",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "first_call_timeliness",
+      "label": "Oportunidad de primera llamada",
+      "institutionalFormula": "Primeras llamadas realizadas en la fecha programada o antes / Primeras llamadas realizadas × 100",
+      "sheetFormula": "=IFERROR(SUMPRODUCT(N('Matriz PASP'!D8:D1191<>\"\");N('Matriz PASP'!P8:P1191>0);N('Matriz PASP'!P8:P1191<='Matriz PASP'!O8:O1191))/COUNTIFS('Matriz PASP'!D8:D1191;\"<>\";'Matriz PASP'!P8:P1191;\">0\");0)",
+      "goal": "≥90%",
+      "definition": "Puntualidad del primer seguimiento telefónico para todos los usuarios.",
+      "objective": "Detectar tempranamente necesidades clínicas o administrativas.",
+      "owner": "Enfermería PASP",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A7:H7",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "second_call_coverage",
+      "label": "Cobertura de segunda llamada programada",
+      "institutionalFormula": "Segundas llamadas realizadas / Segundas llamadas programadas × 100",
+      "sheetFormula": "=IFERROR(COUNTIFS('Matriz PASP'!D8:D1191;\"<>\";'Matriz PASP'!AN8:AN1191;\">0\";'Matriz PASP'!AO8:AO1191;\">0\")/COUNTIFS('Matriz PASP'!D8:D1191;\"<>\";'Matriz PASP'!AN8:AN1191;\">0\");0)",
+      "goal": "≥85%",
+      "definition": "Cumplimiento del segundo contacto telefónico programado.",
+      "objective": "Confirmar evolución, asistencia a cita y cierre del seguimiento.",
+      "owner": "Enfermería PASP",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A8:H8",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "second_call_timeliness",
+      "label": "Oportunidad de segunda llamada",
+      "institutionalFormula": "Segundas llamadas realizadas en la fecha programada o antes / Segundas llamadas realizadas × 100",
+      "sheetFormula": "=IFERROR(SUM(ARRAYFORMULA(IFERROR((('Matriz PASP'!D8:D1191<>\"\")*('Matriz PASP'!AN8:AN1191<>\"\")*('Matriz PASP'!AO8:AO1191<>\"\")*(VALUE('Matriz PASP'!AO8:AO1191)<=VALUE('Matriz PASP'!AN8:AN1191)));0)))/COUNTIFS('Matriz PASP'!D8:D1191;\"<>\";'Matriz PASP'!AN8:AN1191;\">0\";'Matriz PASP'!AO8:AO1191;\">0\");0)",
+      "goal": "≥85%",
+      "definition": "Puntualidad del segundo seguimiento telefónico.",
+      "objective": "Evitar retrasos en el cierre o reescalamiento de casos.",
+      "owner": "Enfermería PASP",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A9:H9",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "appointment_attendance",
+      "label": "Asistencia a consulta POP",
+      "institutionalFormula": "Usuarios que asistieron / Usuarios con resultado Sí o No × 100",
+      "sheetFormula": "=IFERROR(COUNTIF('Matriz PASP'!AS8:AS1191;\"Sí\")/(COUNTIF('Matriz PASP'!AS8:AS1191;\"Sí\")+COUNTIF('Matriz PASP'!AS8:AS1191;\"No\"));0)",
+      "goal": "≥90%",
+      "definition": "Adherencia de los usuarios a la consulta postoperatoria asignada.",
+      "objective": "Reducir inasistencias y favorecer valoración oportuna.",
+      "owner": "Programación y Coordinación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A10:H10",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "administrative_findings",
+      "label": "Hallazgos administrativos identificados",
+      "institutionalFormula": "Hallazgos administrativos de llamada 1 + llamada 2",
+      "sheetFormula": "=COUNTIF('Matriz PASP'!AI8:AI1191;\"Hallazgo administrativo\")+COUNTIF('Matriz PASP'!BF8:BF1191;\"Hallazgo administrativo\")",
+      "goal": "Tendencia decreciente",
+      "definition": "Cantidad de barreras relacionadas con citas, autorizaciones o programación.",
+      "objective": "Identificar oportunidades de mejora en la gestión administrativa.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A11:H11",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "nonurgent_findings",
+      "label": "Hallazgos clínicos no urgentes",
+      "institutionalFormula": "Hallazgos clínicos no urgentes de llamada 1 + llamada 2",
+      "sheetFormula": "=COUNTIF('Matriz PASP'!AI8:AI1191;\"Hallazgo clínico no urgente\")+COUNTIF('Matriz PASP'!BF8:BF1191;\"Hallazgo clínico no urgente\")",
+      "goal": "Tendencia decreciente",
+      "definition": "Situaciones clínicas que requieren educación, control o seguimiento sin urgencia.",
+      "objective": "Prevenir progresión de hallazgos y orientar oportunamente al usuario.",
+      "owner": "Enfermería PASP y Coordinación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A12:H12",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "priority_findings",
+      "label": "Hallazgos prioritarios y eventos o incidentes",
+      "institutionalFormula": "Hallazgos prioritarios, urgentes y eventos de ambas llamadas",
+      "sheetFormula": "=COUNTIF('Matriz PASP'!AI8:AI1191;\"Hallazgo clínico prioritario\")+COUNTIF('Matriz PASP'!AI8:AI1191;\"Hallazgo clínico urgente prioritario\")+COUNTIF('Matriz PASP'!AI8:AI1191;\"Evento o incidente\")+COUNTIF('Matriz PASP'!BF8:BF1191;\"Hallazgo clínico prioritario\")+COUNTIF('Matriz PASP'!BF8:BF1191;\"Hallazgo clínico urgente prioritario\")+COUNTIF('Matriz PASP'!BF8:BF1191;\"Evento o incidente\")",
+      "goal": "Gestión inmediata del 100%",
+      "definition": "Número de situaciones que requieren intervención prioritaria o reporte institucional.",
+      "objective": "Garantizar respuesta inmediata, trazabilidad y escalamiento.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A13:H13",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "coordination_open",
+      "label": "Casos abiertos en Coordinación de Cirugía",
+      "institutionalFormula": "Conteo de casos con estado de coordinación Abierto",
+      "sheetFormula": "=COUNTIF('Matriz PASP'!BR8:BR1191;\"Abierto\")",
+      "goal": "0 casos vencidos",
+      "definition": "Casos que requieren revisión inicial por Coordinación de Cirugía.",
+      "objective": "Evitar acumulación de casos pendientes de revisión.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Diaria",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A14:H14",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "coordination_followup",
+      "label": "Casos en seguimiento por Coordinación de Cirugía",
+      "institutionalFormula": "Conteo de casos con estado de coordinación En seguimiento",
+      "sheetFormula": "=COUNTIF('Matriz PASP'!BR8:BR1191;\"En seguimiento\")",
+      "goal": "100% con conducta activa",
+      "definition": "Casos revisados que aún requieren acciones antes del cierre.",
+      "objective": "Asegurar continuidad hasta la resolución documentada.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Diaria",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A15:H15",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "coordination_closed",
+      "label": "Casos cerrados por Coordinación de Cirugía",
+      "institutionalFormula": "Conteo de casos con estado de coordinación Cerrado",
+      "sheetFormula": "=COUNTIF('Matriz PASP'!BR8:BR1191;\"Cerrado\")",
+      "goal": "Informativo",
+      "definition": "Casos con revisión, análisis y resolución finalizados.",
+      "objective": "Cuantificar la gestión resolutiva de Coordinación de Cirugía.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A16:H16",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "coordination_closure_rate",
+      "label": "% de cierre de casos de Coordinación de Cirugía",
+      "institutionalFormula": "Casos cerrados / Casos que requieren revisión de coordinación × 100",
+      "sheetFormula": "=IFERROR(COUNTIF('Matriz PASP'!BR8:BR1191;\"Cerrado\")/(COUNTIF('Matriz PASP'!BR8:BR1191;\"Abierto\")+COUNTIF('Matriz PASP'!BR8:BR1191;\"En seguimiento\")+COUNTIF('Matriz PASP'!BR8:BR1191;\"Cerrado\"));0)",
+      "goal": "≥95%",
+      "definition": "Proporción de casos de coordinación que cuentan con cierre completo.",
+      "objective": "Medir la capacidad de resolución y cierre oportuno.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A17:H17",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "escalation_owner",
+      "label": "% de escalamientos con responsable registrado",
+      "institutionalFormula": "Escalamientos con responsable / Total de escalamientos × 100",
+      "sheetFormula": "=IFERROR((SUMPRODUCT(--('Matriz PASP'!AK8:AK1191<>\"\");--REGEXMATCH('Matriz PASP'!AJ8:AJ1191;\"^(Escalamiento|Programación / reprogramación|Reporte seguridad del paciente|Remisión a urgencias)\"))+SUMPRODUCT(--('Matriz PASP'!BH8:BH1191<>\"\");--REGEXMATCH('Matriz PASP'!BG8:BG1191;\"^(Escalamiento|Programación / reprogramación|Reporte seguridad del paciente|Remisión a urgencias)\")))/(SUMPRODUCT(--REGEXMATCH('Matriz PASP'!AJ8:AJ1191;\"^(Escalamiento|Programación / reprogramación|Reporte seguridad del paciente|Remisión a urgencias)\"))+SUMPRODUCT(--REGEXMATCH('Matriz PASP'!BG8:BG1191;\"^(Escalamiento|Programación / reprogramación|Reporte seguridad del paciente|Remisión a urgencias)\")));0)",
+      "goal": "100%",
+      "definition": "Trazabilidad de la persona que realizó y escaló el seguimiento.",
+      "objective": "Garantizar responsabilidad nominal en cada escalamiento.",
+      "owner": "Enfermería PASP",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A18:H18",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "safety_notified_cases",
+      "label": "Casos derivados a Seguridad del Paciente",
+      "institutionalFormula": "Conteo de derivaciones reales confirmadas en BN",
+      "sheetFormula": "=COUNTIF('Matriz PASP'!BN8:BN1191;\"Sí\")",
+      "goal": "Informativo",
+      "definition": "Número de casos que Coordinación de Cirugía derivó efectivamente a Seguridad del Paciente.",
+      "objective": "Cuantificar las derivaciones reales sin confundirlas con alertas automáticas.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A19:H19",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "coordination_closed_safety_notified",
+      "label": "Casos resueltos por Coordinación de Cirugía derivados a Seguridad del Paciente",
+      "institutionalFormula": "Casos cerrados por Coordinación con BN = Sí",
+      "sheetFormula": "=COUNTIFS('Matriz PASP'!BR8:BR1191;\"Cerrado\";'Matriz PASP'!BN8:BN1191;\"Sí\")",
+      "goal": "Informativo",
+      "definition": "De los casos cerrados por Coordinación de Cirugía, cuántos fueron derivados a Seguridad del Paciente.",
+      "objective": "Mostrar la resolución institucional y la proporción que requirió derivación.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A20:H20",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "coordination_reviewer",
+      "label": "% de casos de coordinación con profesional revisor",
+      "institutionalFormula": "Casos con profesional registrado / Casos que requieren revisión × 100",
+      "sheetFormula": "=IFERROR((COUNTIFS('Matriz PASP'!BR8:BR1191;\"Abierto\";'Matriz PASP'!BO8:BO1191;\"?*\";'Matriz PASP'!BO8:BO1191;\"<>No aplica\")+COUNTIFS('Matriz PASP'!BR8:BR1191;\"En seguimiento\";'Matriz PASP'!BO8:BO1191;\"?*\";'Matriz PASP'!BO8:BO1191;\"<>No aplica\")+COUNTIFS('Matriz PASP'!BR8:BR1191;\"Cerrado\";'Matriz PASP'!BO8:BO1191;\"?*\";'Matriz PASP'!BO8:BO1191;\"<>No aplica\"))/(COUNTIF('Matriz PASP'!BR8:BR1191;\"Abierto\")+COUNTIF('Matriz PASP'!BR8:BR1191;\"En seguimiento\")+COUNTIF('Matriz PASP'!BR8:BR1191;\"Cerrado\"));0)",
+      "goal": "100%",
+      "definition": "Trazabilidad del profesional de Coordinación de Cirugía que revisó el caso.",
+      "objective": "Garantizar identificación del responsable de la revisión.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A21:H21",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "findings_analyzed",
+      "label": "% de hallazgos aplicables con análisis y resolución documentados",
+      "institutionalFormula": "Hallazgos con análisis registrado / Total de hallazgos aplicables de ambas llamadas × 100",
+      "sheetFormula": "=IFERROR((COUNTIFS('Matriz PASP'!BL8:BL1191;\"?*\";'Matriz PASP'!BL8:BL1191;\"<>No aplica\";'Matriz PASP'!BP8:BP1191;\"?*\";'Matriz PASP'!BP8:BP1191;\"<>No aplica\")+COUNTIFS('Matriz PASP'!BM8:BM1191;\"?*\";'Matriz PASP'!BM8:BM1191;\"<>No aplica\";'Matriz PASP'!BQ8:BQ1191;\"?*\";'Matriz PASP'!BQ8:BQ1191;\"<>No aplica\"))/(COUNTIFS('Matriz PASP'!BL8:BL1191;\"?*\";'Matriz PASP'!BL8:BL1191;\"<>No aplica\")+COUNTIFS('Matriz PASP'!BM8:BM1191;\"?*\";'Matriz PASP'!BM8:BM1191;\"<>No aplica\"));0)",
+      "goal": "100%",
+      "definition": "Proporción de hallazgos de primera y segunda llamada con análisis y resolución documentados.",
+      "objective": "Medir la integridad y avance real de la gestión de Coordinación de Cirugía.",
+      "owner": "Coordinación de Cirugía",
+      "frequency": "Semanal",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A22:H22",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "appointment_timeliness",
+      "label": "Oportunidad de asignación de cita POP",
+      "institutionalFormula": "Episodios quirúrgicos definitivos con cita POP asignada máximo 10 días calendario posteriores a la última cirugía del episodio / Episodios definitivos evaluables con cita POP × 100.",
+      "sheetFormula": "=IFERROR(LET(ids;UNIQUE(FILTER('_EPISODIOS_QX'!$AA$2:$AA$1185;'Matriz PASP'!$N$8:$N$1191<>\"No aplica\";'Matriz PASP'!$K$8:$K$1191<>\"\";'_EPISODIOS_QX'!$AA$2:$AA$1185<>\"\"));dias;MAP(ids;LAMBDA(id;LET(cita;MIN(FILTER('Matriz PASP'!$K$8:$K$1191;'_EPISODIOS_QX'!$AA$2:$AA$1185=id;'Matriz PASP'!$K$8:$K$1191<>\"\";'Matriz PASP'!$N$8:$N$1191<>\"No aplica\"));proc;MAX(FILTER('_EPISODIOS_QX'!$AC$2:$AC$1185;'_EPISODIOS_QX'!$AA$2:$AA$1185=id;'_EPISODIOS_QX'!$AC$2:$AC$1185<=cita));cita-proc)));validos;FILTER(dias;dias>=0;dias<=365);COUNTIF(validos;\"<=10\")/COUNTA(validos));0)",
+      "goal": "≥90%",
+      "definition": "Proporción de usuarios que requieren consulta POP y cuya cita fue asignada dentro del plazo máximo institucional de 10 días calendario posteriores al procedimiento; las asignaciones antes del día 7 se identifican como anticipadas y no penalizan.",
+      "objective": "Medir la oportunidad de la asignación de la consulta postoperatoria y detectar citas asignadas después del plazo máximo institucional.",
+      "owner": "Programación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A23:H23",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "appointment_mean_days",
+      "label": "Promedio de días procedimiento → cita POP",
+      "institutionalFormula": "Promedio de días calendario entre fecha de procedimiento y fecha de cita POP, excluyendo No aplica y registros sin cita.",
+      "sheetFormula": "=LET(ids;UNIQUE(FILTER('Matriz PASP'!E8:E1191;'Matriz PASP'!E8:E1191<>\"\";'Matriz PASP'!N8:N1191<>\"No aplica\";'Matriz PASP'!K8:K1191<>\"\"));dias;MAP(ids;LAMBDA(id;LET(cita;MIN(FILTER('Matriz PASP'!K8:K1191;'Matriz PASP'!E8:E1191=id;'Matriz PASP'!K8:K1191<>\"\";'Matriz PASP'!N8:N1191<>\"No aplica\"));proc;MAX(FILTER('Matriz PASP'!C8:C1191;'Matriz PASP'!E8:E1191=id;'Matriz PASP'!C8:C1191<=cita));cita-proc)));AVERAGE(FILTER(dias;dias>=0;dias<=365)))",
+      "goal": "",
+      "definition": "",
+      "objective": "Caracterizar el comportamiento temporal de la programación POP.",
+      "owner": "Programación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A24:H24",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "appointment_min_days",
+      "label": "Cita POP más pronta",
+      "institutionalFormula": "Menor número de días calendario entre procedimiento y cita POP.",
+      "sheetFormula": "=LET(ids;UNIQUE(FILTER('Matriz PASP'!E8:E1191;'Matriz PASP'!E8:E1191<>\"\";'Matriz PASP'!N8:N1191<>\"No aplica\";'Matriz PASP'!K8:K1191<>\"\"));dias;MAP(ids;LAMBDA(id;LET(cita;MIN(FILTER('Matriz PASP'!K8:K1191;'Matriz PASP'!E8:E1191=id;'Matriz PASP'!K8:K1191<>\"\";'Matriz PASP'!N8:N1191<>\"No aplica\"));proc;MAX(FILTER('Matriz PASP'!C8:C1191;'Matriz PASP'!E8:E1191=id;'Matriz PASP'!C8:C1191<=cita));cita-proc)));MIN(FILTER(dias;dias>=0;dias<=365)))",
+      "goal": "Informativo",
+      "definition": "Menor intervalo observado de asignación.",
+      "objective": "Identificar la asignación más temprana del periodo.",
+      "owner": "Programación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A25:H25",
+        "reviewedAt": "2026-10-07"
+      }
+    },
+    {
+      "id": "appointment_max_days",
+      "label": "Cita POP más demorada",
+      "institutionalFormula": "Mayor número de días calendario entre procedimiento y cita POP.",
+      "sheetFormula": "=LET(ids;UNIQUE(FILTER('Matriz PASP'!E8:E1191;'Matriz PASP'!E8:E1191<>\"\";'Matriz PASP'!N8:N1191<>\"No aplica\";'Matriz PASP'!K8:K1191<>\"\"));dias;MAP(ids;LAMBDA(id;LET(cita;MIN(FILTER('Matriz PASP'!K8:K1191;'Matriz PASP'!E8:E1191=id;'Matriz PASP'!K8:K1191<>\"\";'Matriz PASP'!N8:N1191<>\"No aplica\"));proc;MAX(FILTER('Matriz PASP'!C8:C1191;'Matriz PASP'!E8:E1191=id;'Matriz PASP'!C8:C1191<=cita));cita-proc)));MAX(FILTER(dias;dias>=0;dias<=365)))",
+      "goal": "Informativo",
+      "definition": "Mayor intervalo observado de asignación.",
+      "objective": "Identificar demoras extremas y posibles casos atípicos.",
+      "owner": "Programación de Cirugía",
+      "frequency": "Mensual",
+      "source": {
+        "url": "",
+        "sheet": "Indicadores",
+        "range": "A26:H26",
+        "reviewedAt": "2026-10-07"
+      }
+    }
+  ],
+  "implementationNotes": [
+    "Denominador cero: resultado null (no evaluable), sin afirmar cumplimiento.",
+    "Cohorte por fecha de cirugía e ID de episodio; una ficha por intento. Indicadores institucionales de llamadas usan únicamente fichas 1 y 2; los intentos adicionales se presentan por separado.",
+    "Dashboard y fórmulas institucionales esperan Abierto/En seguimiento en BR, pero la validación leída ofrece Activo/Cerrado/No aplica: Activo sin revisión se presenta como Abierto y con revisión documentada como En seguimiento, conservando el estado registrado.",
+    "No se aplica el reemplazo histórico del Dashboard O4 que cambia la fecha real 10/08/2026 por fecha de registro. La fecha real registrada se conserva.",
+    "Las fuentes discrepan en agrupación por documento vs episodio, y en exclusión Fallecido: se usa episodio quirúrgico confirmado y se excluyen No aplica y Fallecido para cita POP, consistente con Dashboard actual.",
+    "La fecha objetivo es la guardada en cada ficha; cambios posteriores de reglas no reescriben llamadas históricas.",
+    "Los indicadores son agregados de datos simulados; no constituyen indicadores reales de producción ni importan registros del documento."
+  ]
+}
