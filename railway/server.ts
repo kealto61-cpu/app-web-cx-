@@ -1,4 +1,5 @@
 import {resolveReportRange} from './report-range.ts';
+import {DATABASE_JSON_TYPES,repairSimulationJson} from './database-json.ts';
 import postgres from "postgres";
 import {initPasp,handlePasp,PASP_PERMISSION_CATALOG} from "./pasp.ts";
 import {searchCare} from "./care-search.ts";
@@ -11,7 +12,7 @@ const dbUrl=Bun.env.DATABASE_URL;if(!dbUrl)throw new Error("DATABASE_URL missing
 const DATA_MODE=String(Bun.env.DATA_MODE||'SIMULATED').toUpperCase();
 if(DATA_MODE!=='SIMULATED')throw new Error('Este despliegue requiere DATA_MODE=SIMULATED.');
 const setupSql=postgres(dbUrl,{ssl:'require',max:1});await setupSql.unsafe('create schema if not exists qx_simulation');await setupSql.end();
-const sql=postgres(dbUrl,{ssl:'require',max:8,connection:{search_path:'qx_simulation'}});const PORT=Number(Bun.env.PORT||3000),SESSION_TTL=21600000;
+const sql=postgres(dbUrl,{ssl:'require',max:8,types:DATABASE_JSON_TYPES,connection:{search_path:'qx_simulation'}});const PORT=Number(Bun.env.PORT||3000),SESSION_TTL=21600000;
 const sessionKey=createHash("sha256").update(dbUrl+"|APP_WEB_CX_SESSION").digest();
 const PAGE=await Bun.file("./public/index.html").text();
 const SW=await Bun.file("./public/sw.js").text();
@@ -108,6 +109,7 @@ await sql.unsafe(`
   create index if not exists companion_push_case_idx on companion_push_subscriptions(case_id) where active=true;
 `);
 await initPasp(sql);await initApplicationSettings(sql);
+await repairSimulationJson(sql);
 function json(data,status=200,headers={}){return new Response(JSON.stringify(data),{status,headers:Object.assign({"content-type":"application/json; charset=utf-8","cache-control":"no-store"},headers)})}
 function html(body,status=200){return new Response(body,{status,headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}})}
 function textResponse(body,type,status=200){return new Response(body,{status,headers:{"content-type":type,"cache-control":"no-cache"}})}
