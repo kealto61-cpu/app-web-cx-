@@ -1,9 +1,9 @@
 {
-  "version": "5.9.1-pasp",
+  "version": "5.9.2-pasp",
   "sourceKind": "SIMULADO",
-  "individualIndicatorCount": 71,
+  "individualIndicatorCount": 70,
   "institutionalPaspCount": 23,
-  "additionalPaspCount": 14,
+  "additionalPaspCount": 13,
   "aggregateReports": [
     {
       "group": "KPI · Reportes por separado",
@@ -1045,22 +1045,6 @@
       "owner": "Coordinación de Cirugía",
       "limitations": "Sin denominador: No evaluable. Denominador por episodio, no por número de fichas.",
       "download": "PASP_CONTACT_EPISODE_COVERAGE",
-      "scope": "AMPLIACION"
-    },
-    {
-      "id": "PASP_URGENT_ALARMS",
-      "metricId": "urgent_alarms",
-      "label": "Llamadas con al menos una alerta urgente",
-      "group": "PASP · Seguimiento adicional",
-      "unit": "fichas",
-      "definition": "Cuenta cada ficha original con urgentSafety verdadero una sola vez, aunque tenga varias señales urgentes.",
-      "formula": "Conteo de fichas originales con urgentSafety = verdadero.",
-      "institutionalFormula": "Fichas con señal urgente registrada",
-      "goal": "Informativo",
-      "frequency": "Según cohorte por fecha de cirugía",
-      "owner": "Coordinación de Cirugía",
-      "limitations": "Tres alertas en una llamada cuentan una ficha; dos llamadas con alerta al mismo paciente cuentan dos fichas. No mide pacientes únicos, productividad, triage ni eventos adversos confirmados. Un período sin fichas con alerta tiene conteo 0.",
-      "download": "PASP_URGENT_ALARMS",
       "scope": "AMPLIACION"
     },
     {

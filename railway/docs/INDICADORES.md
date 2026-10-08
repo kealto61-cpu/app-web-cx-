@@ -1,6 +1,6 @@
 # Fichas técnicas de indicadores · APP WEB CX 5.9 PASP
 
-Catálogo de 71 medidas individuales (23 de la matriz PASP, 14 ampliaciones de seguimiento y 34 del módulo quirúrgico) y 19 reportes agregados. Dos contadores heredados de revisión de reintervenciones se presentan como **No evaluables**, porque no tienen registro de revisión verificable. Los candidatos son alertas para análisis profesional; no confirman una reintervención ni un evento adverso.
+Catálogo de 70 medidas individuales (23 de la matriz PASP, 13 ampliaciones de seguimiento y 34 del módulo quirúrgico) y 19 reportes agregados. Dos contadores heredados de revisión de reintervenciones se presentan como **No evaluables**, porque no tienen registro de revisión verificable. Los candidatos son alertas para análisis profesional; no confirman una reintervención ni un evento adverso.
 
 ## Periodo y fuentes
 
@@ -770,19 +770,6 @@ El despliegue Railway utiliza únicamente datos ficticios, en una base aislada d
 - **Interpretación y límites:** Sin denominador: No evaluable. Denominador por episodio, no por número de fichas.
 - **Descarga individual:** PASP_CONTACT_EPISODE_COVERAGE (CSV, Excel o PDF; rango, mes o año).
 
-### 63. Llamadas con al menos una alerta urgente
-
-- **Código:** PASP_URGENT_ALARMS
-- **Qué mide:** Número de fichas originales de llamada que registraron al menos una señal urgente (`urgentSafety = verdadero`).
-- **Fórmula:** Conteo de fichas originales con alerta urgente; cada ficha cuenta una vez.
-- **Ejemplo:** Tres señales urgentes en la llamada de Ana cuentan una ficha. Si Ana registra una alerta en dos llamadas diferentes, cuentan dos fichas.
-- **Unidad:** fichas de llamada; no pacientes únicos.
-- **Meta:** Informativo. No se interpreta un mayor o menor conteo como mejor desempeño del profesional.
-- **Período:** Cohorte por fecha de cirugía, igual que los demás indicadores PASP; incluye todas las llamadas asociadas a los episodios de esa cohorte.
-- **Responsable:** Coordinación de Cirugía.
-- **Interpretación:** No confirma diagnósticos, eventos adversos ni categoría de triage. Cero significa que no hay fichas con alerta en los registros incluidos, no que se haya demostrado ausencia de riesgo.
-- **Descarga:** PASP_URGENT_ALARMS (CSV, Excel o PDF; rango, mes o año).
-
 ### 64. Escalamientos registrados
 
 - **Código:** PASP_ESCALATIONS
@@ -918,7 +905,7 @@ Estos 19 reportes reúnen varias medidas o desglosan las existentes por responsa
 
 Ejemplo: un jefe registra 10 fichas y logra 6 contactos efectivos en 4 pacientes: productividad documentada **10 fichas**, **6 contactos efectivos**, **4 pacientes contactados**, con efectividad de contacto **60 %**. Esto mide volumen registrado; no constituye una evaluación de calidad clínica ni comparación ajustada por jornada, complejidad y carga.
 
-Ambos reportes se descargan por rango, mes o año en **Coordinación → Descargas**, en CSV, Excel o PDF. El reporte **Productividad quirúrgica** también incorpora el detalle por enfermero jefe. Se mantienen las 71 medidas originales y su numeración: estos reportes desglosan medidas existentes por responsable.
+Ambos reportes se descargan por rango, mes o año en **Coordinación → Descargas**, en CSV, Excel o PDF. El reporte **Productividad quirúrgica** también incorpora el detalle por enfermero jefe. Se mantienen las 70 medidas vigentes y su numeración: estos reportes desglosan medidas existentes por responsable.
 
 ## Productividad, cancelaciones y tasas por especialista
 

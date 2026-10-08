@@ -545,6 +545,20 @@ describe('coordination and patient safety governance', () => {
 });
 
 describe('PASP matrix indicators', () => {
+  test('retira el indicador de alerta urgente sin perder señales clínicas ni escalamientos', async () => {
+    const e=await episode();
+    const saved=await call(e,{clinical:{feelsWell:'No',urinaryRetention:'Sí'},classification:'Hallazgo clínico urgente prioritario',conduct:'Remisión a urgencias',observations:'Registro SIMULADO de prueba de señal urgente.'});
+    expect(saved.call.urgentSafety).toBe(true);
+    expect(saved.escalation.priority).toBe('INMEDIATA');
+    const result=await request('/indicators?from=2026-10-01&to=2026-10-31');
+    expect(result.status).toBe(200);expect(result.body.metrics).toHaveLength(36);
+    expect(result.body.metrics.some(m=>m.id==='urgent_alarms')).toBe(false);
+    expect(result.body.totals.urgentCalls).toBeUndefined();
+    expect(result.body.series.every(row=>row.urgentCalls===undefined)).toBe(true);
+    expect(metric(result.body,'escalations').value).toBe(1);
+    expect((await request('/episodes/'+e.id)).body.episode.calls[0].urgentSafety).toBe(true);
+  });
+
   test('productividad atribuye fichas al autor autenticado y usa la fecha real aunque la cirugía sea anterior', async () => {
     const e=await episode({surgeryDate:'2026-09-01'});
     const first=await request('/calls',callPayload(e,{professional:'Autor inventado en formulario',recordedBy:'OTRA-CUENTA',professionalUserId:'ID-INVENTADO',contactResult:'No contesta',clinical:{},classification:'No contesta',conduct:'',extra:{}}),{session:{...staff,uid:'SIM-UID-A'}});

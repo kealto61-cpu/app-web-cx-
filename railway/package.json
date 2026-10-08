@@ -1,6 +1,6 @@
 {
   "name": "app-web-cx-railway",
-  "version": "5.9.1-pasp",
+  "version": "5.9.2-pasp",
   "private": true,
   "type": "module",
   "scripts": {
