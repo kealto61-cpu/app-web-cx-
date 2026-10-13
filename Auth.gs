@@ -5,14 +5,6 @@ function hexBytes_(bytes) {
   }).join('');
 }
 
-function hashLegacyPin_(pin) {
-  return hexBytes_(Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    String(pin || ''),
-    Utilities.Charset.UTF_8
-  ));
-}
-
 function getAuthPepper_() {
   var props = PropertiesService.getScriptProperties();
   var pepper = props.getProperty(APP.PROPERTY_AUTH_PEPPER);
@@ -261,27 +253,6 @@ function clearLoginFailures_(user) {
   invalidateUserSecurity_(user.id);
 }
 
-function migrateLegacyPin_(user, pin) {
-  if (!user || user.salt) return user;
-
-  var salt = newPinSalt_();
-  var now = new Date();
-
-  patchRow_(
-    getSheet_(SHEETS.USUARIOS, DATA_SOURCES.MAIN),
-    user.rowNumber,
-    {
-      'HASH PIN': hashSecurePin_(pin, salt),
-      'SALT PIN': salt,
-      'PIN ACTUALIZADO EN': now,
-      'ACTUALIZADO EN': now
-    }
-  );
-
-  invalidateUserSecurity_(user.id);
-  return findUserById_(user.id) || user;
-}
-
 function invalidateUserSecurity_(userId) {
   if (!userId) return;
   CacheService.getScriptCache().remove(
@@ -445,7 +416,7 @@ function apiLogin_(arg1, arg2, arg3) {
       valid = verifyUserPin_(user, pin);
     } else {
       // Coste deliberado para reducir diferencia temporal de usuario inexistente.
-      hashLegacyPin_(pin);
+      hashSecurePin_(pin, 'DUMMY-SALT-NO-USER');
     }
 
     if (!user || user.estado !== 'ACTIVO' || !valid) {
