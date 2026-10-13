@@ -12,7 +12,7 @@ function apiRequest(request) {
   if (path === '/api/care-guides' && method === 'GET') return careGuidesApp_(token, query, false);
 
   if (path === '/api/tracking') {
-    return publicTracking_(query.code || '');
+    return publicTracking_(query.code || '', query.client || '');
   }
 
   if (path === '/api/login' && method === 'POST') {
