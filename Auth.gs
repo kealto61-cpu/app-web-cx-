@@ -197,13 +197,11 @@ function getRole_(roleId) {
 }
 
 function verifyUserPin_(user, pin) {
-  if (!user) return false;
-
-  var expected = user.salt ?
-    hashSecurePin_(pin, user.salt) :
-    hashLegacyPin_(pin);
-
-  return constantTimeEquals_(expected, user.hash);
+  if (!user || !user.salt) return false;
+  return constantTimeEquals_(
+    hashSecurePin_(pin, user.salt),
+    user.hash
+  );
 }
 
 function loginBlocked_(user) {
@@ -438,9 +436,7 @@ function apiLogin_(arg1, arg2, arg3) {
 
     if (user && loginBlocked_(user)) {
       Utilities.sleep(500);
-      throw new Error(
-        'Acceso temporalmente bloqueado. Intente nuevamente más tarde.'
-      );
+      throw new Error('Usuario o PIN incorrectos.');
     }
 
     var valid = false;
@@ -474,7 +470,6 @@ function apiLogin_(arg1, arg2, arg3) {
     }
 
     clearLoginFailures_(user);
-    user = migrateLegacyPin_(user, pin);
 
     var ttlMinutes = sessionMinutesForRole_(user.role);
     var token = uuid_().replace(/-/g, '') +
