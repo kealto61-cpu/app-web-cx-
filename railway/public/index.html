@@ -2254,7 +2254,7 @@ async function refreshLiveTracking(epoch,initial=false){
   if(epoch!==liveTracking.epoch||liveTracking.inFlight||!liveTracking.code)return;
   const code=liveTracking.code;liveTracking.inFlight=true;
   try{
-    const data=await api('/api/tracking?code='+encodeURIComponent(code));
+    const data=await api('/api/tracking?code='+encodeURIComponent(code)+'&client='+encodeURIComponent(trackingClientId()));
     if(epoch!==liveTracking.epoch||code!==liveTracking.code)return;
     const previous=liveTracking.last;
     $('trackResult').innerHTML=trackingDisplay(data);trackingUpdated(previous,data);liveTracking.last=data;
@@ -2270,8 +2270,8 @@ async function refreshLiveTracking(epoch,initial=false){
   }
 }
 async function track(){
-  const code=$('trackCode').value.replace(/\D/g,'').slice(0,5);$('trackCode').value=code;
-  if(!/^\d{5}$/.test(code)){stopLiveTracking();$('trackResult').innerHTML='<div class="notice">Ingrese un token válido de 5 dígitos.</div>';return}
+  const code=$('trackCode').value.toUpperCase().replace(/[^A-F0-9]/g,'').slice(0,20);$('trackCode').value=code;
+  if(!/^[A-F0-9]{20}$/.test(code)){stopLiveTracking();$('trackResult').innerHTML='<div class="notice">Ingrese un token de seguimiento válido.</div>';return}
   if(code!==liveTracking.code){stopLiveTracking();liveTracking.code=code;$('trackResult').innerHTML='Consultando...';}
   if(liveTracking.timer!==null){clearTimeout(liveTracking.timer);liveTracking.timer=null}
   await refreshLiveTracking(liveTracking.epoch,true);
@@ -2352,7 +2352,7 @@ function createCompanionCardsPdf(rows,qr,date){
     doc.setTextColor(113,137,156);doc.setFont("helvetica","normal");doc.setFontSize(6);doc.text((p.codigo?p.codigo+" · ":"")+fechaTxt,x+4,y+18);
     doc.setTextColor(23,50,74);doc.setFont("helvetica","bold");doc.setFontSize(8);doc.text("Paciente: "+String(p.paciente||"Paciente").slice(0,34),x+4,y+23,{maxWidth:83});
     doc.setFont("helvetica","normal");doc.setTextColor(73,101,123);doc.setFontSize(7);doc.text("Documento: "+String(p.documento||"—")+"   ·   Edad: "+(p.edad?String(p.edad)+" años":"—"),x+4,y+28,{maxWidth:83});
-    doc.setTextColor(10,79,145);doc.setFont("helvetica","bold");doc.setFontSize(7.5);doc.text("TOKEN",x+40,y+35);doc.setFontSize(17);doc.text(String(p.token),x+40,y+43);
+    doc.setTextColor(10,79,145);doc.setFont("helvetica","bold");doc.setFontSize(7.5);doc.text("TOKEN",x+40,y+35);doc.setFontSize(10);doc.text(String(p.token),x+40,y+43,{maxWidth:48});
     doc.addImage(qr,"PNG",x+4,y+32,31,31);doc.setTextColor(73,101,123);doc.setFont("helvetica","normal");doc.setFontSize(6);
     doc.text("Escanee el QR general e ingrese",x+40,y+50);doc.text("este token de seguimiento.",x+40,y+54);
     doc.setTextColor(130,151,168);doc.setFont("helvetica","italic");doc.setFontSize(5.5);doc.text("Uso exclusivo del acompañante.",x+40,y+60);
@@ -2377,7 +2377,7 @@ async function downloadCompanionCards(){
   if(button){button.disabled=true;button.textContent="Preparando fichas..."}
   try{
     const data=await api("/api/tracking-admin?date="+encodeURIComponent(date));
-    const rows=(data.rows||[]).filter(p=>/^\d{5}$/.test(String(p.token||""))&&!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(String(p.estado||"").trim().toUpperCase()));
+    const rows=(data.rows||[]).filter(p=>/^[A-F0-9]{20}$/.test(String(p.token||""))&&!["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(String(p.estado||"").trim().toUpperCase()));
     if(!rows.length){appAlert("No hay pacientes activos con token para "+date+". Seleccione una fecha con programación.");return}
     const url=await ensureTrackingPortalUrl();
     const qr=await window.QRCode.toDataURL(url,{width:500,margin:4,errorCorrectionLevel:"M"});
