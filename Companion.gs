@@ -242,7 +242,7 @@ function ensureTrackingForDate_(session, dateIso) {
         Utilities.getUuid().replace(/-/g, '').slice(0, 6).toUpperCase();
     }
 
-    if (!/^\d{5}$/.test(normalizeText_(row['TOKEN SEGUIMIENTO']))) {
+    if (!/^[A-F0-9]{20}$/.test(normalizeText_(row['TOKEN SEGUIMIENTO']).toUpperCase())) {
       patch['TOKEN SEGUIMIENTO'] = uniqueTrackingToken_();
     }
 
@@ -279,10 +279,52 @@ function trackingRevision_(row) {
   }, 0);
 }
 
-function publicTracking_(code) {
-  var token = String(code || '').replace(/\D/g, '').slice(0, 5);
-  if (!/^\d{5}$/.test(token)) {
-    throw new Error('Ingrese el código temporal de 5 dígitos.');
+function trackingClientKey_(clientId) {
+  var raw = normalizeText_(clientId).slice(0, 120);
+  if (!raw) return 'ANON';
+  return hexBytes_(Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    raw,
+    Utilities.Charset.UTF_8
+  )).slice(0, 24);
+}
+
+function enforcePublicTrackingRate_(clientId) {
+  var cache = CacheService.getScriptCache();
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1500)) throw new Error('Intente nuevamente en unos segundos.');
+
+  try {
+    var minute = Utilities.formatDate(new Date(), APP.TIMEZONE, 'yyyyMMddHHmm');
+    var globalKey = 'QX_TRACK_GLOBAL_' + minute;
+    var globalCount = Number(cache.get(globalKey) || 0) + 1;
+    cache.put(globalKey, String(globalCount), 90);
+    if (globalCount > 180) {
+      throw new Error('Servicio temporalmente limitado. Intente nuevamente más tarde.');
+    }
+
+    var clientKey = 'QX_TRACK_CLIENT_' + trackingClientKey_(clientId);
+    var clientCount = Number(cache.get(clientKey) || 0) + 1;
+    cache.put(clientKey, String(clientCount), 600);
+    if (clientCount > 20) {
+      throw new Error('Demasiados intentos. Intente nuevamente más tarde.');
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function publicTracking_(code, clientId) {
+  enforcePublicTrackingRate_(clientId);
+
+  var token = String(code || '')
+    .toUpperCase()
+    .replace(/[^A-F0-9]/g, '')
+    .slice(0, 20);
+
+  if (!/^[A-F0-9]{20}$/.test(token)) {
+    Utilities.sleep(180);
+    throw new Error('Código de seguimiento inválido o no disponible.');
   }
 
   var hit = findRowByHeader_(
@@ -292,7 +334,10 @@ function publicTracking_(code) {
     DATA_SOURCES.MAIN
   );
 
-  if (!hit) throw new Error('No se encontró un seguimiento asociado a ese código.');
+  if (!hit) {
+    Utilities.sleep(180);
+    throw new Error('Código de seguimiento inválido o no disponible.');
+  }
 
   var c = surgeryCaseFromRow_(hit.object);
   var terminal = ['ALTA', 'HOSPITALIZACIÓN'].indexOf(c.estado) !== -1 ||
@@ -300,7 +345,6 @@ function publicTracking_(code) {
 
   return jsonSafe_({
     ok: true,
-    paciente: c.paciente,
     estadoPublico: terminal ? '' : publicState_(c.estado, c.destino),
     actualizado: c.actualizado || c.avisoFecha,
     revision: trackingRevision_(hit.object),
