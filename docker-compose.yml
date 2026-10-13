@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cx_db}
+      POSTGRES_USER: ${POSTGRES_USER:-cx_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+    volumes:
+      - cx_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cx_user} -d ${POSTGRES_DB:-cx_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cx_private
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATA_MODE: PRODUCTION
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cx_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cx_db}
+      DATABASE_SSL: disable
+      DB_SCHEMA: ${DB_SCHEMA:-qx_app}
+      SESSION_SECRET: ${SESSION_SECRET:?Defina SESSION_SECRET}
+      AUTH_PEPPER: ${AUTH_PEPPER:?Defina AUTH_PEPPER}
+      BOOTSTRAP_ADMIN_USER: ${BOOTSTRAP_ADMIN_USER:-superadmin}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Superadministrador}
+      BOOTSTRAP_ADMIN_PIN: ${BOOTSTRAP_ADMIN_PIN:?Defina BOOTSTRAP_ADMIN_PIN}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:3000}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    networks:
+      - cx_private
+
+volumes:
+  cx_postgres_data:
+
+networks:
+  cx_private:
+    driver: bridge
