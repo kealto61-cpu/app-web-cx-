@@ -53,24 +53,9 @@ var ACTIVE_STATES = Object.freeze([
   'RECUPERACIÓN'
 ]);
 
-function setDataSources(mainSpreadsheetId) {
-  var mainId = normalizeText_(mainSpreadsheetId);
-
-  if (!mainId || mainId.length < 20) {
-    throw new Error('Debe indicar el ID válido de la base principal de cirugía.');
-  }
-
-  var props = PropertiesService.getScriptProperties();
-  props.setProperty(APP.PROPERTY_MAIN_DB_ID, mainId);
-  props.setProperty(APP.PROPERTY_LEGACY_MAIN_DB_ID, mainId);
-
-  return {
-    ok: true,
-    mainConfigured: true
-  };
-}
-
-function getConfiguredDataSources() {
+// La fuente de datos se configura exclusivamente en Script Properties:
+// QX_MAIN_DB_ID. No existe setter invocable desde el cliente.
+function getConfiguredDataSources_() {
   var props = PropertiesService.getScriptProperties();
   return {
     main: Boolean(
