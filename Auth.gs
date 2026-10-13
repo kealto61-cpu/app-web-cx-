@@ -418,7 +418,7 @@ function sessionMinutesForRole_(role) {
   return Math.max(10, Math.min(configured, 360));
 }
 
-function apiLogin(arg1, arg2, arg3) {
+function apiLogin_(arg1, arg2, arg3) {
   var requestedRole = arg3 !== undefined ?
     normalizeText_(arg1).toUpperCase() : '';
 
@@ -529,7 +529,7 @@ function apiLogin(arg1, arg2, arg3) {
   }
 }
 
-function apiSession(token) {
+function apiSession_(token) {
   var session = session_(token);
 
   if (!session) {
@@ -547,7 +547,7 @@ function apiSession(token) {
   });
 }
 
-function apiLogout(token) {
+function apiLogout_(token) {
   var session = session_(token);
 
   CacheService.getScriptCache().remove(
