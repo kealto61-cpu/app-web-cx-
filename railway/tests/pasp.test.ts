@@ -710,3 +710,43 @@ describe('lista de seguimiento y programación de tercera llamada',()=>{
     expect(list.map(e=>e.id)).toEqual(['SIM-OVERDUE','SIM-FUTURE']);
   });
 });
+
+
+test('production PASP uses configured schema, rejects SIMULATED input and does not seed patients', async () => {
+  const productionDB = new PGlite();
+  const previous = Bun.env.DATA_MODE;
+  try {
+    await productionDB.exec('create schema qx_app; set search_path to qx_app;');
+    const productionSql = pgliteAdapter(productionDB);
+    Bun.env.DATA_MODE = 'PRODUCTION';
+    await initPasp(productionSql);
+    const tables = await productionSql.unsafe("select table_name from information_schema.tables where table_schema='qx_app'");
+    expect(tables.map((x:any)=>x.table_name)).toContain('qx_pasp_episodes');
+    expect(Number((await productionSql.unsafe('select count(*)::int as n from qx_pasp_episodes'))[0].n)).toBe(0);
+    const url = new URL('https://example.invalid/api/pasp/episodes');
+    async function productionRequest(payload:any) {
+      const response = await handlePasp(new Request(url, {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)}),url,{
+        sql:productionSql,session:staff,permissions:['CUIDADOS_POSTOP'],
+        json:(data:any,status=200)=>Response.json(data,{status})
+      });
+      return {status:response!.status,body:await response!.json()};
+    }
+    const sample = episodePayload({
+      sourceKind:'REAL', simulationConfirmed:false, sourceCaseId:'',
+      patientName:'PACIENTE FICTICIO DE PRUEBA AISLADA',documentNumber:'QA-ONLY-0001'
+    });
+    const created = await productionRequest(sample);
+    expect(created.status).toBe(201);
+    expect(created.body.episode.sourceKind).toBe('REAL');
+    expect(created.body.episode.paspCode.startsWith('PASP-')).toBe(true);
+    const stored = await productionSql.unsafe('select source_kind,payload from qx_pasp_episodes');
+    expect(stored).toHaveLength(1);
+    expect(stored[0].source_kind).toBe('REAL');
+    expect((await productionRequest({...sample, sourceKind:'SIMULADO',simulationConfirmed:true})).status).toBe(400);
+    expect((await productionSql.unsafe("select count(*)::int as n from qx_pasp_episodes where source_kind='SIMULADO'"))[0].n).toBe(0);
+    expect((await sql.unsafe('select count(*)::int as n from qx_simulation.qx_pasp_episodes'))[0].n).toBe(0);
+  } finally {
+    Bun.env.DATA_MODE = previous;
+    await productionDB.close();
+  }
+});
