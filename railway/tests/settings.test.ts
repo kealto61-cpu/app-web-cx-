@@ -4,7 +4,7 @@ import {pgliteAdapter} from './pglite-adapter.ts';
 import {initApplicationSettings,handleApplicationSettings,handleProphylaxisConfiguration,APPLICATION_DEFAULTS} from '../settings.ts';
 import {calculatePaspIndicators} from '../pasp.ts';
 let db:any,sql:any;
-beforeAll(async()=>{db=new PGlite();sql=pgliteAdapter(db);await initApplicationSettings(sql);await sql.unsafe('create table qx_simulation.qx_prophylaxis_rules(row_order integer primary key,payload jsonb,updated_at timestamptz default now())');});
+beforeAll(async()=>{db=new PGlite();sql=pgliteAdapter(db);await sql.unsafe('create schema if not exists qx_simulation; set search_path to qx_simulation');await initApplicationSettings(sql);await sql.unsafe('create table qx_simulation.qx_prophylaxis_rules(row_order integer primary key,payload jsonb,updated_at timestamptz default now())');});
 beforeEach(async()=>{await sql.unsafe("update qx_simulation.qx_application_settings set version=1,payload=$1::jsonb where id='PAGE'",[JSON.stringify(APPLICATION_DEFAULTS)]);await sql.unsafe('truncate qx_simulation.qx_application_settings_history,qx_simulation.qx_prophylaxis_rules');});
 afterAll(async()=>db.close());
 async function call(path:string,body?:any,role='SUPERADMIN'){const url=new URL('https://example.invalid'+path),req=new Request(url,{method:body?'POST':'GET',...(body?{body:JSON.stringify(body),headers:{'content-type':'application/json'}}:{})}),ctx={sql,session:role?{role,user:'SIM-ADMIN'}:null,json:(b:any,status=200)=>Response.json(b,{status})};const response=path.includes('prophylaxis-rules')?await handleProphylaxisConfiguration(req,url,ctx):await handleApplicationSettings(req,url,ctx);return {status:response!.status,body:await response!.json()};}
