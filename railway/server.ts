@@ -23,16 +23,16 @@ await setupSql.end();
 const sql=postgres(dbUrl,{ssl:sslOption,max:8,types:DATABASE_JSON_TYPES,connection:{search_path:DB_SCHEMA}});
 const PORT=Number(Bun.env.PORT||3000),SESSION_TTL=21600000;
 const SESSION_SECRET=String(Bun.env.SESSION_SECRET||"");
-const AUTH_PEPPER_V2=String(Bun.env.RAILWAY_AUTH_PEPPER_V2||"");
+const AUTH_PEPPER_V2=String(Bun.env.AUTH_PEPPER||Bun.env.RAILWAY_AUTH_PEPPER_V2||"");
 if(SESSION_SECRET.length<32)throw new Error("SESSION_SECRET missing or too short");
-if(AUTH_PEPPER_V2.length<32)throw new Error("RAILWAY_AUTH_PEPPER_V2 missing or too short");
+if(AUTH_PEPPER_V2.length<32)throw new Error("AUTH_PEPPER missing or too short");
 const sessionKey=createHash("sha256").update(SESSION_SECRET).digest();
 const PAGE=await Bun.file("./public/index.html").text();
 const SW=await Bun.file("./public/sw.js").text();
 const MANIFEST=await Bun.file("./public/manifest.webmanifest").text();
 const VAPID_PUBLIC_KEY=String(Bun.env.VAPID_PUBLIC_KEY||"").trim();
 const VAPID_PRIVATE_KEY=String(Bun.env.VAPID_PRIVATE_KEY||"").trim();
-const VAPID_SUBJECT=String(Bun.env.VAPID_SUBJECT||(Bun.env.RAILWAY_PUBLIC_DOMAIN?("https://"+Bun.env.RAILWAY_PUBLIC_DOMAIN):"https://railway.app")).trim();
+const VAPID_SUBJECT=String(Bun.env.VAPID_SUBJECT||Bun.env.APP_PUBLIC_URL||(Bun.env.RAILWAY_PUBLIC_DOMAIN?("https://"+Bun.env.RAILWAY_PUBLIC_DOMAIN):"https://localhost")).trim();
 const PUSH_READY=false; // Alerts are limited to the open portal, as requested.
 if(PUSH_READY)webpush.setVapidDetails(VAPID_SUBJECT,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY);
 await sql.unsafe(`
