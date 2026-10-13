@@ -216,7 +216,6 @@ async function insertCancellation(session,old,b){
 function pct(a,b){return b?Math.round(a*1000/b)/10:0}function avg(a){const x=a.filter(n=>Number.isFinite(n)&&n>0);return x.length?Math.round(x.reduce((s,n)=>s+n,0)*10/x.length)/10:0}
 function publicState(s,d){s=norm(s);d=norm(d);if(s==="PREPARACION")return"En preparación prequirúrgica";if(s==="QUIROFANO")return"En procedimiento quirúrgico";if(s==="RECUPERACION")return"En recuperación postanestésica";if(s==="CANCELADO")return"Procedimiento cancelado";if(s==="ALTA"||d==="ALTA")return"Proceso quirúrgico finalizado · Alta";if(s==="HOSPITALIZACION"||d==="HOSPITALIZACION")return"Proceso quirúrgico finalizado · Hospitalización";return"Programado / pendiente de ingreso"}
 function maskName(n){const p=String(n||"").trim().split(/\s+/).filter(Boolean);return p.length?p[0]+" "+p.slice(1).map(x=>x[0]+".").join(" "):"Paciente"}
-function legacyRailwayAuthPepper(){return createHash("sha256").update(dbUrl+"|QX_RAILWAY_AUTH_V1").digest("hex")}
 function validPin(pin){
   const p=String(pin||"");
   if(!/^[A-Za-z0-9]{6,16}$/.test(p))return false;
@@ -224,16 +223,11 @@ function validPin(pin){
   if(/^\d+$/.test(p)&&("0123456789012345".includes(p)||"9876543210987654".includes(p)))return false;
   return true;
 }
-function hashRailwayPinV1(pin,salt){return secureHash(pin,salt,legacyRailwayAuthPepper())}
 function hashRailwayPin(pin,salt){return secureHash(pin,salt,AUTH_PEPPER_V2)}
 function verifyUserPinPayload(u,pin){
   const hash=String(u["HASH PIN"]||""),salt=String(u["SALT PIN"]||""),algo=String(u["ALGORITMO PIN"]||"");
-  if(!salt)return false;
-  if(algo==="RAILWAY_V2")return eqHex(hashRailwayPin(pin,salt),hash);
-  if(algo==="RAILWAY_V1")return eqHex(hashRailwayPinV1(pin,salt),hash);
-  const appsPepper=String(Bun.env.QX_AUTH_PEPPER_V1||"");
-  if(!appsPepper)return false;
-  return eqHex(secureHash(pin,salt,appsPepper),hash);
+  if(!salt||algo!=="RAILWAY_V2")return false;
+  return eqHex(hashRailwayPin(pin,salt),hash);
 }
 function parseBlockedUntil(v){
   const t=Date.parse(String(v||""));
@@ -263,18 +257,7 @@ async function clearLoginFailuresPayload(payload){
   await patchUserRow(String(u["ID USUARIO"]||""),u);
   return u;
 }
-async function migrateAuthToV2(payload,pin){
-  const u=Object.assign({},payload||{});
-  if(String(u["ALGORITMO PIN"]||"")==="RAILWAY_V2")return u;
-  const salt=randomBytes(24).toString("hex");
-  u["HASH PIN"]=hashRailwayPin(pin,salt);
-  u["SALT PIN"]=salt;
-  u["ALGORITMO PIN"]="RAILWAY_V2";
-  u["PIN ACTUALIZADO EN"]=nowBog();
-  u["ACTUALIZADO EN"]=nowBog();
-  await patchUserRow(String(u["ID USUARIO"]||""),u);
-  return u;
-}
+
 async function authDelay(){await Bun.sleep(400)}
 function isAdminSession(s){return ["SUPERADMIN","ADMIN"].includes(String(s?.role||"").toUpperCase())}
 async function getRolePermissions(roleCode){
@@ -461,7 +444,7 @@ async function seedSimulation(){
   await sql.unsafe(`create table if not exists case_attachments(id uuid primary key,case_id text not null default '',upload_context text not null,original_name text not null,mime_type text not null,size_bytes bigint not null,sha256 text not null,content_base64 text not null,metadata jsonb not null,uploaded_by text not null,created_at timestamptz not null default now())`);
   const pin=String(Bun.env.DEMO_ADMIN_PIN||'');if(!validPin(pin))throw new Error('DEMO_ADMIN_PIN missing');
   const salt='SIMULATION-ADMIN-V1',user={'ID USUARIO':'DEMO-ADMIN','USUARIO':'demo','NOMBRE':'Coordinación de prueba','ROL':'SUPERADMIN','ESTADO':'ACTIVO','HASH PIN':hashRailwayPin(pin,salt),'SALT PIN':salt,'ALGORITMO PIN':'RAILWAY_V2','VERSIÓN SESIÓN':'1','CAMBIO PIN REQUERIDO':'NO'};
-  await sql.unsafe("insert into qx_users(user_id,username,payload) values('DEMO-ADMIN','demo',$1::jsonb) on conflict(user_id) do nothing",[JSON.stringify(user)]);
+  await sql.unsafe("insert into qx_users(user_id,username,payload,updated_at) values('DEMO-ADMIN','demo',$1::jsonb,now()) on conflict(user_id) do update set username='demo',payload=excluded.payload,updated_at=now()",[JSON.stringify(user)]);
   const role={'ID ROL':'SUPERADMIN','NOMBRE':'Superadministrador','ESTADO':'ACTIVO','PERMISOS JSON':'["*"]','SISTEMA':'SI'};
   await sql.unsafe("insert into qx_roles(role_id,payload) values('SUPERADMIN',$1::jsonb) on conflict do nothing",[JSON.stringify(role)]);
   const today=safeDate(''),count=await sql.unsafe('select count(*)::int as n from qx_cases');
@@ -483,7 +466,18 @@ async function seedSimulation(){
 }
 
 function csvCell(v){let s=String(v??"");if(/^[=+@\-\t\r]/.test(s))s="'"+s;return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+async function rotateWeakTrackingTokensAtStartup(){
+  const rows=await sql.unsafe("select case_id,payload,tracking_token from qx_cases");
+  for(const row of rows){
+    const current=String(row.tracking_token||row.payload?.["TOKEN SEGUIMIENTO"]||"").trim().toUpperCase();
+    if(/^[A-F0-9]{20}$/.test(current))continue;
+    const token=await uniqueTrackingToken();
+    const p=Object.assign({},row.payload,{"TOKEN SEGUIMIENTO":token,"ÚLTIMA ACTUALIZACIÓN WEB":nowBog()});
+    await saveCasePayload(p);
+  }
+}
 await seedSimulation();
+await rotateWeakTrackingTokensAtStartup();
 Bun.serve({port:PORT,async fetch(req,server){try{
  const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'5.9.5-pasp',dataMode:DATA_MODE,push:false,educationalCards:count[0].n});}if(url.pathname==="/")return html(PAGE);
  if(['/postop.js','/postop.css','/settings.js'].includes(url.pathname))return textResponse(await Bun.file('./public'+url.pathname).text(),url.pathname.endsWith('.js')?'application/javascript; charset=utf-8':'text/css; charset=utf-8');
@@ -533,7 +527,6 @@ Bun.serve({port:PORT,async fetch(req,server){try{
      return json({error:"Usuario o PIN incorrectos."},401);
    }
    x=await clearLoginFailuresPayload(x);
-   if(String(x["ALGORITMO PIN"]||"")!=="RAILWAY_V2")x=await migrateAuthToV2(x,pin);
    const p={uid:x["ID USUARIO"],user:x["USUARIO"],name:x["NOMBRE"],role:x["ROL"],ver:String(x["VERSIÓN SESIÓN"]||"1"),exp:Date.now()+SESSION_TTL};
    const t=sign(p),permissions=await getRolePermissions(p.role);
    return json({ok:true,user:p.user,name:p.name,role:p.role,permissions,mustChangePin:norm(x["CAMBIO PIN REQUERIDO"])==="SI",token:sha(t)},200,{"set-cookie":"qx_session="+encodeURIComponent(t)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=21600"});
