@@ -397,7 +397,7 @@ describe('coordination and patient safety governance', () => {
     const reopened = await request(path, { expectedVersion: 5, action: 'REABRIR', reason: 'Nuevo hallazgo SIMULADO' }, options);
     expect(reopened.status).toBe(200);
     expect(reopened.body.escalation.reopenedAt).toBeTruthy();
-    const full = await request('/episodes/' + e.id);
+    const full = await request('/episodes/' + e.id, undefined, options);
     const actions = full.body.episode.history.filter((x: any) => x.escalationId === saved.escalation.id).map((x: any) => x.action);
     expect(actions).toContain('ESCALAMIENTO_RECIBIR');
     expect(actions).toContain('ESCALAMIENTO_RESOLVER');
@@ -604,11 +604,11 @@ describe('PASP matrix indicators', () => {
   test('cohort metrics distinguish episodes, individual attempts, effective contacts and institutional timeliness', async () => {
     const firstEpisode = await episode();
     const secondEpisode = await episode({ surgeryDate: '2026-10-02', documentNumber: 'SIM-QA-0002', patientName: 'Paciente SIMULADO QA 2' });
-    const outside = await episode({ surgeryDate: '2026-10-20', documentNumber: 'SIM-QA-OUTSIDE', patientName: 'Paciente SIMULADO fuera de cohorte' });
+    const outside = await episode({ surgeryDate: '2026-09-20', documentNumber: 'SIM-QA-OUTSIDE', patientName: 'Paciente SIMULADO fuera de cohorte' });
     const first = await call(firstEpisode, { realDate: '2026-10-05', clinical: { feelsWell: 'Sí' } });
     const second = await call(first.episode, { number: 2, thirdCall:{enabled:true,date:'2026-10-10',reason:'Reintento SIMULADO'}, realDate: '2026-10-09', contactResult: 'Buzón', clinical: {}, classification: 'Buzón', conduct: '', extra: {} });
     const third = await call(second.episode, { number: 3, realDate: '2026-10-10' });
-    await call(outside, { realDate: '2026-10-21' });
+    await call(outside, { realDate: '2026-09-21' });
     expect((await request('/calls/' + first.call.id + '/addenda', { episodeId: firstEpisode.id, expectedVersion: third.episode.version, reason: 'Adenda SIMULADA no suma otra llamada', content: 'Anotación de revisión SIMULADA' })).status).toBe(200);
     const result = await request('/indicators?from=2026-10-01&to=2026-10-02');
     expect(result.status).toBe(200);
