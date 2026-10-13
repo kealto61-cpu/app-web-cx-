@@ -548,7 +548,7 @@ async function rotateWeakTrackingTokensAtStartup(){
 await bootstrapStandalone();
 await rotateWeakTrackingTokensAtStartup();
 Bun.serve({port:PORT,async fetch(req,server){try{
- const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'6.0.0-standalone',dataMode:DATA_MODE,schema:DB_SCHEMA,push:false,educationalCards:count[0].n,sourceKind:DATA_MODE==='PRODUCTION'?'REAL':'SIMULADO'});}if(url.pathname==="/")return html(PAGE);
+ const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'6.0.1-standalone',dataMode:DATA_MODE,schema:DB_SCHEMA,push:false,educationalCards:count[0].n,sourceKind:DATA_MODE==='PRODUCTION'?'REAL':'SIMULADO'});}if(url.pathname==="/")return html(PAGE);
  if(['/postop.js','/postop.css','/settings.js'].includes(url.pathname))return textResponse(await Bun.file('./public'+url.pathname).text(),url.pathname.endsWith('.js')?'application/javascript; charset=utf-8':'text/css; charset=utf-8');
  if(url.pathname==='/api/care-guides-public'&&req.method==='GET'){const catalog=await sql.unsafe('select payload from qx_pasp_care_catalog'),dictionary=await sql.unsafe('select payload from qx_pasp_dictionary');return json(searchCare(catalog.map(r=>r.payload),dictionary.map(r=>r.payload),Object.fromEntries(url.searchParams),true));}
  if(url.pathname==='/api/application-settings/public'){const response=await handleApplicationSettings(req,url,{sql,session:null,json});if(response)return response;}
