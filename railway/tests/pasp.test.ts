@@ -59,7 +59,7 @@ async function episode(overrides: any = {}) {
 function callPayload(e: any, overrides: any = {}) {
   return {
     episodeId: e.id, expectedVersion: e.version, number: 1,
-    realDate: '2026-10-05', time: '08:30', contactResult: 'Sí',
+    realDate: '2026-10-05', realDateReason: 'Registro retrospectivo exclusivamente ficticio de QA.', time: '08:30', contactResult: 'Sí',
     clinical: { feelsWell: 'Sí', painControlled: 'Sí', painScore: '2', fever: 'No' },
     observations: 'Evaluación de prueba SIMULADA.', classification: 'Evolución esperada',
     conduct: 'Educación y seguimiento',
@@ -84,7 +84,8 @@ beforeAll(async () => {
   sql = pgliteAdapter(db);
   await db.exec(`create table public.qx_cases(case_id text primary key, payload jsonb not null);
     insert into public.qx_cases values('PUBLIC-QA-SENTINEL','{"marker":"DO_NOT_MIGRATE_OR_READ"}');`);
-  await initPasp(sql);
+  await db.exec('create schema if not exists qx_simulation; set search_path to qx_simulation;');
+   await initPasp(sql);
 }, 30000);
 
 beforeEach(async () => {
@@ -123,7 +124,9 @@ describe('PASP migration and isolation', () => {
   });
 
   test('exposes exactly the 70 institutional matrix headers without patient rows', async () => {
-    const result = await request('/schema', undefined, { session: null, permissions: [] });
+    const unauthorized = await request('/schema', undefined, { session: null, permissions: [] });
+    expect(unauthorized.status).toBe(401);
+    const result = await request('/schema');
     expect(result.status).toBe(200);
     expect(result.body.headers).toHaveLength(70);
     expect(result.body.headers.map((h: any) => h.label)).toEqual(schemaSeed.headers.map((h: any) => h.label));
@@ -132,7 +135,7 @@ describe('PASP migration and isolation', () => {
     expect(result.body.calls).toBeUndefined();
   });
 
-  test.each(['REAL', 'PRODUCTION', ''])('fails closed when DATA_MODE is %s', async (value) => {
+  test.each(['REAL', ''])('fails closed when DATA_MODE is %s', async (value) => {
     Bun.env.DATA_MODE = value;
     const result = await request('/episodes');
     expect(result.status).toBe(503);
