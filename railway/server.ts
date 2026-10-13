@@ -178,7 +178,7 @@ async function ensureTrackingForDate(session,date){
       p["CÓDIGO SEGUIMIENTO"]="SEG-"+d.replace(/-/g,"")+"-"+randomBytes(3).toString("hex").toUpperCase();
       changed=true;
     }
-    if(!/^\d{5}$/.test(String(p["TOKEN SEGUIMIENTO"]||"").trim())){
+    if(!/^[A-F0-9]{20}$/.test(String(p["TOKEN SEGUIMIENTO"]||"").trim().toUpperCase())){
       p["TOKEN SEGUIMIENTO"]=await uniqueTrackingToken();
       changed=true;
     }
@@ -235,6 +235,47 @@ function verifyUserPinPayload(u,pin){
   if(!appsPepper)return false;
   return eqHex(secureHash(pin,salt,appsPepper),hash);
 }
+function parseBlockedUntil(v){
+  const t=Date.parse(String(v||""));
+  return Number.isFinite(t)?t:0;
+}
+async function registerLoginFailurePayload(payload){
+  const u=Object.assign({},payload||{});
+  const failures=Number(u["INTENTOS FALLIDOS"]||0)+1;
+  let blocked="";
+  if(failures>=5){
+    const level=Math.max(0,Math.floor((failures-5)/5));
+    const minutes=Math.min(60,15*Math.pow(2,level));
+    blocked=new Date(Date.now()+minutes*60000).toISOString();
+  }
+  u["INTENTOS FALLIDOS"]=String(failures);
+  u["BLOQUEADO HASTA"]=blocked;
+  u["ACTUALIZADO EN"]=nowBog();
+  await patchUserRow(String(u["ID USUARIO"]||""),u);
+  return u;
+}
+async function clearLoginFailuresPayload(payload){
+  const u=Object.assign({},payload||{});
+  u["INTENTOS FALLIDOS"]="0";
+  u["BLOQUEADO HASTA"]="";
+  u["ÚLTIMO INGRESO"]=nowBog();
+  u["ACTUALIZADO EN"]=nowBog();
+  await patchUserRow(String(u["ID USUARIO"]||""),u);
+  return u;
+}
+async function migrateAuthToV2(payload,pin){
+  const u=Object.assign({},payload||{});
+  if(String(u["ALGORITMO PIN"]||"")==="RAILWAY_V2")return u;
+  const salt=randomBytes(24).toString("hex");
+  u["HASH PIN"]=hashRailwayPin(pin,salt);
+  u["SALT PIN"]=salt;
+  u["ALGORITMO PIN"]="RAILWAY_V2";
+  u["PIN ACTUALIZADO EN"]=nowBog();
+  u["ACTUALIZADO EN"]=nowBog();
+  await patchUserRow(String(u["ID USUARIO"]||""),u);
+  return u;
+}
+async function authDelay(){await Bun.sleep(400)}
 function isAdminSession(s){return ["SUPERADMIN","ADMIN"].includes(String(s?.role||"").toUpperCase())}
 async function getRolePermissions(roleCode){
   const role=String(roleCode||"").toUpperCase();
@@ -353,7 +394,7 @@ async function sendCompanionPush(caseId,payload,message,messageId){
   let sent=0;
   const notice=JSON.stringify({
     title:"Clínica AMA · Seguimiento quirúrgico",
-    body:"Paciente: "+String(payload?.["PACIENTE"]||"Paciente")+". "+String(message||""),
+    body:String(message||"Hay una actualización en el seguimiento quirúrgico."),
     tag:"cx-"+String(caseId||""),
     data:{url:"/?follow=1",caseId:String(caseId||""),messageId:String(messageId||"")}
   });
@@ -419,14 +460,14 @@ async function patchUserRow(userId,payload){
 async function seedSimulation(){
   await sql.unsafe(`create table if not exists case_attachments(id uuid primary key,case_id text not null default '',upload_context text not null,original_name text not null,mime_type text not null,size_bytes bigint not null,sha256 text not null,content_base64 text not null,metadata jsonb not null,uploaded_by text not null,created_at timestamptz not null default now())`);
   const pin=String(Bun.env.DEMO_ADMIN_PIN||'');if(!validPin(pin))throw new Error('DEMO_ADMIN_PIN missing');
-  const salt='SIMULATION-ADMIN-V1',user={'ID USUARIO':'DEMO-ADMIN','USUARIO':'demo','NOMBRE':'Coordinación de prueba','ROL':'SUPERADMIN','ESTADO':'ACTIVO','HASH PIN':hashRailwayPin(pin,salt),'SALT PIN':salt,'ALGORITMO PIN':'RAILWAY_V1','VERSIÓN SESIÓN':'1','CAMBIO PIN REQUERIDO':'NO'};
+  const salt='SIMULATION-ADMIN-V1',user={'ID USUARIO':'DEMO-ADMIN','USUARIO':'demo','NOMBRE':'Coordinación de prueba','ROL':'SUPERADMIN','ESTADO':'ACTIVO','HASH PIN':hashRailwayPin(pin,salt),'SALT PIN':salt,'ALGORITMO PIN':'RAILWAY_V2','VERSIÓN SESIÓN':'1','CAMBIO PIN REQUERIDO':'NO'};
   await sql.unsafe("insert into qx_users(user_id,username,payload) values('DEMO-ADMIN','demo',$1::jsonb) on conflict(user_id) do nothing",[JSON.stringify(user)]);
   const role={'ID ROL':'SUPERADMIN','NOMBRE':'Superadministrador','ESTADO':'ACTIVO','PERMISOS JSON':'["*"]','SISTEMA':'SI'};
   await sql.unsafe("insert into qx_roles(role_id,payload) values('SUPERADMIN',$1::jsonb) on conflict do nothing",[JSON.stringify(role)]);
   const today=safeDate(''),count=await sql.unsafe('select count(*)::int as n from qx_cases');
   if(count[0].n===0){
     for(let i=1;i<=6;i++){
-      const stateName=['PROGRAMADO','PREPARACIÓN','QUIRÓFANO','RECUPERACIÓN','ALTA','HOSPITALIZACIÓN'][i-1],p={'ID CASO':'DEMO-QX-'+i,'FECHA CIRUGÍA':today,'HORA PROGRAMADA':String(6+i).padStart(2,'0')+':00','DOCUMENTO':'DEMO-DOC-'+i,'PACIENTE':'PACIENTE FICTICIO '+i,'TELÉFONO':'','PROCEDIMIENTO':['Artroscopia de hombro','Colecistectomía laparoscópica','Cistoscopia','Histeroscopia','Reparación del manguito rotador','Hernioplastia inguinal'][i-1],'ESPECIALIDAD':['ORTOPEDIA','CIRUGÍA GENERAL','UROLOGÍA','GINECOLOGÍA','ORTOPEDIA','CIRUGÍA GENERAL'][i-1],'ESPECIALISTA':'ESPECIALISTA DE PRUEBA','SALA / QNO':'QNO '+(1+(i%3)),'CAMA / UBICACIÓN PROGRAMADA':i===6?'DEMO-06':'DEMO-'+i,'ESTADO ACTUAL':stateName,'TIPO DE ATENCIÓN':i===6?'HOSPITALIZADO':'AMBULATORIO','OPERADO':i>=4?'TRUE':'FALSE','DESTINO POSTOP':i>=5?stateName:'','CÓDIGO SEGUIMIENTO':'DEMO-SEG-'+i,'TOKEN SEGUIMIENTO':String(99000+i),'SOURCE KIND':'SIMULADO','OBSERVACIONES':'Datos ficticios para verificar el flujo.','ÚLTIMA ACTUALIZACIÓN WEB':nowBog()};
+      const stateName=['PROGRAMADO','PREPARACIÓN','QUIRÓFANO','RECUPERACIÓN','ALTA','HOSPITALIZACIÓN'][i-1],p={'ID CASO':'DEMO-QX-'+i,'FECHA CIRUGÍA':today,'HORA PROGRAMADA':String(6+i).padStart(2,'0')+':00','DOCUMENTO':'DEMO-DOC-'+i,'PACIENTE':'PACIENTE FICTICIO '+i,'TELÉFONO':'','PROCEDIMIENTO':['Artroscopia de hombro','Colecistectomía laparoscópica','Cistoscopia','Histeroscopia','Reparación del manguito rotador','Hernioplastia inguinal'][i-1],'ESPECIALIDAD':['ORTOPEDIA','CIRUGÍA GENERAL','UROLOGÍA','GINECOLOGÍA','ORTOPEDIA','CIRUGÍA GENERAL'][i-1],'ESPECIALISTA':'ESPECIALISTA DE PRUEBA','SALA / QNO':'QNO '+(1+(i%3)),'CAMA / UBICACIÓN PROGRAMADA':i===6?'DEMO-06':'DEMO-'+i,'ESTADO ACTUAL':stateName,'TIPO DE ATENCIÓN':i===6?'HOSPITALIZADO':'AMBULATORIO','OPERADO':i>=4?'TRUE':'FALSE','DESTINO POSTOP':i>=5?stateName:'','CÓDIGO SEGUIMIENTO':'DEMO-SEG-'+i,'TOKEN SEGUIMIENTO':randomBytes(10).toString("hex").toUpperCase(),'SOURCE KIND':'SIMULADO','OBSERVACIONES':'Datos ficticios para verificar el flujo.','ÚLTIMA ACTUALIZACIÓN WEB':nowBog()};
       await saveCasePayload(p);
     }
   }
@@ -454,30 +495,92 @@ Bun.serve({port:PORT,async fetch(req,server){try{
  if(url.pathname==="/api/push/config")return json({enabled:PUSH_READY,publicKey:PUSH_READY?VAPID_PUBLIC_KEY:""});
  if(url.pathname==="/api/push/subscribe"&&req.method==="POST"){
    if(!PUSH_READY)return json({error:"Las notificaciones push no están configuradas."},503);
-   if(!trackingRateAllowed(req))return json({error:"Demasiados intentos. Intente nuevamente más tarde."},429);
-   const b=await body(req),code=String(b.code||"").replace(/\D/g,"").slice(0,5),subscription=b.subscription;
-   if(!/^\d{5}$/.test(code))return json({error:"Código temporal inválido."},400);
+   if(!trackingRateAllowed(req,server))return json({error:"Demasiados intentos. Intente nuevamente más tarde."},429);
+   const b=await body(req),code=String(b.code||"").toUpperCase().replace(/[^A-F0-9]/g,"").slice(0,20),subscription=b.subscription;
+   if(!/^[A-F0-9]{20}$/.test(code))return json({error:"Código de seguimiento inválido o no disponible."},404);
    if(!subscription||typeof subscription!=="object"||!String(subscription.endpoint||"").startsWith("https://"))return json({error:"Suscripción push inválida."},400);
-   const payload=await findTrackingByCode(code);if(!payload)return json({error:"No se encontró un seguimiento asociado a ese código."},404);
+   const payload=await findTrackingByCode(code);if(!payload)return json({error:"Código de seguimiento inválido o no disponible."},404);
    const c=mapCase(payload),terminal=["ALTA","HOSPITALIZACIÓN","CANCELADO"].includes(c.estado)||["ALTA","HOSPITALIZACIÓN"].includes(String(c.destino||"").toUpperCase());
-   if(terminal)return json({error:"El seguimiento de este paciente ya finalizó."},409);
+   if(terminal)return json({error:"El seguimiento ya finalizó."},409);
    await sql.unsafe(`insert into companion_push_subscriptions(case_id,endpoint,subscription,active,last_seen_at)
      values($1,$2,$3::jsonb,true,now())
      on conflict(endpoint) do update set case_id=excluded.case_id,subscription=excluded.subscription,active=true,last_seen_at=now()`,
      [c.id,String(subscription.endpoint),JSON.stringify(subscription)]);
-   return json({ok:true,patient:c.paciente});
+   return json({ok:true});
  }
  if(url.pathname==="/api/tracking"){
-   if(!trackingRateAllowed(req))return json({error:"Demasiados intentos. Intente nuevamente más tarde."},429);
-   const code=String(url.searchParams.get("code")||"").replace(/\D/g,"").slice(0,5);if(!/^\d{5}$/.test(code))return json({error:"Ingrese el código temporal de 5 dígitos."},400);
-   const payload=await findTrackingByCode(code);if(!payload)return json({error:"No se encontró un seguimiento asociado a ese código."},404);
+   if(!trackingRateAllowed(req,server))return json({error:"Demasiados intentos. Intente nuevamente más tarde."},429);
+   const code=String(url.searchParams.get("code")||"").toUpperCase().replace(/[^A-F0-9]/g,"").slice(0,20);
+   if(!/^[A-F0-9]{20}$/.test(code)){await authDelay();return json({error:"Código de seguimiento inválido o no disponible."},404)}
+   const payload=await findTrackingByCode(code);
+   if(!payload){await authDelay();return json({error:"Código de seguimiento inválido o no disponible."},404)}
    const c=mapCase(payload),terminal=["ALTA","HOSPITALIZACIÓN"].includes(c.estado)||["ALTA","HOSPITALIZACIÓN"].includes(String(c.destino||"").toUpperCase());
-   return json({ok:true,paciente:c.paciente,documento:c.documento,estadoPublico:terminal?"":publicState(c.estado,c.destino),actualizado:c.avisoFecha||c.actualizado,active:!terminal&&trackingActiveState(c.estado),terminal,aviso:c.aviso||"",avisoFecha:c.avisoFecha||""});
+   return json({ok:true,estadoPublico:terminal?"":publicState(c.estado,c.destino),actualizado:c.avisoFecha||c.actualizado,active:!terminal&&trackingActiveState(c.estado),terminal,aviso:c.aviso||"",avisoFecha:c.avisoFecha||""});
  }
- if(url.pathname==="/api/login"&&req.method==="POST"){const b=await body(req),u=String(b.user||"").trim().toLowerCase(),pin=String(b.pin||"");const r=await sql.unsafe("select payload from qx_users where username=$1 limit 1",[u]);if(!r.length)return json({error:"Usuario o PIN incorrectos."},401);const x=r[0].payload;if(norm(x["ESTADO"])!=="ACTIVO")return json({error:"Cuenta inactiva."},403);const salt=String(x["SALT PIN"]||""),algo=String(x["ALGORITMO PIN"]||"");if(salt&&algo!=="RAILWAY_V1"&&!Bun.env.QX_AUTH_PEPPER_V1)return json({error:"Esta cuenta antigua requiere migración de autenticación. Un SUPERADMIN puede asignar un nuevo PIN desde Usuarios."},409);const ok=verifyUserPinPayload(x,pin);if(!ok)return json({error:"Usuario o PIN incorrectos."},401);const p={uid:x["ID USUARIO"],user:x["USUARIO"],name:x["NOMBRE"],role:x["ROL"],ver:String(x["VERSIÓN SESIÓN"]||"1"),exp:Date.now()+SESSION_TTL},t=sign(p),permissions=await getRolePermissions(p.role);return json({ok:true,user:p.user,name:p.name,role:p.role,permissions,mustChangePin:norm(x["CAMBIO PIN REQUERIDO"])==="SI",token:sha(t)},200,{"set-cookie":"qx_session="+encodeURIComponent(t)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=21600"})}
- if(url.pathname==="/api/logout"&&req.method==="POST")return json({ok:true},200,{"set-cookie":"qx_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"});
+ if(url.pathname==="/api/login"&&req.method==="POST"){
+   if(!loginRateAllowed(req,server)){await authDelay();return json({error:"Usuario o PIN incorrectos."},429)}
+   const b=await body(req),u=String(b.user||"").trim().toLowerCase(),pin=String(b.pin||"");
+   const r=await sql.unsafe("select user_id,payload from qx_users where username=$1 limit 1",[u]);
+   if(!r.length){secureHash(pin,"DUMMY-SALT",AUTH_PEPPER_V2);await authDelay();return json({error:"Usuario o PIN incorrectos."},401)}
+   let x=objectPayload(r[0].payload);
+   const blockedUntil=parseBlockedUntil(x["BLOQUEADO HASTA"]);
+   const blocked=blockedUntil>Date.now();
+   const active=norm(x["ESTADO"])==="ACTIVO";
+   const pinShape=/^[A-Za-z0-9]{6,16}$/.test(pin);
+   const ok=!blocked&&active&&pinShape&&verifyUserPinPayload(x,pin);
+   if(!ok){
+     if(active&&!blocked)x=await registerLoginFailurePayload(x);
+     await authDelay();
+     return json({error:"Usuario o PIN incorrectos."},401);
+   }
+   x=await clearLoginFailuresPayload(x);
+   if(String(x["ALGORITMO PIN"]||"")!=="RAILWAY_V2")x=await migrateAuthToV2(x,pin);
+   const p={uid:x["ID USUARIO"],user:x["USUARIO"],name:x["NOMBRE"],role:x["ROL"],ver:String(x["VERSIÓN SESIÓN"]||"1"),exp:Date.now()+SESSION_TTL};
+   const t=sign(p),permissions=await getRolePermissions(p.role);
+   return json({ok:true,user:p.user,name:p.name,role:p.role,permissions,mustChangePin:norm(x["CAMBIO PIN REQUERIDO"])==="SI",token:sha(t)},200,{"set-cookie":"qx_session="+encodeURIComponent(t)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=21600"});
+ }
+ if(url.pathname==="/api/logout"&&req.method==="POST"){
+   const current=sess(req);
+   if(current){
+     const hit=await findUserById(current.uid);
+     if(hit){
+       const u=Object.assign({},hit.payload);
+       u["VERSIÓN SESIÓN"]=String(Number(u["VERSIÓN SESIÓN"]||1)+1);
+       u["ACTUALIZADO EN"]=nowBog();
+       await patchUserRow(hit.user_id,u);
+     }
+   }
+   return json({ok:true},200,{"set-cookie":"qx_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"});
+ }
  if(url.pathname==="/api/attachment"&&req.method==="POST"){
    const s=sess(req);if(!s)return json({error:"Sesión no autorizada o vencida."},401);
+   const account=await findUserById(s.uid);
+   if(!account||norm(account.payload["ESTADO"])!=="ACTIVO"||String(account.payload["VERSIÓN SESIÓN"]||"1")!==String(s.ver||"1")||norm(account.payload["CAMBIO PIN REQUERIDO"])==="SI")return json({error:"Inicie sesión con un acceso vigente antes de cargar soportes."},401);
+   const perms=await getRolePermissions(account.payload["ROL"]);
+   const fd=await req.formData(),f=fd.get("file");
+   if(!(f instanceof File))return json({error:"No se recibió un archivo válido."},400);
+   const caseId=String(fd.get("caseId")||"").trim(),context=String(fd.get("context")||"GENERAL").trim().toUpperCase().slice(0,80);
+   const canBulk=context==="BULK_IMPORT"&&hasPermission(perms,"CARGUE_MASIVO");
+   const canPatient=(context==="PATIENT_NEW"||context==="PATIENT_UPDATE"||context==="GENERAL")&&(hasPermission(perms,"PROGRAMACION_EDITAR")||hasPermission(perms,"OPERACION_GESTIONAR"));
+   const canPostop=context.startsWith("PASP")&&hasPermission(perms,"CUIDADOS_POSTOP");
+   if(!(canBulk||canPatient||canPostop))return permissionDenied(canBulk?"CARGUE_MASIVO":"PROGRAMACION_EDITAR");
+   if(!canBulk&&caseId){const exists=await findCase(caseId);if(!exists)return json({error:"El caso indicado no existe."},404)}
+   const max=10*1024*1024;if(f.size>max)return json({error:"El archivo supera el límite de 10 MB."},413);
+   const ext=String(f.name||"").toLowerCase().split(".").pop()||"";
+   const allowedExt=new Set(["pdf","jpg","jpeg","png","webp","csv","xls","xlsx","doc","docx","txt","json"]);
+   const allowedMime=new Set(["application/pdf","image/jpeg","image/png","image/webp","text/csv","text/plain","application/json","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/octet-stream"]);
+   const mime=String(f.type||"application/octet-stream").toLowerCase();
+   if(!allowedExt.has(ext)||!allowedMime.has(mime))return json({error:"Tipo de archivo no permitido."},415);
+   const quota=await sql.unsafe("select coalesce(sum(size_bytes),0)::bigint as bytes,count(*)::int as n from case_attachments where uploaded_by=$1 and created_at>=date_trunc('day',now())",[s.user||""]);
+   const used=Number(quota[0]?.bytes||0),count=Number(quota[0]?.n||0);
+   if(count>=100||used+f.size>50*1024*1024)return json({error:"Se alcanzó la cuota diaria de carga de archivos."},429);
+   let metadata={};try{metadata=JSON.parse(String(fd.get("metadata")||"{}"))}catch{}
+   const buf=Buffer.from(await f.arrayBuffer()),digest=createHash("sha256").update(buf).digest("hex"),id=randomUUID();
+   await sql.unsafe("insert into case_attachments(id,case_id,upload_context,original_name,mime_type,size_bytes,sha256,content_base64,metadata,uploaded_by) values($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)",[id,caseId,context,String(f.name||"archivo").slice(0,255),mime,f.size,digest,buf.toString("base64"),JSON.stringify(metadata||{}),s.user||""]);
+   await audit(s,"CARGA ARCHIVO","ARCHIVOS",caseId,String(f.name||"archivo")+" · "+f.size+" bytes");
+   return json({ok:true,id,caseId,context,name:f.name,type:mime,size:f.size,sha256:digest});
+ }
+ const s=sess(req);if(!s)return json({error:"Sesión no autorizada o vencida."},401);
    const account=await findUserById(s.uid);if(!account||norm(account.payload["ESTADO"])!=="ACTIVO"||String(account.payload["VERSIÓN SESIÓN"]||"1")!==String(s.ver||"1")||norm(account.payload["CAMBIO PIN REQUERIDO"])==="SI")return json({error:"Inicie sesión con un acceso vigente antes de cargar soportes."},401);
    const fd=await req.formData(),f=fd.get("file");
    if(!(f instanceof File))return json({error:"No se recibió un archivo válido."},400);
@@ -558,11 +661,11 @@ Bun.serve({port:PORT,async fetch(req,server){try{
  }
  if(url.pathname==="/api/change-pin"&&req.method==="POST"){
    const b=await body(req),current=String(b.currentPin||""),next=String(b.newPin||"");
-   if(!validPin(next))return json({error:"El nuevo PIN debe tener de 4 a 16 letras y números."},400);
+   if(!validPin(next))return json({error:"El nuevo PIN debe tener de 6 a 16 letras y números."},400);
    const hit=await findUserById(s.uid);if(!hit)return json({error:"Usuario no encontrado."},404);
    const u=Object.assign({},hit.payload);if(!verifyUserPinPayload(u,current))return json({error:"PIN actual incorrecto."},401);
    const salt=randomUUID().replace(/-/g,""),version=Number(u["VERSIÓN SESIÓN"]||1)+1;
-   u["HASH PIN"]=hashRailwayPin(next,salt);u["SALT PIN"]=salt;u["ALGORITMO PIN"]="RAILWAY_V1";u["PIN ACTUALIZADO EN"]=nowBog();u["CAMBIO PIN REQUERIDO"]="NO";u["VERSIÓN SESIÓN"]=String(version);u["ACTUALIZADO EN"]=nowBog();
+   u["HASH PIN"]=hashRailwayPin(next,salt);u["SALT PIN"]=salt;u["ALGORITMO PIN"]="RAILWAY_V2";u["PIN ACTUALIZADO EN"]=nowBog();u["CAMBIO PIN REQUERIDO"]="NO";u["VERSIÓN SESIÓN"]=String(version);u["ACTUALIZADO EN"]=nowBog();
    await patchUserRow(hit.user_id,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"CAMBIO_PIN",{"ID USUARIO":u["ID USUARIO"],"USUARIO":u["USUARIO"],"ACTUALIZADO EN":u["ACTUALIZADO EN"]});await audit(s,"CAMBIO PIN","USUARIOS",String(u["ID USUARIO"]||""),"Cambio de PIN propio");
    return json({ok:true});
  }
@@ -612,11 +715,11 @@ Bun.serve({port:PORT,async fetch(req,server){try{
    const b=await body(req),usuario=String(b.usuario||"").trim().toLowerCase(),nombre=String(b.nombre||"").trim(),rol=String(b.rol||"").trim().toUpperCase(),pin=String(b.pin||"");
    if(!/^[a-z0-9._-]{3,40}$/.test(usuario))return json({error:"Usuario inválido. Use 3–40 caracteres: letras, números, punto, guion o guion bajo."},400);
    if(!nombre)return json({error:"El nombre es obligatorio."},400);
-   if(!validPin(pin))return json({error:"El PIN debe tener de 4 a 16 letras y números."},400);
+   if(!validPin(pin))return json({error:"El PIN debe tener de 6 a 16 letras y números."},400);
    const dup=await sql.unsafe("select 1 from qx_users where username=$1 limit 1",[usuario]);if(dup.length)return json({error:"Ese usuario ya existe."},409);
    const validRoles=await sql.unsafe("select payload from qx_roles");if(!validRoles.some(x=>{const p=objectPayload(x.payload);return String(p["ID ROL"]||"").toUpperCase()===rol&&String(p["ESTADO"]||"ACTIVO").toUpperCase()==="ACTIVO"}))return json({error:"Rol no válido."},400);
    const salt=randomUUID().replace(/-/g,""),id="USR-"+randomUUID().slice(0,8).toUpperCase(),created=nowBog();
-   const u={"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"HASH PIN":hashRailwayPin(pin,salt),"ESTADO":"ACTIVO","CREADO EN":created,"CREADO POR":s.user,"ÚLTIMO INGRESO":"","ACTUALIZADO EN":created,"CAMBIO PIN REQUERIDO":b.forceChange?"SI":"NO","SALT PIN":salt,"PIN ACTUALIZADO EN":created,"INTENTOS FALLIDOS":"0","BLOQUEADO HASTA":"","VERSIÓN SESIÓN":"1","ALGORITMO PIN":"RAILWAY_V1"};
+   const u={"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"HASH PIN":hashRailwayPin(pin,salt),"ESTADO":"ACTIVO","CREADO EN":created,"CREADO POR":s.user,"ÚLTIMO INGRESO":"","ACTUALIZADO EN":created,"CAMBIO PIN REQUERIDO":b.forceChange?"SI":"NO","SALT PIN":salt,"PIN ACTUALIZADO EN":created,"INTENTOS FALLIDOS":"0","BLOQUEADO HASTA":"","VERSIÓN SESIÓN":"1","ALGORITMO PIN":"RAILWAY_V2"};
    await sql.unsafe("insert into qx_users(user_id,username,payload,updated_at) values($1,$2,$3::jsonb,now())",[id,usuario,JSON.stringify(u)]);await outbox("USUARIO",id,"CREAR",{"ID USUARIO":id,"USUARIO":usuario,"NOMBRE":nombre,"ROL":rol,"ESTADO":"ACTIVO"});await audit(s,"CREAR USUARIO","USUARIOS",id,usuario+" · "+rol);
    return json({ok:true,id});
  }
@@ -630,10 +733,10 @@ Bun.serve({port:PORT,async fetch(req,server){try{
    return json({ok:true});
  }
  if(url.pathname==="/api/users/reset-pin"&&req.method==="POST"){if(String(s.role||"").toUpperCase()!=="SUPERADMIN")return json({error:"Solo SUPERADMIN puede administrar la configuración y los accesos."},403);
-   const b=await body(req),pin=String(b.pin||"");if(!validPin(pin))return json({error:"El PIN debe tener de 4 a 16 letras y números."},400);
+   const b=await body(req),pin=String(b.pin||"");if(!validPin(pin))return json({error:"El PIN debe tener de 6 a 16 letras y números."},400);
    const hit=await findUserById(b.id);if(!hit)return json({error:"Usuario no encontrado."},404);
    const u=Object.assign({},hit.payload),salt=randomUUID().replace(/-/g,""),version=Number(u["VERSIÓN SESIÓN"]||1)+1;
-   u["HASH PIN"]=hashRailwayPin(pin,salt);u["SALT PIN"]=salt;u["ALGORITMO PIN"]="RAILWAY_V1";u["PIN ACTUALIZADO EN"]=nowBog();u["CAMBIO PIN REQUERIDO"]=b.forceChange?"SI":"NO";u["VERSIÓN SESIÓN"]=String(version);u["ACTUALIZADO EN"]=nowBog();u["INTENTOS FALLIDOS"]="0";u["BLOQUEADO HASTA"]="";
+   u["HASH PIN"]=hashRailwayPin(pin,salt);u["SALT PIN"]=salt;u["ALGORITMO PIN"]="RAILWAY_V2";u["PIN ACTUALIZADO EN"]=nowBog();u["CAMBIO PIN REQUERIDO"]=b.forceChange?"SI":"NO";u["VERSIÓN SESIÓN"]=String(version);u["ACTUALIZADO EN"]=nowBog();u["INTENTOS FALLIDOS"]="0";u["BLOQUEADO HASTA"]="";
    await patchUserRow(hit.user_id,u);await outbox("USUARIO",String(u["ID USUARIO"]||""),"REINICIAR_PIN",{"ID USUARIO":u["ID USUARIO"],"USUARIO":u["USUARIO"]});await audit(s,"REINICIAR PIN","USUARIOS",String(u["ID USUARIO"]||""),String(u["USUARIO"]||""));
    return json({ok:true});
  }
