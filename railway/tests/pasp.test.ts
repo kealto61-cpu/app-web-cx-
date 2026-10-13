@@ -59,7 +59,7 @@ async function episode(overrides: any = {}) {
 function callPayload(e: any, overrides: any = {}) {
   return {
     episodeId: e.id, expectedVersion: e.version, number: 1,
-    realDate: '2026-10-05', time: '08:30', contactResult: 'Sí',
+    realDate: '2026-10-05', realDateReason: 'Registro retrospectivo exclusivamente ficticio de QA.', time: '08:30', contactResult: 'Sí',
     clinical: { feelsWell: 'Sí', painControlled: 'Sí', painScore: '2', fever: 'No' },
     observations: 'Evaluación de prueba SIMULADA.', classification: 'Evolución esperada',
     conduct: 'Educación y seguimiento',
@@ -84,7 +84,8 @@ beforeAll(async () => {
   sql = pgliteAdapter(db);
   await db.exec(`create table public.qx_cases(case_id text primary key, payload jsonb not null);
     insert into public.qx_cases values('PUBLIC-QA-SENTINEL','{"marker":"DO_NOT_MIGRATE_OR_READ"}');`);
-  await initPasp(sql);
+  await db.exec('create schema if not exists qx_simulation; set search_path to qx_simulation;');
+   await initPasp(sql);
 }, 30000);
 
 beforeEach(async () => {
@@ -123,7 +124,9 @@ describe('PASP migration and isolation', () => {
   });
 
   test('exposes exactly the 70 institutional matrix headers without patient rows', async () => {
-    const result = await request('/schema', undefined, { session: null, permissions: [] });
+    const unauthorized = await request('/schema', undefined, { session: null, permissions: [] });
+    expect(unauthorized.status).toBe(401);
+    const result = await request('/schema');
     expect(result.status).toBe(200);
     expect(result.body.headers).toHaveLength(70);
     expect(result.body.headers.map((h: any) => h.label)).toEqual(schemaSeed.headers.map((h: any) => h.label));
@@ -132,7 +135,7 @@ describe('PASP migration and isolation', () => {
     expect(result.body.calls).toBeUndefined();
   });
 
-  test.each(['REAL', 'PRODUCTION', ''])('fails closed when DATA_MODE is %s', async (value) => {
+  test.each(['REAL', ''])('fails closed when DATA_MODE is %s', async (value) => {
     Bun.env.DATA_MODE = value;
     const result = await request('/episodes');
     expect(result.status).toBe(503);
@@ -394,7 +397,7 @@ describe('coordination and patient safety governance', () => {
     const reopened = await request(path, { expectedVersion: 5, action: 'REABRIR', reason: 'Nuevo hallazgo SIMULADO' }, options);
     expect(reopened.status).toBe(200);
     expect(reopened.body.escalation.reopenedAt).toBeTruthy();
-    const full = await request('/episodes/' + e.id);
+    const full = await request('/episodes/' + e.id, undefined, options);
     const actions = full.body.episode.history.filter((x: any) => x.escalationId === saved.escalation.id).map((x: any) => x.action);
     expect(actions).toContain('ESCALAMIENTO_RECIBIR');
     expect(actions).toContain('ESCALAMIENTO_RESOLVER');
@@ -601,11 +604,11 @@ describe('PASP matrix indicators', () => {
   test('cohort metrics distinguish episodes, individual attempts, effective contacts and institutional timeliness', async () => {
     const firstEpisode = await episode();
     const secondEpisode = await episode({ surgeryDate: '2026-10-02', documentNumber: 'SIM-QA-0002', patientName: 'Paciente SIMULADO QA 2' });
-    const outside = await episode({ surgeryDate: '2026-10-20', documentNumber: 'SIM-QA-OUTSIDE', patientName: 'Paciente SIMULADO fuera de cohorte' });
+    const outside = await episode({ surgeryDate: '2026-09-20', documentNumber: 'SIM-QA-OUTSIDE', patientName: 'Paciente SIMULADO fuera de cohorte' });
     const first = await call(firstEpisode, { realDate: '2026-10-05', clinical: { feelsWell: 'Sí' } });
     const second = await call(first.episode, { number: 2, thirdCall:{enabled:true,date:'2026-10-10',reason:'Reintento SIMULADO'}, realDate: '2026-10-09', contactResult: 'Buzón', clinical: {}, classification: 'Buzón', conduct: '', extra: {} });
     const third = await call(second.episode, { number: 3, realDate: '2026-10-10' });
-    await call(outside, { realDate: '2026-10-21' });
+    await call(outside, { realDate: '2026-09-21' });
     expect((await request('/calls/' + first.call.id + '/addenda', { episodeId: firstEpisode.id, expectedVersion: third.episode.version, reason: 'Adenda SIMULADA no suma otra llamada', content: 'Anotación de revisión SIMULADA' })).status).toBe(200);
     const result = await request('/indicators?from=2026-10-01&to=2026-10-02');
     expect(result.status).toBe(200);
@@ -706,4 +709,44 @@ describe('lista de seguimiento y programación de tercera llamada',()=>{
     const list=buildCallQueue([{...base,id:'SIM-FUTURE',call1:{scheduledDate:'2026-10-08'}},{...base,id:'SIM-OVERDUE',call1:{scheduledDate:'2026-10-06'}}],[],'2026-10-07',d=>d);
     expect(list.map(e=>e.id)).toEqual(['SIM-OVERDUE','SIM-FUTURE']);
   });
+});
+
+
+test('production PASP uses configured schema, rejects SIMULATED input and does not seed patients', async () => {
+  const productionDB = new PGlite();
+  const previous = Bun.env.DATA_MODE;
+  try {
+    await productionDB.exec('create schema qx_app; set search_path to qx_app;');
+    const productionSql = pgliteAdapter(productionDB);
+    Bun.env.DATA_MODE = 'PRODUCTION';
+    await initPasp(productionSql);
+    const tables = await productionSql.unsafe("select table_name from information_schema.tables where table_schema='qx_app'");
+    expect(tables.map((x:any)=>x.table_name)).toContain('qx_pasp_episodes');
+    expect(Number((await productionSql.unsafe('select count(*)::int as n from qx_pasp_episodes'))[0].n)).toBe(0);
+    const url = new URL('https://example.invalid/api/pasp/episodes');
+    async function productionRequest(payload:any) {
+      const response = await handlePasp(new Request(url, {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)}),url,{
+        sql:productionSql,session:staff,permissions:['CUIDADOS_POSTOP'],
+        json:(data:any,status=200)=>Response.json(data,{status})
+      });
+      return {status:response!.status,body:await response!.json()};
+    }
+    const sample = episodePayload({
+      sourceKind:'REAL', simulationConfirmed:false, sourceCaseId:'',
+      patientName:'PACIENTE FICTICIO DE PRUEBA AISLADA',documentNumber:'QA-ONLY-0001'
+    });
+    const created = await productionRequest(sample);
+    expect(created.status).toBe(201);
+    expect(created.body.episode.sourceKind).toBe('REAL');
+    expect(created.body.episode.paspCode.startsWith('PASP-')).toBe(true);
+    const stored = await productionSql.unsafe('select source_kind,payload from qx_pasp_episodes');
+    expect(stored).toHaveLength(1);
+    expect(stored[0].source_kind).toBe('REAL');
+    expect((await productionRequest({...sample, sourceKind:'SIMULADO',simulationConfirmed:true})).status).toBe(400);
+    expect((await productionSql.unsafe("select count(*)::int as n from qx_pasp_episodes where source_kind='SIMULADO'"))[0].n).toBe(0);
+    expect((await sql.unsafe('select count(*)::int as n from qx_simulation.qx_pasp_episodes'))[0].n).toBe(0);
+  } finally {
+    Bun.env.DATA_MODE = previous;
+    await productionDB.close();
+  }
 });
