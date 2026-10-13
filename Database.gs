@@ -40,7 +40,7 @@ function getSheet_(sheetName, source) {
   return sheet;
 }
 
-function setupSystem() {
+function setupSystem_() {
   var ss = mainSpreadsheet_();
   var missing = REQUIRED_MAIN_SHEETS.filter(function(name) {
     return !ss.getSheetByName(name);
@@ -60,7 +60,7 @@ function setupSystem() {
     version: APP.VERSION,
     spreadsheetTitle: ss.getName(),
     requiredSheets: REQUIRED_MAIN_SHEETS.slice(),
-    sources: getConfiguredDataSources()
+    sources: getConfiguredDataSources_()
   };
 }
 
