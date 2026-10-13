@@ -201,22 +201,91 @@ function attachmentsFolder_() {
   return folder;
 }
 
+function uploadQuotaKey_(session) {
+  var date = Utilities.formatDate(new Date(), APP.TIMEZONE, 'yyyyMMdd');
+  return 'QX_UPLOAD_' + date + '_' + String(session.userId || session.user || 'USER');
+}
+
+function reserveUploadQuota_(session, bytes) {
+  var props = PropertiesService.getScriptProperties();
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) throw new Error('Intente cargar el archivo nuevamente.');
+
+  try {
+    var key = uploadQuotaKey_(session);
+    var raw = props.getProperty(key);
+    var q = { bytes: 0, count: 0 };
+    if (raw) {
+      try { q = JSON.parse(raw); } catch (error) {}
+    }
+
+    if (Number(q.count || 0) >= 100 ||
+        Number(q.bytes || 0) + bytes > 50 * 1024 * 1024) {
+      throw new Error('Se alcanzó la cuota diaria de carga de archivos.');
+    }
+
+    q.count = Number(q.count || 0) + 1;
+    q.bytes = Number(q.bytes || 0) + bytes;
+    props.setProperty(key, JSON.stringify(q));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function apiUploadAttachment_(token, payload) {
   var session = requireSession_(token);
   payload = payload || {};
 
-  var name = normalizeText_(payload.name || 'archivo');
-  var mime = normalizeText_(payload.mime || 'application/octet-stream');
+  var context = normalizeText_(payload.context || 'GENERAL').toUpperCase();
+  var canBulk = context === 'BULK_IMPORT' &&
+    hasPermission_(session, 'CARGUE_MASIVO');
+  var canPatient =
+    ['PATIENT_NEW', 'PATIENT_UPDATE', 'GENERAL'].indexOf(context) !== -1 &&
+    (hasPermission_(session, 'PROGRAMACION_EDITAR') ||
+     hasPermission_(session, 'OPERACION_GESTIONAR'));
+  var canPostop = context.indexOf('PASP') === 0 &&
+    hasPermission_(session, 'CUIDADOS_POSTOP');
+
+  if (!(canBulk || canPatient || canPostop)) {
+    throw new Error('Su rol no tiene permiso para cargar este tipo de soporte.');
+  }
+
+  var name = normalizeText_(payload.name || 'archivo').slice(0, 255);
+  var mime = normalizeText_(payload.mime || 'application/octet-stream').toLowerCase();
   var base64 = String(payload.base64 || '');
   var caseId = normalizeText_(payload.caseId);
-  var context = normalizeText_(payload.context || 'GENERAL');
 
   if (!base64) throw new Error('No se recibió contenido del archivo.');
 
-  var bytes = Utilities.base64Decode(base64);
-  if (bytes.length > 25 * 1024 * 1024) {
-    throw new Error('El archivo supera el límite de 25 MB.');
+  var ext = name.toLowerCase().split('.').pop() || '';
+  var allowedExt = [
+    'pdf', 'jpg', 'jpeg', 'png', 'webp',
+    'csv', 'xls', 'xlsx', 'doc', 'docx', 'txt', 'json'
+  ];
+  var allowedMime = [
+    'application/pdf', 'image/jpeg', 'image/png', 'image/webp',
+    'text/csv', 'text/plain', 'application/json',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/octet-stream'
+  ];
+
+  if (allowedExt.indexOf(ext) === -1 || allowedMime.indexOf(mime) === -1) {
+    throw new Error('Tipo de archivo no permitido.');
   }
+
+  var bytes = Utilities.base64Decode(base64);
+  if (bytes.length > 10 * 1024 * 1024) {
+    throw new Error('El archivo supera el límite de 10 MB.');
+  }
+
+  if (!canBulk && caseId && !findCaseRow_(caseId)) {
+    throw new Error('El caso indicado no existe.');
+  }
+
+  reserveUploadQuota_(session, bytes.length);
 
   var folder = attachmentsFolder_();
   var caseFolder = folder;
