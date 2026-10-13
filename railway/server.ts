@@ -15,7 +15,11 @@ const DATA_MODE=String(Bun.env.DATA_MODE||'SIMULATED').toUpperCase();
 if(DATA_MODE!=='SIMULATED')throw new Error('Este despliegue requiere DATA_MODE=SIMULATED.');
 const setupSql=postgres(dbUrl,{ssl:'require',max:1});await setupSql.unsafe('create schema if not exists qx_simulation');await setupSql.end();
 const sql=postgres(dbUrl,{ssl:'require',max:8,types:DATABASE_JSON_TYPES,connection:{search_path:'qx_simulation'}});const PORT=Number(Bun.env.PORT||3000),SESSION_TTL=21600000;
-const sessionKey=createHash("sha256").update(dbUrl+"|APP_WEB_CX_SESSION").digest();
+const SESSION_SECRET=String(Bun.env.SESSION_SECRET||"");
+const AUTH_PEPPER_V2=String(Bun.env.RAILWAY_AUTH_PEPPER_V2||"");
+if(SESSION_SECRET.length<32)throw new Error("SESSION_SECRET missing or too short");
+if(AUTH_PEPPER_V2.length<32)throw new Error("RAILWAY_AUTH_PEPPER_V2 missing or too short");
+const sessionKey=createHash("sha256").update(SESSION_SECRET).digest();
 const PAGE=await Bun.file("./public/index.html").text();
 const SW=await Bun.file("./public/sw.js").text();
 const MANIFEST=await Bun.file("./public/manifest.webmanifest").text();
@@ -112,9 +116,18 @@ await sql.unsafe(`
 `);
 await initPasp(sql);await initApplicationSettings(sql);
 await repairSimulationJson(sql);
-function json(data,status=200,headers={}){return new Response(JSON.stringify(data),{status,headers:Object.assign({"content-type":"application/json; charset=utf-8","cache-control":"no-store"},headers)})}
-function html(body,status=200){return new Response(body,{status,headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}})}
-function textResponse(body,type,status=200){return new Response(body,{status,headers:{"content-type":type,"cache-control":"no-cache"}})}
+const SECURITY_HEADERS={
+  "x-content-type-options":"nosniff",
+  "x-frame-options":"DENY",
+  "referrer-policy":"no-referrer",
+  "permissions-policy":"camera=(), microphone=(), geolocation=()",
+  "strict-transport-security":"max-age=31536000; includeSubDomains",
+  "content-security-policy":"default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob: https://cdnjs.cloudflare.com; manifest-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+};
+function withSecurity(headers={}){return Object.assign({},SECURITY_HEADERS,headers)}
+function json(data,status=200,headers={}){return new Response(JSON.stringify(data),{status,headers:withSecurity(Object.assign({"content-type":"application/json; charset=utf-8","cache-control":"no-store"},headers))})}
+function html(body,status=200){return new Response(body,{status,headers:withSecurity({"content-type":"text/html; charset=utf-8","cache-control":"no-store"})})}
+function textResponse(body,type,status=200){return new Response(body,{status,headers:withSecurity({"content-type":type,"cache-control":"no-cache"})})}
 function b64(v){return Buffer.from(v).toString("base64url")}function sign(p){const b=b64(JSON.stringify(p));return b+"."+createHmac("sha256",sessionKey).update(b).digest("base64url")}
 function verify(t){try{const [b,s]=String(t||"").split(".");if(!b||!s)return null;const e=createHmac("sha256",sessionKey).update(b).digest(),g=Buffer.from(s,"base64url");if(e.length!==g.length||!timingSafeEqual(e,g))return null;const p=JSON.parse(Buffer.from(b,"base64url").toString("utf8"));return p.exp&&Date.now()<p.exp?p:null}catch{return null}}
 function cookies(req){const o={};(req.headers.get("cookie")||"").split(";").forEach(x=>{const i=x.indexOf("=");if(i>0)o[x.slice(0,i).trim()]=decodeURIComponent(x.slice(i+1).trim())});return o}
@@ -144,7 +157,7 @@ async function updateCase(s,id,patch,action){const hit=await findCase(id);if(!hi
 async function addMovement(s,p,from,to){const row={"MARCA TEMPORAL":nowBog(),"ID CASO":p["ID CASO"]||"","DOCUMENTO":p["DOCUMENTO"]||"","PACIENTE":p["PACIENTE"]||"","ORIGEN":from||"","DESTINO":to||"","USUARIO":s.user||"","ROL":s.role||"","QNO":p["SALA / QNO"]||"","OBSERVACIÓN":"Railway"};await sql.unsafe("insert into qx_movements(case_id,payload) values($1,$2::jsonb)",[String(p["ID CASO"]||""),JSON.stringify(row)])}
 async function uniqueTrackingToken(){
   for(let i=0;i<60;i++){
-    const token=String(Math.floor(10000+Math.random()*90000));
+    const token=randomBytes(10).toString("hex").toUpperCase();
     const exists=await sql.unsafe("select 1 from qx_cases where tracking_token=$1 limit 1",[token]);
     if(!exists.length)return token;
   }
@@ -203,26 +216,24 @@ async function insertCancellation(session,old,b){
 function pct(a,b){return b?Math.round(a*1000/b)/10:0}function avg(a){const x=a.filter(n=>Number.isFinite(n)&&n>0);return x.length?Math.round(x.reduce((s,n)=>s+n,0)*10/x.length)/10:0}
 function publicState(s,d){s=norm(s);d=norm(d);if(s==="PREPARACION")return"En preparación prequirúrgica";if(s==="QUIROFANO")return"En procedimiento quirúrgico";if(s==="RECUPERACION")return"En recuperación postanestésica";if(s==="CANCELADO")return"Procedimiento cancelado";if(s==="ALTA"||d==="ALTA")return"Proceso quirúrgico finalizado · Alta";if(s==="HOSPITALIZACION"||d==="HOSPITALIZACION")return"Proceso quirúrgico finalizado · Hospitalización";return"Programado / pendiente de ingreso"}
 function maskName(n){const p=String(n||"").trim().split(/\s+/).filter(Boolean);return p.length?p[0]+" "+p.slice(1).map(x=>x[0]+".").join(" "):"Paciente"}
-function railwayAuthPepper(){return createHash("sha256").update(dbUrl+"|QX_RAILWAY_AUTH_V1").digest("hex")}
-function validPin(pin) {
-  var p = String(pin || '');
-  if (!/^[A-Za-z0-9]{4,16}$/.test(p)) return false;
-  if (/^([A-Za-z0-9])\1+$/i.test(p)) return false;
-  if (/^\d+$/.test(p) && (
-    '0123456789012345'.indexOf(p) !== -1 ||
-    '9876543210987654'.indexOf(p) !== -1
-  )) return false;
+function legacyRailwayAuthPepper(){return createHash("sha256").update(dbUrl+"|QX_RAILWAY_AUTH_V1").digest("hex")}
+function validPin(pin){
+  const p=String(pin||"");
+  if(!/^[A-Za-z0-9]{6,16}$/.test(p))return false;
+  if(/^([A-Za-z0-9])\1+$/i.test(p))return false;
+  if(/^\d+$/.test(p)&&("0123456789012345".includes(p)||"9876543210987654".includes(p)))return false;
   return true;
 }
-
-function hashRailwayPin(pin,salt){return secureHash(pin,salt,railwayAuthPepper())}
+function hashRailwayPinV1(pin,salt){return secureHash(pin,salt,legacyRailwayAuthPepper())}
+function hashRailwayPin(pin,salt){return secureHash(pin,salt,AUTH_PEPPER_V2)}
 function verifyUserPinPayload(u,pin){
   const hash=String(u["HASH PIN"]||""),salt=String(u["SALT PIN"]||""),algo=String(u["ALGORITMO PIN"]||"");
-  if(algo==="RAILWAY_V1"&&salt)return eqHex(hashRailwayPin(pin,salt),hash);
-  if(!salt)return eqHex(sha(pin),hash);
-  const pepper=Bun.env.QX_AUTH_PEPPER_V1||"";
-  if(!pepper)return false;
-  return eqHex(secureHash(pin,salt,pepper),hash);
+  if(!salt)return false;
+  if(algo==="RAILWAY_V2")return eqHex(hashRailwayPin(pin,salt),hash);
+  if(algo==="RAILWAY_V1")return eqHex(hashRailwayPinV1(pin,salt),hash);
+  const appsPepper=String(Bun.env.QX_AUTH_PEPPER_V1||"");
+  if(!appsPepper)return false;
+  return eqHex(secureHash(pin,salt,appsPepper),hash);
 }
 function isAdminSession(s){return ["SUPERADMIN","ADMIN"].includes(String(s?.role||"").toUpperCase())}
 async function getRolePermissions(roleCode){
@@ -312,13 +323,25 @@ function renderCompanionMessage(template,payload){
     .trim();
 }
 const trackingAttempts=new Map();
-function trackingRateAllowed(req){
-  const forwarded=String(req.headers.get("x-forwarded-for")||"").split(",")[0].trim();
-  const key=forwarded||String(req.headers.get("cf-connecting-ip")||"unknown");
-  const now=Date.now(),windowMs=10*60*1000,limit=30;
-  const x=trackingAttempts.get(key);
-  if(!x||now-x.started>windowMs){trackingAttempts.set(key,{started:now,count:1});return true}
-  x.count++;return x.count<=limit;
+const loginAttempts=new Map();
+function requestIp(req,server){
+  try{return String(server?.requestIP(req)?.address||"unknown")}catch{return "unknown"}
+}
+function allowRate(map,key,limit,windowMs){
+  const now=Date.now();
+  if(map.size>5000){
+    for(const [k,v] of map){if(now-v.started>windowMs)map.delete(k)}
+    if(map.size>5000){let n=0;for(const k of map.keys()){map.delete(k);if(++n>=1000)break}}
+  }
+  const hit=map.get(key);
+  if(!hit||now-hit.started>windowMs){map.set(key,{started:now,count:1});return true}
+  hit.count++;return hit.count<=limit;
+}
+function trackingRateAllowed(req,server){
+  return allowRate(trackingAttempts,requestIp(req,server),20,10*60*1000);
+}
+function loginRateAllowed(req,server){
+  return allowRate(loginAttempts,requestIp(req,server),30,10*60*1000);
 }
 async function findTrackingByCode(code){
   const r=await sql.unsafe("select payload from qx_cases where tracking_token=$1 limit 1",[String(code||"")]);
@@ -420,7 +443,7 @@ async function seedSimulation(){
 
 function csvCell(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 await seedSimulation();
-Bun.serve({port:PORT,async fetch(req){try{
+Bun.serve({port:PORT,async fetch(req,server){try{
  const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'5.9.5-pasp',dataMode:DATA_MODE,push:false,educationalCards:count[0].n});}if(url.pathname==="/")return html(PAGE);
  if(['/postop.js','/postop.css','/settings.js'].includes(url.pathname))return textResponse(await Bun.file('./public'+url.pathname).text(),url.pathname.endsWith('.js')?'application/javascript; charset=utf-8':'text/css; charset=utf-8');
  if(url.pathname==='/api/care-guides-public'&&req.method==='GET'){const catalog=await sql.unsafe('select payload from qx_pasp_care_catalog'),dictionary=await sql.unsafe('select payload from qx_pasp_dictionary');return json(searchCare(catalog.map(r=>r.payload),dictionary.map(r=>r.payload),Object.fromEntries(url.searchParams),true));}
