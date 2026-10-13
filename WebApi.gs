@@ -6,7 +6,7 @@ function apiRequest(request) {
   var body = request.body || {};
   var token = normalizeText_(request.token);
 
-  if (path === '/health') return apiHealth();
+    if (path === '/api/webapp-info' && method === 'GET') return apiWebAppInfo_();
 
   if (path === '/api/care-guides-public' && method === 'GET') return careGuidesApp_('', query, true);
   if (path === '/api/care-guides' && method === 'GET') return careGuidesApp_(token, query, false);
@@ -16,15 +16,19 @@ function apiRequest(request) {
   }
 
   if (path === '/api/login' && method === 'POST') {
-    return apiLogin(body.user || '', body.pin || '');
+    return apiLogin_(body.user || '', body.pin || '');
   }
 
   if (path === '/api/logout' && method === 'POST') {
-    return apiLogout(token);
+    return apiLogout_(token);
+  }
+
+  if (path === '/api/attachment' && method === 'POST') {
+    return apiUploadAttachment_(token, body);
   }
 
   if (path === '/api/me') {
-    var me = apiSession(token);
+    var me = apiSession_(token);
     if (!me.valid) throw new Error('Sesión no autorizada o vencida.');
     return me;
   }
@@ -197,7 +201,7 @@ function attachmentsFolder_() {
   return folder;
 }
 
-function apiUploadAttachment(token, payload) {
+function apiUploadAttachment_(token, payload) {
   var session = requireSession_(token);
   payload = payload || {};
 
