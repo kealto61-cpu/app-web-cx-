@@ -1144,7 +1144,7 @@ async function uploadAttachment(file,caseId,context,metadata){
     context:context||"GENERAL",
     metadata:metadata||{}
   };
-  return await gasCall("apiUploadAttachment",[token,payload]);
+  return await api("/api/attachment",{method:"POST",body:JSON.stringify(payload)});
 }
 async function uploadMany(files,caseId,context,metadata){
   const result=[];
@@ -2296,7 +2296,7 @@ function trackingPortalUrl(){
 }
 async function ensureTrackingPortalUrl(){
   try{return trackingPortalUrl()}catch(e){}
-  const info=await gasCall("apiWebAppInfo",[]);
+  const info=await api("/api/webapp-info");
   state.webAppUrl=String(info?.url||"");return trackingPortalUrl();
 }
 async function renderTrackingQr(){
@@ -2894,7 +2894,7 @@ window.addEventListener('pagehide',()=>stopLiveTracking());
 (async()=>{
   $("date").value=new Date().toLocaleDateString("en-CA",{timeZone:"America/Bogota"});
   try{
-    const info=await gasCall("apiWebAppInfo",[]);
+    const info=await api("/api/webapp-info");
     state.webAppUrl=info&&info.url?info.url:"";
   }catch(e){}
   const loc=await gasLocation();
