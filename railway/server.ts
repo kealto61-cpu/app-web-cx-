@@ -572,18 +572,6 @@ Bun.serve({port:PORT,async fetch(req,server){try{
    await audit(s,"CARGA ARCHIVO","ARCHIVOS",caseId,String(f.name||"archivo")+" · "+f.size+" bytes");
    return json({ok:true,id,caseId,context,name:f.name,type:mime,size:f.size,sha256:digest});
  }
- const s=sess(req);if(!s)return json({error:"Sesión no autorizada o vencida."},401);
-   const account=await findUserById(s.uid);if(!account||norm(account.payload["ESTADO"])!=="ACTIVO"||String(account.payload["VERSIÓN SESIÓN"]||"1")!==String(s.ver||"1")||norm(account.payload["CAMBIO PIN REQUERIDO"])==="SI")return json({error:"Inicie sesión con un acceso vigente antes de cargar soportes."},401);
-   const fd=await req.formData(),f=fd.get("file");
-   if(!(f instanceof File))return json({error:"No se recibió un archivo válido."},400);
-   const max=25*1024*1024;if(f.size>max)return json({error:"El archivo supera el límite de 25 MB."},413);
-   const caseId=String(fd.get("caseId")||""),context=String(fd.get("context")||"GENERAL").slice(0,80);
-   let metadata={};try{metadata=JSON.parse(String(fd.get("metadata")||"{}"))}catch{}
-   const buf=Buffer.from(await f.arrayBuffer()),digest=createHash("sha256").update(buf).digest("hex"),id=randomUUID();
-   await sql.unsafe("insert into case_attachments(id,case_id,upload_context,original_name,mime_type,size_bytes,sha256,content_base64,metadata,uploaded_by) values($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)",[id,caseId,context,String(f.name||"archivo").slice(0,255),String(f.type||"application/octet-stream").slice(0,150),f.size,digest,buf.toString("base64"),JSON.stringify(metadata||{}),s.user||""]);
-   await audit(s,"CARGA ARCHIVO","ARCHIVOS",caseId,String(f.name||"archivo")+" · "+f.size+" bytes");
-   return json({ok:true,id,caseId,context,name:f.name,type:f.type||"application/octet-stream",size:f.size,sha256:digest});
- }
  const s=sess(req);if(!s)return json({error:"Sesión no autorizada o vencida."},401);const account=await findUserById(s.uid);if(!account||norm(account.payload['ESTADO'])!=='ACTIVO'||String(account.payload['VERSIÓN SESIÓN']||'1')!==String(s.ver||'1'))return json({error:'La sesión cambió. Inicie sesión nuevamente.'},401);
  const permissions=await getRolePermissions(account.payload['ROL']);s.role=account.payload['ROL'];const mustChangePin=norm(account.payload['CAMBIO PIN REQUERIDO'])==='SI';
  if(url.pathname==='/api/me')return json({valid:true,user:s.user,name:s.name,role:s.role,permissions,mustChangePin,token:sha(cookies(req).qx_session)});
