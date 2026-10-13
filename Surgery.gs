@@ -253,21 +253,50 @@ function elapsedMinutes_(a, b) {
   return diff;
 }
 
+function trackingTokenSecret_() {
+  var props = PropertiesService.getScriptProperties();
+  var key = 'QX_TRACKING_SECRET_V1';
+  var secret = props.getProperty(key);
+  if (secret) return secret;
+
+  secret =
+    Utilities.getUuid().replace(/-/g, '') +
+    Utilities.getUuid().replace(/-/g, '') +
+    Utilities.getUuid().replace(/-/g, '');
+  props.setProperty(key, secret);
+  return secret;
+}
+
+function secureTrackingToken_() {
+  var raw =
+    Utilities.getUuid() + '|' +
+    Utilities.getUuid() + '|' +
+    String(Date.now());
+  var signature = Utilities.computeHmacSha256Signature(
+    raw,
+    trackingTokenSecret_(),
+    Utilities.Charset.UTF_8
+  );
+  return hexBytes_(signature).slice(0, 20).toUpperCase();
+}
+
 function uniqueTrackingToken_() {
   var sheet = getSheet_(SHEETS.PROGRAMACION, DATA_SOURCES.MAIN);
   var col = requireColumn_(sheet, 'TOKEN SEGUIMIENTO');
   var lastRow = sheet.getLastRow();
   var existing = {};
+
   if (lastRow >= 2) {
     sheet.getRange(2, col, lastRow - 1, 1)
       .getDisplayValues()
       .forEach(function(row) {
-        if (row[0]) existing[String(row[0]).trim()] = true;
+        var value = normalizeText_(row[0]).toUpperCase();
+        if (value) existing[value] = true;
       });
   }
 
   for (var i = 0; i < 80; i++) {
-    var token = String(Math.floor(10000 + Math.random() * 90000));
+    var token = secureTrackingToken_();
     if (!existing[token]) return token;
   }
   throw new Error('No fue posible generar un token de seguimiento único.');
