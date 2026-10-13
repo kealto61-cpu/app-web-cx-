@@ -289,9 +289,11 @@ function listUsersApp_(token) {
         rol: normalizeText_(r['ROL']).toUpperCase(),
         estado: normalizeText_(r['ESTADO']).toUpperCase(),
         ultimoIngreso: formatDateTime_(r['ÚLTIMO INGRESO']),
-        cambioPin: ['SI', 'SÍ'].indexOf(
-          normalizeText_(r['CAMBIO PIN REQUERIDO']).toUpperCase()
-        ) !== -1
+        cambioPin:
+          !normalizeText_(r['SALT PIN']) ||
+          ['SI', 'SÍ'].indexOf(
+            normalizeText_(r['CAMBIO PIN REQUERIDO']).toUpperCase()
+          ) !== -1
       };
     })
   };
