@@ -126,7 +126,7 @@ async function createEscalation(tx,ctx,episode,call,raw){
   const priority=call?.urgentSafety?'INMEDIATA':call?.classification==='Hallazgo clínico prioritario'?'PRIORITARIA':!call||call.contactResult!=='Sí'||call.classification==='Hallazgo administrativo'?'ADMINISTRATIVA':'NO_URGENTE';
   const sentAt=now();
   const policy=(await config(tx)).config,minutes=policy.responseTimesMinutes?.[priority];
-  const deadline=Number.isInteger(minutes)&&minutes>=0?new Date(Date.parse(sentAt)+minutes*60000).toISOString():'';
+  const deadline=b.deadline?instant(b.deadline,'Plazo del escalamiento'):(Number.isInteger(minutes)&&minutes>=0?new Date(Date.parse(sentAt)+minutes*60000).toISOString():'');
   const p={
     id:id(),episodeId:episode.id,callId:call?.id||null,sourceKind:sourceKind(),version:1,area,
     recipient:txt(b.recipient||call?.escalationResponsible,180),priority,status:'NUEVO',
