@@ -1,37 +1,66 @@
-# APP WEB CX · Seguimiento postoperatorio PASP
+# APP WEB CX · Cirugía y seguimiento postoperatorio
 
-Versión Railway: **5.9.0-pasp**. El código, las definiciones de la matriz, las pruebas y la configuración del despliegue están en este repositorio. La aplicación se publica desde `main`, carpeta `railway/`.
+Versión principal: **6.0.0 standalone**.
 
-## Despliegue de demostración
+La aplicación funciona como sistema web independiente con frontend, API y PostgreSQL. No requiere Google Apps Script para operar y no depende de un proveedor de hosting específico.
 
-Esta versión funciona exclusivamente con **pacientes ficticios**. `DATA_MODE=SIMULATED` es obligatorio. Todas las tablas se inicializan en el esquema PostgreSQL `qx_simulation`, sin consultar, copiar o migrar pacientes, usuarios o registros clínicos de Google Drive o del esquema `public`.
+## Despliegue
 
-El repositorio es público: no contiene credenciales, PIN de despliegue ni información de pacientes reales. Las variables privadas se conservan en Railway. Las pruebas usan una base PostgreSQL temporal en memoria.
+La raíz del repositorio contiene:
 
-## Seguimiento postoperatorio
+- `Dockerfile`: imagen lista para producción.
+- `docker-compose.yml`: aplicación + PostgreSQL.
+- `.env.example`: variables requeridas.
+- `HOSTING.md`: guía completa para VPS y hosting Docker.
+- `railway/`: código fuente principal de la aplicación; el nombre de la carpeta se conserva por compatibilidad histórica, pero el código ya no depende de Railway.
 
-- Un episodio por intervención; **una ficha independiente por cada llamada o intento**, incluyendo llamadas adicionales. Las fichas son inmutables y admiten adendas trazables.
-- Fecha real, profesional, contacto, valoración, recomendaciones, clasificación, conducta, cita y gestión de hallazgos. Los 70 encabezados de la matriz PASP se conservan en la definición y en la exportación compatible.
-- Programación de llamadas con plazos, base de cálculo, calendario y festivos configurables. La segunda llamada toma la primera llamada efectiva según la regla elegida.
-- Eventos escalados a Coordinación de Cirugía o Seguridad del Paciente, con permisos, responsable, análisis y resolución independientes del registro de la llamada.
-- Indicadores de la matriz con denominadores explícitos, filtros por fecha y descarga separada.
-- Catálogo educativo de 38 fichas y 39 conceptos de búsqueda; procedimientos, anestesia, recomendaciones, alarmas, fuentes y sinónimos editables desde la página.
-- Campos y listas del formulario, reglas de seguimiento y criterios administrativos de cierre editables en Configuración. Los cambios no sobrescriben las fichas anteriores.
+Para iniciar en un servidor con Docker:
 
-La búsqueda de cuidados muestra candidatos cuando la descripción es ambigua; el profesional o acompañante confirma el procedimiento. Las señales de alarma indican una conducta de consulta y no asignan una categoría de triage ni un diagnóstico.
+```sh
+cp .env.example .env
+# Edite .env y configure secretos reales.
+docker compose up -d --build
+```
 
-## Funciones quirúrgicas conservadas
+Healthcheck:
 
-Operativo con Preparación y QNO configurables, jefe de turno, camas, movimientos, profilaxis, tiempos intraoperatorios, Alta/Hospitalización, programación, lector PDF e imágenes, corrección antes de importar, portal de acompañantes, QR y token individual, avisos mientras el portal está abierto, KPI, MCI con meta/programadas/realizadas, descargas por indicador y administración de usuarios con PIN alfanumérico de 4 a 16 caracteres.
+```text
+GET /health
+```
 
-## Instalación y validación
+## Modo de producción
 
-Ver [railway/README.md](railway/README.md), [.railway/README.md](.railway/README.md) y el flujo de validación en `.github/workflows/validate.yml`. `/health` confirma la versión, el modo de datos y la conexión a la base.
+Use:
 
-Los archivos `.gs`, `Index.html` y `appsscript.json` de la raíz mantienen la variante Google Apps Script V8 y sus correcciones previas. La nueva implementación completa de PASP pertenece a Railway. `APPS_SCRIPT_INSTALL.md` es la guía de la variante Apps Script; la carpeta `railway/` no se copia a ese editor.
+```text
+DATA_MODE=PRODUCTION
+DB_SCHEMA=qx_app
+```
 
-## Fuentes y decisiones
+En este modo no se crean pacientes ficticios. Si PostgreSQL está vacío, se inicializa el rol `SUPERADMIN` y el primer administrador usando las variables `BOOTSTRAP_ADMIN_*`.
 
-Las definiciones de los campos y de los indicadores se transcriben de los encabezados, listas y fórmulas de la matriz original, sin registros de pacientes. Las discrepancias de fechas, estados y cierre se explican en los metadatos de esas definiciones. Las referencias científicas se incluyen en cada ficha educativa.
+El modo `SIMULATED` permanece disponible exclusivamente para pruebas.
 
-La propuesta que cita la Resolución 1732 de 2026 no se utiliza como norma vigente: fue derogada por la Resolución 2080 del 8 de septiembre de 2026. El marco de habilitación utilizado continúa siendo la Resolución 3100 de 2019 y sus modificaciones vigentes. Las fichas científicas complementan las instrucciones individuales de egreso.
+## Funciones principales
+
+La aplicación incluye operación quirúrgica con QNO configurables, jefe de turno y movimientos; programación y carga masiva con lector PDF editable; cancelaciones; tiempos intraoperatorios y profilaxis; recuperación, alta y hospitalización; portal de acompañantes con token y mensajes configurables; cuidados POP y PASP; KPI/MCI; descargas; productividad; administración de usuarios, roles y permisos; configuración operativa; trazabilidad y auditoría.
+
+Los adjuntos se almacenan en PostgreSQL y no requieren un volumen de archivos independiente.
+
+## Seguridad de despliegue
+
+No guarde contraseñas, PIN, `SESSION_SECRET`, `AUTH_PEPPER` ni cadenas `DATABASE_URL` reales en Git. Utilice variables privadas del hosting.
+
+Para uso con información clínica real, mantenga PostgreSQL en red privada, publique únicamente HTTPS, habilite copias de seguridad automáticas y preserve los secretos de autenticación entre despliegues.
+
+## Código histórico de Apps Script
+
+Los archivos `.gs`, `Index.html`, `appsscript.json` y `APPS_SCRIPT_INSTALL.md` de la raíz se conservan como referencia de una variante anterior. **No forman parte del despliegue standalone 6.0.0.**
+
+El código que debe desplegarse está empaquetado por el `Dockerfile` de la raíz.
+
+## Validación
+
+Las pruebas automatizadas se ejecutan con Bun desde `railway/tests/`. El workflow de GitHub Actions continúa validando la aplicación en cada cambio de `main`.
+
+Consulte **[HOSTING.md](HOSTING.md)** para instalación, variables, actualizaciones y recomendaciones de respaldo.
