@@ -11,10 +11,17 @@ import {resolveSurgeryNurses,surgicalNurseSnapshot} from "./nursing-productivity
 import webpush from "web-push";
 import { createHash, createHmac, timingSafeEqual, randomUUID, randomBytes } from "node:crypto";
 const dbUrl=Bun.env.DATABASE_URL;if(!dbUrl)throw new Error("DATABASE_URL missing");
-const DATA_MODE=String(Bun.env.DATA_MODE||'SIMULATED').toUpperCase();
-if(DATA_MODE!=='SIMULATED')throw new Error('Este despliegue requiere DATA_MODE=SIMULATED.');
-const setupSql=postgres(dbUrl,{ssl:'require',max:1});await setupSql.unsafe('create schema if not exists qx_simulation');await setupSql.end();
-const sql=postgres(dbUrl,{ssl:'require',max:8,types:DATABASE_JSON_TYPES,connection:{search_path:'qx_simulation'}});const PORT=Number(Bun.env.PORT||3000),SESSION_TTL=21600000;
+const DATA_MODE=String(Bun.env.DATA_MODE||'PRODUCTION').toUpperCase();
+if(!['PRODUCTION','SIMULATED'].includes(DATA_MODE))throw new Error('DATA_MODE must be PRODUCTION or SIMULATED.');
+const DB_SCHEMA=String(Bun.env.DB_SCHEMA||(DATA_MODE==='SIMULATED'?'qx_simulation':'qx_app')).trim();
+if(!/^[a-z_][a-z0-9_]{0,62}$/i.test(DB_SCHEMA))throw new Error('DB_SCHEMA invalid.');
+const DATABASE_SSL=String(Bun.env.DATABASE_SSL||'require').toLowerCase();
+const sslOption=DATABASE_SSL==='disable'?false:'require';
+const setupSql=postgres(dbUrl,{ssl:sslOption,max:1});
+await setupSql.unsafe('create schema if not exists "'+DB_SCHEMA.replace(/"/g,'')+'"');
+await setupSql.end();
+const sql=postgres(dbUrl,{ssl:sslOption,max:8,types:DATABASE_JSON_TYPES,connection:{search_path:DB_SCHEMA}});
+const PORT=Number(Bun.env.PORT||3000),SESSION_TTL=21600000;
 const SESSION_SECRET=String(Bun.env.SESSION_SECRET||"");
 const AUTH_PEPPER_V2=String(Bun.env.RAILWAY_AUTH_PEPPER_V2||"");
 if(SESSION_SECRET.length<32)throw new Error("SESSION_SECRET missing or too short");
@@ -440,21 +447,83 @@ async function patchUserRow(userId,payload){
   await sql.unsafe(`insert into qx_users(user_id,username,payload,updated_at) values($1,$2,$3::jsonb,now())
     on conflict(user_id) do update set username=excluded.username,payload=excluded.payload,updated_at=now()`,[id,username,JSON.stringify(payload)]);
 }
-async function seedSimulation(){
-  await sql.unsafe(`create table if not exists case_attachments(id uuid primary key,case_id text not null default '',upload_context text not null,original_name text not null,mime_type text not null,size_bytes bigint not null,sha256 text not null,content_base64 text not null,metadata jsonb not null,uploaded_by text not null,created_at timestamptz not null default now())`);
-  const pin=String(Bun.env.DEMO_ADMIN_PIN||'');if(!validPin(pin))throw new Error('DEMO_ADMIN_PIN missing');
-  const salt='SIMULATION-ADMIN-V1',user={'ID USUARIO':'DEMO-ADMIN','USUARIO':'demo','NOMBRE':'Coordinación de prueba','ROL':'SUPERADMIN','ESTADO':'ACTIVO','HASH PIN':hashRailwayPin(pin,salt),'SALT PIN':salt,'ALGORITMO PIN':'RAILWAY_V2','VERSIÓN SESIÓN':'1','CAMBIO PIN REQUERIDO':'NO'};
-  await sql.unsafe("insert into qx_users(user_id,username,payload,updated_at) values('DEMO-ADMIN','demo',$1::jsonb,now()) on conflict(user_id) do update set username='demo',payload=excluded.payload,updated_at=now()",[JSON.stringify(user)]);
-  const role={'ID ROL':'SUPERADMIN','NOMBRE':'Superadministrador','ESTADO':'ACTIVO','PERMISOS JSON':'["*"]','SISTEMA':'SI'};
-  await sql.unsafe("insert into qx_roles(role_id,payload) values('SUPERADMIN',$1::jsonb) on conflict do nothing",[JSON.stringify(role)]);
+async function bootstrapStandalone(){
+  await sql.unsafe(`create table if not exists case_attachments(
+    id uuid primary key,
+    case_id text not null default '',
+    upload_context text not null,
+    original_name text not null,
+    mime_type text not null,
+    size_bytes bigint not null,
+    sha256 text not null,
+    content_base64 text not null,
+    metadata jsonb not null,
+    uploaded_by text not null,
+    created_at timestamptz not null default now()
+  )`);
+
+  const superRole={'ID ROL':'SUPERADMIN','NOMBRE':'Superadministrador','ESTADO':'ACTIVO','PERMISOS JSON':'["*"]','SISTEMA':'SI'};
+  await sql.unsafe("insert into qx_roles(role_id,payload) values('SUPERADMIN',$1::jsonb) on conflict(role_id) do update set payload=excluded.payload,updated_at=now()",[JSON.stringify(superRole)]);
+
+  const userCount=await sql.unsafe('select count(*)::int as n from qx_users');
+  if(userCount[0].n===0){
+    const username=String(Bun.env.BOOTSTRAP_ADMIN_USER||(DATA_MODE==='SIMULATED'?'demo':'')).trim().toLowerCase();
+    const name=String(Bun.env.BOOTSTRAP_ADMIN_NAME||(DATA_MODE==='SIMULATED'?'Coordinación de prueba':'')).trim();
+    const pin=String(Bun.env.BOOTSTRAP_ADMIN_PIN||Bun.env.DEMO_ADMIN_PIN||'');
+    if(!username||!name||!validPin(pin)){
+      throw new Error('Database has no users. Set BOOTSTRAP_ADMIN_USER, BOOTSTRAP_ADMIN_NAME and a valid BOOTSTRAP_ADMIN_PIN.');
+    }
+    const salt='BOOTSTRAP-'+randomUUID().replace(/-/g,'').toUpperCase();
+    const userId='USR-'+randomUUID().replace(/-/g,'').slice(0,12).toUpperCase();
+    const user={
+      'ID USUARIO':userId,
+      'USUARIO':username,
+      'NOMBRE':name,
+      'ROL':'SUPERADMIN',
+      'ESTADO':'ACTIVO',
+      'HASH PIN':hashRailwayPin(pin,salt),
+      'SALT PIN':salt,
+      'ALGORITMO PIN':'RAILWAY_V2',
+      'VERSIÓN SESIÓN':'1',
+      'CAMBIO PIN REQUERIDO':'NO',
+      'CREADO EN':nowBog(),
+      'CREADO POR':'BOOTSTRAP'
+    };
+    await sql.unsafe("insert into qx_users(user_id,username,payload,updated_at) values($1,$2,$3::jsonb,now())",[userId,username,JSON.stringify(user)]);
+  }
+
+  if(DATA_MODE!=='SIMULATED')return;
+
   const today=safeDate(''),count=await sql.unsafe('select count(*)::int as n from qx_cases');
   if(count[0].n===0){
     for(let i=1;i<=6;i++){
-      const stateName=['PROGRAMADO','PREPARACIÓN','QUIRÓFANO','RECUPERACIÓN','ALTA','HOSPITALIZACIÓN'][i-1],p={'ID CASO':'DEMO-QX-'+i,'FECHA CIRUGÍA':today,'HORA PROGRAMADA':String(6+i).padStart(2,'0')+':00','DOCUMENTO':'DEMO-DOC-'+i,'PACIENTE':'PACIENTE FICTICIO '+i,'TELÉFONO':'','PROCEDIMIENTO':['Artroscopia de hombro','Colecistectomía laparoscópica','Cistoscopia','Histeroscopia','Reparación del manguito rotador','Hernioplastia inguinal'][i-1],'ESPECIALIDAD':['ORTOPEDIA','CIRUGÍA GENERAL','UROLOGÍA','GINECOLOGÍA','ORTOPEDIA','CIRUGÍA GENERAL'][i-1],'ESPECIALISTA':'ESPECIALISTA DE PRUEBA','SALA / QNO':'QNO '+(1+(i%3)),'CAMA / UBICACIÓN PROGRAMADA':i===6?'DEMO-06':'DEMO-'+i,'ESTADO ACTUAL':stateName,'TIPO DE ATENCIÓN':i===6?'HOSPITALIZADO':'AMBULATORIO','OPERADO':i>=4?'TRUE':'FALSE','DESTINO POSTOP':i>=5?stateName:'','CÓDIGO SEGUIMIENTO':'DEMO-SEG-'+i,'TOKEN SEGUIMIENTO':randomBytes(10).toString("hex").toUpperCase(),'SOURCE KIND':'SIMULADO','OBSERVACIONES':'Datos ficticios para verificar el flujo.','ÚLTIMA ACTUALIZACIÓN WEB':nowBog()};
+      const stateName=['PROGRAMADO','PREPARACIÓN','QUIRÓFANO','RECUPERACIÓN','ALTA','HOSPITALIZACIÓN'][i-1];
+      const p={
+        'ID CASO':'DEMO-QX-'+i,
+        'FECHA CIRUGÍA':today,
+        'HORA PROGRAMADA':String(6+i).padStart(2,'0')+':00',
+        'DOCUMENTO':'DEMO-DOC-'+i,
+        'PACIENTE':'PACIENTE FICTICIO '+i,
+        'TELÉFONO':'',
+        'PROCEDIMIENTO':['Artroscopia de hombro','Colecistectomía laparoscópica','Cistoscopia','Histeroscopia','Reparación del manguito rotador','Hernioplastia inguinal'][i-1],
+        'ESPECIALIDAD':['ORTOPEDIA','CIRUGÍA GENERAL','UROLOGÍA','GINECOLOGÍA','ORTOPEDIA','CIRUGÍA GENERAL'][i-1],
+        'ESPECIALISTA':'ESPECIALISTA DE PRUEBA',
+        'SALA / QNO':'QNO '+(1+(i%3)),
+        'CAMA / UBICACIÓN PROGRAMADA':i===6?'DEMO-06':'DEMO-'+i,
+        'ESTADO ACTUAL':stateName,
+        'TIPO DE ATENCIÓN':i===6?'HOSPITALIZADO':'AMBULATORIO',
+        'OPERADO':i>=4?'TRUE':'FALSE',
+        'DESTINO POSTOP':i>=5?stateName:'',
+        'CÓDIGO SEGUIMIENTO':'DEMO-SEG-'+i,
+        'TOKEN SEGUIMIENTO':randomBytes(10).toString("hex").toUpperCase(),
+        'SOURCE KIND':'SIMULADO',
+        'OBSERVACIONES':'Datos ficticios para verificar el flujo.',
+        'ÚLTIMA ACTUALIZACIÓN WEB':nowBog()
+      };
       await saveCasePayload(p);
     }
   }
-  // MCI uses the same field names as the current source, with exclusively synthetic values.
+
   const year=Number(today.slice(0,4)),month=Number(today.slice(5,7)),days=new Date(year,month,0).getDate(),monthLabel=monthName(month),dataset='BASE ANUAL '+year;
   for(let i=1;i<=days;i++){
     const date=today.slice(0,7)+'-'+String(i).padStart(2,'0'),programadas=i%7===0?0:12,ejecutadas=i%7===0?0:8+i%4;
@@ -476,10 +545,10 @@ async function rotateWeakTrackingTokensAtStartup(){
     await saveCasePayload(p);
   }
 }
-await seedSimulation();
+await bootstrapStandalone();
 await rotateWeakTrackingTokensAtStartup();
 Bun.serve({port:PORT,async fetch(req,server){try{
- const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'5.9.5-pasp',dataMode:DATA_MODE,push:false,educationalCards:count[0].n});}if(url.pathname==="/")return html(PAGE);
+ const url=new URL(req.url);if(url.pathname==="/health"){await sql.unsafe('select 1');const count=await sql.unsafe('select count(*)::int as n from qx_pasp_care_catalog');return json({ok:true,version:'6.0.0-standalone',dataMode:DATA_MODE,schema:DB_SCHEMA,push:false,educationalCards:count[0].n});}if(url.pathname==="/")return html(PAGE);
  if(['/postop.js','/postop.css','/settings.js'].includes(url.pathname))return textResponse(await Bun.file('./public'+url.pathname).text(),url.pathname.endsWith('.js')?'application/javascript; charset=utf-8':'text/css; charset=utf-8');
  if(url.pathname==='/api/care-guides-public'&&req.method==='GET'){const catalog=await sql.unsafe('select payload from qx_pasp_care_catalog'),dictionary=await sql.unsafe('select payload from qx_pasp_dictionary');return json(searchCare(catalog.map(r=>r.payload),dictionary.map(r=>r.payload),Object.fromEntries(url.searchParams),true));}
  if(url.pathname==='/api/application-settings/public'){const response=await handleApplicationSettings(req,url,{sql,session:null,json});if(response)return response;}
