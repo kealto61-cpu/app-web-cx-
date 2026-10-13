@@ -9,8 +9,8 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
-function apiBoot(token, dateIso) {
-  var session = apiSession(token || '');
+function apiBoot_(token, dateIso) {
+  var session = apiSession_(token || '');
   var result = {
     app: {
       name: APP.NAME,
@@ -41,12 +41,12 @@ function apiBoot(token, dateIso) {
   return jsonSafe_(result);
 }
 
-function apiHealth() {
-  return setupSystem();
+function apiHealth_() {
+  return setupSystem_();
 }
 
 
-function apiWebAppInfo() {
+function apiWebAppInfo_() {
   return {
     url: ScriptApp.getService().getUrl() || '',
     version: APP.VERSION,
@@ -54,7 +54,7 @@ function apiWebAppInfo() {
   };
 }
 
-function validateCurrentSchema() {
+function validateCurrentSchema_() {
   var sheet = getSheet_(SHEETS.PROGRAMACION, DATA_SOURCES.MAIN);
   var headers = getHeaderMap_(sheet).map;
   var required = [
