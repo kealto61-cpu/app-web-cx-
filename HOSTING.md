@@ -93,6 +93,21 @@ docker compose up -d --build
 
 El esquema se conserva. Realice un backup de PostgreSQL antes de actualizaciones mayores.
 
+
+## Validación obligatoria antes de habilitar uso asistencial
+
+Ejecute las verificaciones en un ambiente de pruebas aislado, sin datos identificables de pacientes y sin usar las credenciales de producción:
+
+1. Compruebe que `DATA_MODE=PRODUCTION`, `DB_SCHEMA=qx_app` y `/health` informan el modo, esquema y versión esperados. Una base nueva **no** debe cargar pacientes ficticios.
+2. Valide inicio y cierre de sesión, cambio de PIN inicial, roles, permisos y bloqueo de las rutas de seguimiento sin autenticación.
+3. En la base vacía de pruebas, registre un episodio ficticio con `sourceKind=REAL` únicamente como prueba técnica interna en un sistema aislado (no se debe incorporar al servicio real); compruebe que un episodio marcado `SIMULADO` es rechazado en modo producción.
+4. Revise el flujo de primera y segunda llamada, seguimiento adicional, correcciones por adenda, escalamiento a Coordinación/Seguridad del Paciente e indicadores. No registre como realizadas llamadas no efectuadas.
+5. Revise que las descargas, el portal de acompañantes, los adjuntos y las consultas por roles no filtren identificadores o hallazgos clínicos sin autorización.
+6. Valide en un navegador real la interfaz, diseño adaptable, formulario de pacientes, errores de red, impresión y exportaciones; las pruebas automatizadas no sustituyen esta revisión.
+7. Antes del uso real, habilite HTTPS, respaldo cifrado y recuperación probada de PostgreSQL, retención y auditoría de accesos, control de secretos, rotación de claves en caso de exposición y revisión de permisos del repositorio.
+
+**Condición de puesta en producción:** completar pruebas funcionales y de seguridad con responsables de Sistemas, Coordinación de Cirugía y Seguridad del Paciente. Un CI exitoso no constituye autorización clínica o habilitación del software. La aplicación no se ha desplegado por esta documentación.
+
 ## Comprobaciones
 
 - `GET /health`: salud del servicio y conexión a PostgreSQL.
@@ -100,4 +115,4 @@ El esquema se conserva. Realice un backup de PostgreSQL antes de actualizaciones
 - `/?follow=1`: portal público de acompañantes.
 - La autenticación, permisos y administración de roles se realizan en la propia aplicación.
 
-Versión de despliegue: **6.0.0 standalone**.
+Versión de despliegue: **6.0.1 standalone**.

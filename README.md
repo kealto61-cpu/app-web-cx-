@@ -1,6 +1,6 @@
 # APP WEB CX · Cirugía y seguimiento postoperatorio
 
-Versión principal: **6.0.0 standalone**.
+Versión principal: **6.0.1 standalone** (correcciones de compatibilidad de producción y PASP).
 
 La aplicación funciona como sistema web independiente con frontend, API y PostgreSQL. No requiere Google Apps Script para operar y no depende de un proveedor de hosting específico.
 
@@ -27,6 +27,16 @@ Healthcheck:
 ```text
 GET /health
 ```
+
+## Correcciones 6.0.1
+
+- La configuración general y PASP usan el esquema indicado por `DB_SCHEMA` en PostgreSQL, sin escribir en un esquema de simulación ajeno.
+- PASP admite registros identificados como `REAL` únicamente en `DATA_MODE=PRODUCTION`; el entorno `SIMULATED` conserva `SIMULADO`.
+- Formularios, reportes de productividad, indicadores y exportaciones identifican el origen de datos.
+- La lectura del esquema de trabajo PASP requiere sesión autenticada y permisos correspondientes.
+- Se verifica el modo de producción mediante una prueba aislada con PostgreSQL en memoria. La suite automatizada no sustituye la validación manual en un hosting real.
+
+**Importante:** el pull request se mantiene en revisión hasta completar las pruebas de aceptación y seguridad del paciente. No cargue información clínica real en ambientes de prueba ni en el repositorio.
 
 ## Modo de producción
 
