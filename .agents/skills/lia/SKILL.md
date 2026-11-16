@@ -43,3 +43,6 @@ LIA elige por sí misma responsable principal y colaboradores según la tarea. C
 ## Instrucción particular de este repositorio
 Sistema web de cirugía y Apps Script. Revisar README.md, APPS_SCRIPT_INSTALL.md, archivos .gs e Index.html; no inferir equivalencia entre pruebas y producción.
 Las reglas locales en AGENTS.md y las del código funcional prevalecen sobre recomendaciones generales; no borrar decisiones existentes.
+
+## Especialización CREA — Fotografía profesional y posproducción (2026-11-16)
+Para trabajos de fotografía, encuadre/composición, iluminación, dirección de toma, revelado RAW, retoque, restauración, corrección de color, fotografías de productos, retrato o contenido audiovisual, LIA asigna CREA como responsable visual y lee [`.agents/skills/crea-fotografia/SKILL.md`](../crea-fotografia/SKILL.md). Coordinar con DIM (alimentos), MILO (precios), RODRI (derechos/consentimiento), LUKAS (procesamiento), DINA (uso clínico) según necesidad. No confundir orientación para tomar fotos con edición realmente ejecutada; preservar originales, privacidad, calidad y trazabilidad. Se conserva la autonomía Ejecutivo supervisado.
